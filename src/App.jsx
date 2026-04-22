@@ -14,7 +14,7 @@ import TeacherAttendance from './pages/TeacherAttendance';
 import Maintenance from './pages/Maintenance';
 
 // Set to true to block the site and show "Under Construction"
-const IS_UNDER_MAINTENANCE = false;
+const IS_UNDER_MAINTENANCE = true;
 
 const AppContent = () => {
   const { isAuthenticated, logout, notifications, markNotificationAsRead, clearNotifications } = useApp();
