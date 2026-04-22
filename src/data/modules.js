@@ -109,8 +109,35 @@ export const MODULES_DATA = {
   },
   'Technicien': {
     'Gestion Informatisée': {
-      '1ère année': [],
-      '2ème année': [],
+      '1ère année': [
+        'Comptabilité générale',
+        'Logiciel de gestion comptable (sage-Saari 100)',
+        'Comptabilité des sociétés',
+        'Mathématiques Financières',
+        'Statistiques descriptive',
+        'Management et Organisation des entreprises',
+        'Droit de travail',
+        'Entreprenariat',
+        'Droit des entreprises',
+        'Architecture et Système d\'exploitation',
+        'Bureautique',
+        'SOFTSKILS',
+        'Anglais'
+      ],
+      '2ème année': [
+        'Diagnostic financier',
+        'Traitement des salaires et charges sociales (Logiciel de paie)',
+        'Comptabilité analytique',
+        'Gestion d\'approvisionnement de stock et de production',
+        'Lean Manufacturing',
+        'Réseaux informatiques',
+        'Fondamentaux de la cybersécurité',
+        'Administration des bases de données.',
+        'Gestion de projet (MS Project)',
+        'ERP',
+        'SOFTSKILS',
+        'Anglais'
+      ],
     },
   },
 };
