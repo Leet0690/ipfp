@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   flexRender, getCoreRowModel, useReactTable, getFilteredRowModel, getPaginationRowModel,
 } from '@tanstack/react-table';
@@ -10,9 +11,10 @@ import { FILIERES, MODULES_DATA, getModulesForStudent } from '../data/modules';
 const labelStyle = { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '2px' };
 const selectStyle = { cursor: 'pointer', appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2394a3b8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px', paddingRight: '36px' };
 
-const AdminDashboard = () => {
+const UnifiedManagement = ({ forceTab }) => {
+  const navigate = useNavigate();
   const { students, teachers, grades, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance } = useApp();
-  const [activeTab, setActiveTab] = useState('students');
+  const [activeTab, setActiveTab] = useState(forceTab || 'students');
   const [globalFilter, setGlobalFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [diplomaFilter, setDiplomaFilter] = useState('');
@@ -398,14 +400,22 @@ const AdminDashboard = () => {
 
       {/* ── Controls ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', padding: '8px', marginBottom: '20px', background: 'white', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xs)' }}>
-        <div className="modern-tabs-container" style={{ flexShrink: 0 }}>
-          {['students', 'teachers'].map(tab => (
-            <button key={tab} onClick={() => { setActiveTab(tab); setCategoryFilter(''); setDiplomaFilter(''); setYearFilter(''); }} className={`modern-tab ${activeTab === tab ? 'active' : ''}`} style={{ whiteSpace: 'nowrap' }}>
-              {tab === 'students' ? 'Stagiaires' : 'Formateurs'}
-            </button>
-          ))}
-        </div>
+        {!forceTab && (
+          <div className="modern-tabs-container">
+            <button className={`modern-tab ${activeTab === 'students' ? 'active' : ''}`} onClick={() => { setActiveTab('students'); setGlobalFilter(''); setCategoryFilter(''); setDiplomaFilter(''); setYearFilter(''); }}>Stagiaires</button>
+            <button className={`modern-tab ${activeTab === 'teachers' ? 'active' : ''}`} onClick={() => { setActiveTab('teachers'); setGlobalFilter(''); setCategoryFilter(''); setDiplomaFilter(''); setYearFilter(''); }}>Formateurs</button>
+          </div>
+        )}
         <div style={{ flex: 1 }}></div>
+        
+        <button 
+          onClick={() => navigate(activeTab === 'students' ? '/admin/add-student' : '/admin/add-teacher')} 
+          className="btn-modern primary" 
+          style={{ padding: '7px 14px', fontSize: '12px' }}
+        >
+          <i className="fa-solid fa-plus" style={{ fontSize: '11px', marginRight: '6px' }}></i>
+          {activeTab === 'students' ? 'Nouveau Stagiaire' : 'Nouveau Formateur'}
+        </button>
         
         <select className="input-premium" style={{ fontSize: '12px', padding: '7px 12px', maxWidth: '140px', cursor: 'pointer', appearance: 'auto' }} value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
           <option value="">Toutes années</option>
@@ -533,6 +543,12 @@ const AdminDashboard = () => {
                         }}>
                         <i className="fa-solid fa-copy"></i> Copier
                       </button>
+                      
+                      <a href={`mailto:?subject=${encodeURIComponent(`Votre accès IPFP Manager`)}&body=${encodeURIComponent(`Bonjour,\n\nVoici votre lien d'accès sécurisé : ${window.location.origin}${activeTab === 'students' ? `/results/${selectedItem.token}` : `/portal/${selectedItem.token}`}\n\nCordialement,\nL'administration IPFP`)}`} 
+                         className="btn-modern" 
+                         style={{ padding: '8px 14px', fontSize: '11px', flexShrink: 0, textDecoration: 'none' }}>
+                        <i className="fa-solid fa-envelope"></i> Email
+                      </a>
                     </div>
                   </div>
 
@@ -803,4 +819,4 @@ const InfoBox = ({ label, value, icon, valueColor = 'var(--text-secondary)' }) =
   </div>
 );
 
-export default AdminDashboard;
+export default UnifiedManagement;

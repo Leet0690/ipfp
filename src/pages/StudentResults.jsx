@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { getModulesForStudent } from '../data/modules';
+import TokenProtection from '../components/TokenProtection';
 
 /* ── Styles ── */
 const thStyle = { padding: '10px 12px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-subtle)', whiteSpace: 'nowrap' };
@@ -231,4 +232,10 @@ const StudentResults = () => {
   );
 };
 
-export default StudentResults;
+export default function StudentResultsPage() {
+  return (
+    <TokenProtection tokenType="student_results">
+      <StudentResults />
+    </TokenProtection>
+  );
+}

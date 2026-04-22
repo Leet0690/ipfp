@@ -19,7 +19,7 @@ const AddStudent = () => {
     e.preventDefault();
     addStudent(formData);
     setIsSuccess(true);
-    setTimeout(() => navigate('/'), 1200);
+    setTimeout(() => navigate('/admin/students'), 1200);
   };
 
   const labelStyle = {
@@ -38,10 +38,10 @@ const AddStudent = () => {
     <div className="max-w-container section-padding" style={{ maxWidth: '640px' }}>
       <motion.button 
         initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-        onClick={() => navigate('/')}
+        onClick={() => navigate('/admin/students')}
         style={{ marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontWeight: '600', fontSize: '12px', background: 'transparent', border: 'none', cursor: 'pointer' }}
       >
-        <i className="fa-solid fa-arrow-left" style={{ fontSize: '11px' }}></i> Retour au Dashboard
+        <i className="fa-solid fa-arrow-left" style={{ fontSize: '11px' }}></i> Retour à la liste
       </motion.button>
 
       <div style={{ marginBottom: '32px' }}>

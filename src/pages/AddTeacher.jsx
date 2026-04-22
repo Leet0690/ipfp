@@ -75,7 +75,10 @@ const AddTeacher = () => {
     if (formData.years.length === 0) return alert('Sélectionnez au moins un niveau.');
     addTeacher(formData);
     setIsSuccess(true);
-    setTimeout(() => navigate('/'), 1200);
+    setTimeout(() => {
+      setIsSuccess(false);
+      navigate('/admin/teachers');
+    }, 1200);
   };
 
   const labelStyle = { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '2px' };
@@ -83,9 +86,12 @@ const AddTeacher = () => {
 
   return (
     <div className="max-w-container section-padding" style={{ maxWidth: '900px' }}>
-      <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} onClick={() => navigate('/')}
-        style={{ marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontWeight: '600', fontSize: '12px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-        <i className="fa-solid fa-arrow-left" style={{ fontSize: '11px' }}></i> Retour au Dashboard
+      <motion.button 
+        initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+        onClick={() => navigate('/admin/teachers')}
+        style={{ marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontWeight: '600', fontSize: '12px', background: 'transparent', border: 'none', cursor: 'pointer' }}
+      >
+        <i className="fa-solid fa-arrow-left" style={{ fontSize: '11px' }}></i> Retour à la liste
       </motion.button>
 
       <div style={{ marginBottom: '32px' }}>
