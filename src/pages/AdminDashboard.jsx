@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   flexRender, getCoreRowModel, useReactTable, getFilteredRowModel, getPaginationRowModel,
 } from '@tanstack/react-table';
@@ -11,10 +11,129 @@ import { FILIERES, MODULES_DATA, getModulesForStudent } from '../data/modules';
 const labelStyle = { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '2px' };
 const selectStyle = { cursor: 'pointer', appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2394a3b8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px', paddingRight: '36px' };
 
-const UnifiedManagement = ({ forceTab }) => {
-  const navigate = useNavigate();
-  const { students, teachers, grades, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance } = useApp();
-  const [activeTab, setActiveTab] = useState(forceTab || 'students');
+const getGroupAbbreviation = (filiere, annee) => {
+  let diplomaAbbr = "";
+  let majorAbbr = "";
+  
+  for (const dip in MODULES_DATA) {
+    if (MODULES_DATA[dip][filiere]) {
+      diplomaAbbr = dip.includes('Spécialisé') ? "TS" : "T";
+      break;
+    }
+  }
+
+  if (filiere.includes('Développement')) majorAbbr = "DI";
+  else if (filiere.includes('Gestion Informatisée')) majorAbbr = "GI";
+  else if (filiere.includes('Logistique')) majorAbbr = "GTL";
+  else if (filiere.includes('Entreprises')) majorAbbr = "GE";
+  else majorAbbr = filiere.split(' ').map(w => w[0]).join('').toUpperCase();
+
+  const yearNum = annee.includes('1') ? "1" : "2";
+  
+  return diplomaAbbr + majorAbbr + yearNum;
+};
+
+const ScheduleCalendar = ({ realSchedules, teachers }) => {
+  const allFilieres = useMemo(() => Array.from(new Set(Object.values(FILIERES).flat())), []);
+  const allAnnees = ['1ère année', '2ème année'];
+  const [selectedFiliere, setSelectedFiliere] = useState(allFilieres.includes('Développement Informatique') ? 'Développement Informatique' : allFilieres[0]);
+  const [selectedAnnee, setSelectedAnnee] = useState(allAnnees[0]);
+
+  const groupLabel = useMemo(() => getGroupAbbreviation(selectedFiliere, selectedAnnee), [selectedFiliere, selectedAnnee]);
+
+  const modules = useMemo(() => {
+    for (const dip in MODULES_DATA) {
+      if (MODULES_DATA[dip][selectedFiliere] && MODULES_DATA[dip][selectedFiliere][selectedAnnee]) {
+        return MODULES_DATA[dip][selectedFiliere][selectedAnnee];
+      }
+    }
+    return ['Atelier Pratique', 'Cours Général', 'Formation Générale'];
+  }, [selectedFiliere, selectedAnnee]);
+
+  const scheduleData = useMemo(() => {
+    const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+    
+    // Check real schedules
+    const filteredReal = realSchedules.filter(s => s.filiere === selectedFiliere && s.annee === selectedAnnee);
+    return days.map(day => {
+      const sessions = filteredReal.filter(s => s.day === day).map(s => ({
+        id: s.id,
+        time: s.time,
+        title: s.module,
+        room: s.room,
+        type: s.type,
+        teacherId: s.teacherId
+      })).sort((a,b) => a.time.localeCompare(b.time));
+      return { day, sessions };
+    });
+  }, [selectedFiliere, selectedAnnee, realSchedules]);
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Emploi du temps
+          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <select className="input-premium" style={{ fontSize: '12px', padding: '6px 12px', maxWidth: '220px', cursor: 'pointer', appearance: 'auto' }} value={selectedFiliere} onChange={(e) => setSelectedFiliere(e.target.value)}>
+              {allFilieres.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+            <select className="input-premium" style={{ fontSize: '12px', padding: '6px 12px', width: '130px', cursor: 'pointer', appearance: 'auto' }} value={selectedAnnee} onChange={(e) => setSelectedAnnee(e.target.value)}>
+              {allAnnees.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+        </div>
+        <Link to="/admin/schedules" className="btn-modern" style={{ padding: '6px 14px', fontSize: '12px', textDecoration: 'none' }}>
+          <i className="fa-regular fa-calendar-plus" style={{ marginRight: '6px' }}></i> Gérer le planning
+        </Link>
+      </div>
+      
+      <div style={{ width: '100%', overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto', paddingBottom: '8px' }} className="no-scrollbar">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(130px, 1fr))', gap: '8px', minWidth: '100%' }}>
+          {scheduleData.map((dayPlan, i) => (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '16px', border: '1px solid var(--border-light)' }}>
+              <div style={{ textAlign: 'center', fontWeight: '800', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
+                {dayPlan.day}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+                {dayPlan.sessions.length > 0 ? dayPlan.sessions.map((session, j) => (
+                  <div key={j} style={{ background: 'var(--bg-page)', padding: '14px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xs)', border: '1px solid var(--border-light)', borderLeft: `3px solid ${session.type === 'TP' ? 'var(--primary)' : 'var(--accent)'}`, transition: 'transform 0.2s', cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}><i className="fa-regular fa-clock" style={{marginRight: '4px'}}></i> {session.time}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.3', marginBottom: '6px' }}>{session.title}</div>
+                    {session.teacherId && (
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '10px', fontWeight: '600' }}>
+                        <i className="fa-solid fa-user-tie" style={{ marginRight: '4px' }}></i>
+                        {teachers.find(t => t.id === session.teacherId)?.name || 'Formateur'}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '10px', background: 'var(--primary-ultra-light)', padding: '2px 6px', borderRadius: '4px', fontWeight: '800', color: 'var(--primary)', border: '1px solid rgba(139, 92, 246, 0.1)' }}>{groupLabel}</span>
+                    </div>
+                  </div>
+                )) : (
+                  <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: '13px', fontWeight: '600' }}>Libre</div>
+                )}
+              </div>
+            </div>
+          ))}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const AdminDashboard = () => {
+  const { students, teachers, grades, schedules, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance, migrateTeacherTokens } = useApp();
+  const location = useLocation();
+  const isDashboard = location.pathname === '/';
+  const [localActiveTab, setLocalActiveTab] = useState('students');
+  const activeTab = location.pathname.includes('teacher') ? 'teachers' 
+                 : location.pathname.includes('student') ? 'students' 
+                 : localActiveTab;
+
   const [globalFilter, setGlobalFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [diplomaFilter, setDiplomaFilter] = useState('');
@@ -228,20 +347,42 @@ const UnifiedManagement = ({ forceTab }) => {
       ),
     },
     {
-      accessorKey: 'token', header: 'Lien',
+      accessorKey: 'token', header: activeTab === 'students' ? 'Lien' : 'Liens Formateur',
       cell: ({ row }) => {
         const base = window.location.origin;
-        const path = activeTab === 'students' ? `/results/${row.original.token}` : `/portal/${row.original.token}`;
-        const fullLink = base + path;
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', maxWidth: '260px' }}
-            onClick={() => { navigator.clipboard?.writeText(fullLink); }} title="Cliquer pour copier le lien">
-            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', flexShrink: 0 }}>
-              <i className="fa-solid fa-link"></i>
+        if (activeTab === 'students') {
+          const fullLink = base + `/results/${row.original.token}`;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', maxWidth: '260px' }}
+              onClick={() => { navigator.clipboard?.writeText(fullLink); }} title="Copier le lien">
+              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', flexShrink: 0 }}>
+                <i className="fa-solid fa-link"></i>
+              </div>
+              <span style={{ fontSize: '10px', fontWeight: '500', fontFamily: 'monospace', color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullLink}</span>
             </div>
-            <span style={{ fontSize: '10px', fontWeight: '500', fontFamily: 'monospace', color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullLink}</span>
-          </div>
-        );
+          );
+        } else {
+          const linkAtt = base + `/portal/${row.original.tokenAttendance}`;
+          const linkNotes = base + `/portal/${row.original.tokenGrades}`;
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', maxWidth: '220px' }}
+                onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(linkAtt); alert('Lien Absences copié !'); }} title="Copier le lien Absences">
+                <div style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', flexShrink: 0 }}>
+                  <i className="fa-solid fa-user-clock"></i>
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--primary)', whiteSpace: 'nowrap' }}>Absences</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', maxWidth: '220px' }}
+                onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(linkNotes); alert('Lien Notes copié !'); }} title="Copier le lien Notes">
+                <div style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'rgba(254, 205, 8, 0.1)', color: '#a06208', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', flexShrink: 0 }}>
+                  <i className="fa-solid fa-clipboard-check"></i>
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: '700', color: '#a06208', whiteSpace: 'nowrap' }}>Notes / Résultats</span>
+              </div>
+            </div>
+          );
+        }
       },
     },
     {
@@ -365,57 +506,92 @@ const UnifiedManagement = ({ forceTab }) => {
 
   return (
     <div className="max-w-container section-padding" style={{ paddingTop: '24px' }}>
-      {/* ── Stats ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-          <StatCard delay={0.05} icon="fa-graduation-cap" iconColor="var(--primary)" iconBg="var(--primary-ultra-light)" value={(students || []).length} label="Total Stagiaires" />
-          <StatCard delay={0.1} icon="fa-chalkboard-user" iconColor="#a06208" iconBg="rgba(254, 205, 8, 0.12)" value={(teachers || []).length} label="Total Formateurs" />
-          <StatCard delay={0.15} icon="fa-user-check" iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={`${studentAttendanceRate}%`} label="Présence Stagiaires" />
-          <StatCard delay={0.2} icon="fa-user-tie" iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={`${teacherAttendanceRate}%`} label="Présence Formateurs" />
-          <StatCard delay={0.25} icon="fa-check-double" iconColor="var(--accent)" iconBg="rgba(254, 205, 8, 0.1)" value={`${gradesProgress}%`} label="Saisie des Notes" />
-          <StatCard delay={0.3} icon="fa-award" iconColor="#8b5cf6" iconBg="rgba(139, 92, 246, 0.1)" value={`${moduleValidationRate}%`} label="Réussite Modules" />
+      
+      {!isDashboard && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h1 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: '4px' }}>
+              {activeTab === 'students' ? 'Liste des Stagiaires' : 'Liste des Formateurs'}
+            </h1>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: '500' }}>
+              Gestion du personnel et des apprenants
+            </p>
+          </div>
+          
+          {activeTab === 'students' ? (
+             <Link to="/admin/add-student" className="btn-modern primary" style={{ padding: '10px 16px', fontSize: '13px' }}>
+               <i className="fa-solid fa-plus"></i> Ajouter un stagiaire
+             </Link>
+          ) : (
+             <Link to="/admin/add-teacher" className="btn-modern primary" style={{ padding: '10px 16px', fontSize: '13px' }}>
+               <i className="fa-solid fa-plus"></i> Ajouter un formateur
+             </Link>
+          )}
         </div>
-        
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Répartition par Filière</span>
-            <i className="fa-solid fa-chart-pie" style={{ color: 'var(--text-faint)', fontSize: '12px' }}></i>
+      )}
+
+      {/* Migration Notice */}
+      {!isDashboard && activeTab === 'teachers' && teachers.some(t => !t.tokenAttendance) && (
+        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+          className="glass-card" 
+          style={{ padding: '12px 20px', marginBottom: '20px', background: 'rgba(59, 130, 246, 0.05)', border: '1px dashed #3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="fa-solid fa-key" style={{ fontSize: '14px' }}></i>
+            </div>
+            <div>
+              <p style={{ fontSize: '13px', color: '#1e40af', fontWeight: '700' }}>Mise à jour des accès requise</p>
+              <p style={{ fontSize: '11px', color: '#3b82f6', fontWeight: '500' }}>Générez les nouveaux jetons (Notes & Absences) pour les formateurs existants.</p>
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px' }}>
-            {getMajorDistribution().map((m, i) => (
-              <div key={i}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', marginBottom: '6px' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '8px' }}>{m.name}</span>
-                  <span style={{ flexShrink: 0 }}>{m.percent}%</span>
-                </div>
-                <div style={{ width: '100%', background: 'var(--bg-subtle)', borderRadius: '100px', height: '6px', overflow: 'hidden' }}>
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${m.percent}%` }} transition={{ duration: 0.8, delay: 0.3 + i * 0.1 }} style={{ height: '6px', borderRadius: '100px', background: barColors[i] }}></motion.div>
-                </div>
-              </div>
-            ))}
-            {getMajorDistribution().length === 0 && <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Aucune donnée</p>}
-          </div>
+          <button onClick={migrateTeacherTokens} className="btn-modern primary" style={{ padding: '8px 16px', fontSize: '11px', background: '#2563eb' }}>
+            Générer maintenant
+          </button>
         </motion.div>
-      </div>
+      )}
+
+      {isDashboard && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+            <StatCard delay={0.05} icon="fa-graduation-cap" iconColor="var(--primary)" iconBg="var(--primary-ultra-light)" value={(students || []).length} label="Total Stagiaires" />
+            <StatCard delay={0.1} icon="fa-chalkboard-user" iconColor="#a06208" iconBg="rgba(254, 205, 8, 0.12)" value={(teachers || []).length} label="Total Formateurs" />
+            <StatCard delay={0.15} icon="fa-user-check" iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={`${studentAttendanceRate}%`} label="Présence Stagiaires" />
+            <StatCard delay={0.2} icon="fa-user-tie" iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={`${teacherAttendanceRate}%`} label="Présence Formateurs" />
+            <StatCard delay={0.25} icon="fa-check-double" iconColor="var(--accent)" iconBg="rgba(254, 205, 8, 0.1)" value={`${gradesProgress}%`} label="Saisie des Notes" />
+            <StatCard delay={0.3} icon="fa-award" iconColor="#8b5cf6" iconBg="rgba(139, 92, 246, 0.1)" value={`${moduleValidationRate}%`} label="Réussite Modules" />
+          </div>
+          
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Répartition par Filière</span>
+              <i className="fa-solid fa-chart-pie" style={{ color: 'var(--text-faint)', fontSize: '12px' }}></i>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px' }}>
+              {getMajorDistribution().map((m, i) => (
+                <div key={i}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', marginBottom: '6px' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '8px' }}>{m.name}</span>
+                    <span style={{ flexShrink: 0 }}>{m.percent}%</span>
+                  </div>
+                  <div style={{ width: '100%', background: 'var(--bg-subtle)', borderRadius: '100px', height: '6px', overflow: 'hidden' }}>
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${m.percent}%` }} transition={{ duration: 0.8, delay: 0.3 + i * 0.1 }} style={{ height: '6px', borderRadius: '100px', background: barColors[i] }}></motion.div>
+                  </div>
+                </div>
+              ))}
+              {getMajorDistribution().length === 0 && <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Aucune donnée</p>}
+            </div>
+          </motion.div>
+          
+          {/* ── Schedule Calendar ── */}
+          <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} />
+
+        </div>
+      )}
 
       {/* ── Controls ── */}
+      {!isDashboard && (
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', padding: '8px', marginBottom: '20px', background: 'white', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xs)' }}>
-        {!forceTab && (
-          <div className="modern-tabs-container">
-            <button className={`modern-tab ${activeTab === 'students' ? 'active' : ''}`} onClick={() => { setActiveTab('students'); setGlobalFilter(''); setCategoryFilter(''); setDiplomaFilter(''); setYearFilter(''); }}>Stagiaires</button>
-            <button className={`modern-tab ${activeTab === 'teachers' ? 'active' : ''}`} onClick={() => { setActiveTab('teachers'); setGlobalFilter(''); setCategoryFilter(''); setDiplomaFilter(''); setYearFilter(''); }}>Formateurs</button>
-          </div>
-        )}
         <div style={{ flex: 1 }}></div>
-        
-        <button 
-          onClick={() => navigate(activeTab === 'students' ? '/admin/add-student' : '/admin/add-teacher')} 
-          className="btn-modern primary" 
-          style={{ padding: '7px 14px', fontSize: '12px' }}
-        >
-          <i className="fa-solid fa-plus" style={{ fontSize: '11px', marginRight: '6px' }}></i>
-          {activeTab === 'students' ? 'Nouveau Stagiaire' : 'Nouveau Formateur'}
-        </button>
         
         <select className="input-premium" style={{ fontSize: '12px', padding: '7px 12px', maxWidth: '140px', cursor: 'pointer', appearance: 'auto' }} value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
           <option value="">Toutes années</option>
@@ -438,8 +614,10 @@ const UnifiedManagement = ({ forceTab }) => {
         </div>
         <button onClick={exportCSV} className="btn-modern" style={{ padding: '7px 14px', fontSize: '12px' }}><i className="fa-solid fa-arrow-down-to-line" style={{ fontSize: '11px' }}></i> Export</button>
       </div>
+      )}
 
       {/* ── Rows ── */}
+      {!isDashboard && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
         <AnimatePresence mode="popLayout">
           {table.getRowModel().rows.map((row, idx) => (
@@ -455,9 +633,10 @@ const UnifiedManagement = ({ forceTab }) => {
           </motion.div>
         )}
       </div>
+      )}
 
       {/* ── Pagination ── */}
-      {table.getPageCount() > 1 && (
+      {!isDashboard && table.getPageCount() > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '12px 0' }}>
           <button
             onClick={() => table.previousPage()}
@@ -543,12 +722,6 @@ const UnifiedManagement = ({ forceTab }) => {
                         }}>
                         <i className="fa-solid fa-copy"></i> Copier
                       </button>
-                      
-                      <a href={`mailto:?subject=${encodeURIComponent(`Votre accès IPFP Manager`)}&body=${encodeURIComponent(`Bonjour,\n\nVoici votre lien d'accès sécurisé : ${window.location.origin}${activeTab === 'students' ? `/results/${selectedItem.token}` : `/portal/${selectedItem.token}`}\n\nCordialement,\nL'administration IPFP`)}`} 
-                         className="btn-modern" 
-                         style={{ padding: '8px 14px', fontSize: '11px', flexShrink: 0, textDecoration: 'none' }}>
-                        <i className="fa-solid fa-envelope"></i> Email
-                      </a>
                     </div>
                   </div>
 
@@ -819,4 +992,4 @@ const InfoBox = ({ label, value, icon, valueColor = 'var(--text-secondary)' }) =
   </div>
 );
 
-export default UnifiedManagement;
+export default AdminDashboard;

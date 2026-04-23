@@ -20,19 +20,61 @@ const GradeInput = ({ value, onChange, placeholder = '—' }) => (
 const TeacherPortal = () => {
   const { teacherId } = useParams();
   const navigate = useNavigate();
-  const { teachers, students, updateGrades, grades, addNotification, loading, studentAttendance, updateStudentAttendance } = useApp();
+  const { teachers, students, updateGrades, grades, addNotification, loading, studentAttendance, updateStudentAttendance, schedules } = useApp();
   
   const teacher = useMemo(() => {
-    return teachers.find(t => t.token === teacherId || t.id === teacherId);
+    return teachers.find(t => t.tokenGrades === teacherId || t.tokenAttendance === teacherId || t.id === teacherId);
   }, [teachers, teacherId]);
+
+  const accessMode = useMemo(() => {
+    if (!teacher) return null;
+    if (teacher.tokenAttendance === teacherId) return 'attendance';
+    if (teacher.tokenGrades === teacherId) return 'grades';
+    return 'full'; // For admin or internal navigation
+  }, [teacher, teacherId]);
+
+  // Lock tab based on token
+  React.useEffect(() => {
+    if (accessMode === 'attendance') setActiveTab('attendance');
+    if (accessMode === 'grades') setActiveTab('grades');
+  }, [accessMode]);
   
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('');
   const [selectedDiploma, setSelectedDiploma] = useState('');
   const [filterYear, setFilterYear] = useState('1ère année');
   const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState('grades'); // 'grades' or 'attendance'
+  const [activeTab, setActiveTab] = useState('attendance'); // Default to attendance as requested
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceSuccess, setAttendanceSuccess] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
+
+  const dayOfWeek = useMemo(() => {
+    const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+    return days[new Date(selectedDate).getDay()];
+  }, [selectedDate]);
+
+  // Find all scheduled sessions for this teacher today
+  const todaysSessions = useMemo(() => {
+    if (!teacher) return [];
+    return (schedules || []).filter(s => s.teacherId === teacher.id && s.day === dayOfWeek);
+  }, [teacher, schedules, dayOfWeek]);
+
+  const [selectedSessionId, setSelectedSessionId] = useState('');
+  
+  const currentSession = useMemo(() => {
+    if (selectedSessionId) return todaysSessions.find(s => s.id === selectedSessionId);
+    return todaysSessions[0];
+  }, [todaysSessions, selectedSessionId]);
+
+  // Sync group/module when session changes
+  React.useEffect(() => {
+    if (currentSession) {
+      setSelectedGroup(currentSession.filiere);
+      setSelectedSubject(currentSession.module);
+      setFilterYear(currentSession.annee);
+    }
+  }, [currentSession]);
 
   // Initialize selections once teacher is loaded
   React.useEffect(() => {
@@ -53,8 +95,45 @@ const TeacherPortal = () => {
     }
   }, [teacher, selectedSubject, selectedGroup, filterYear, selectedDiploma]);
 
+  // Filter students based on selected group AND year AND diploma AND module
+  const relevantStudents = useMemo(() => {
+    return students.filter(s => {
+      const groupMatch = s.major === selectedGroup;
+      const yearMatch = s.year === filterYear;
+      const diplomaMatch = !selectedDiploma || s.diploma === selectedDiploma;
+      
+      const studentModules = getModulesForStudent(s);
+      const moduleMatch = !selectedSubject || studentModules.includes(selectedSubject);
+      
+      return groupMatch && yearMatch && diplomaMatch && moduleMatch;
+    });
+  }, [students, selectedGroup, filterYear, selectedDiploma, selectedSubject]);
+
+  const allAttended = useMemo(() => {
+    if (!relevantStudents || relevantStudents.length === 0 || !selectedSubject) return true;
+    return relevantStudents.every(s => {
+      const docId = `${s.id}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
+      const record = studentAttendance.find(a => a.id === docId);
+      return record && ['present', 'absent', 'retard'].includes(record.status);
+    });
+  }, [relevantStudents, selectedSubject, selectedDate, studentAttendance]);
+
+  // Prevent closing the page if attendance is incomplete
+  React.useEffect(() => {
+    if (activeTab === 'attendance' && !allAttended) {
+      const handleBeforeUnload = (e) => {
+        e.preventDefault();
+        e.returnValue = "Veuillez terminer l'appel pour tous les stagiaires avant de quitter.";
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }
+  }, [activeTab, allAttended]);
+
   // Loading state
-  if (loading && teachers.length === 0) {
+  const isLoadingOrNoTeacher = loading && teachers.length === 0;
+
+  if (isLoadingOrNoTeacher) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
         <div className="spinner"></div>
@@ -75,18 +154,24 @@ const TeacherPortal = () => {
     );
   }
 
-  // Filter students based on selected group AND year AND diploma AND module
-  const relevantStudents = students.filter(s => {
-    const groupMatch = s.major === selectedGroup;
-    const yearMatch = s.year === filterYear;
-    const diplomaMatch = !selectedDiploma || s.diploma === selectedDiploma;
-    
-    // Ensure the student actually takes this subject
-    const studentModules = getModulesForStudent(s);
-    const moduleMatch = !selectedSubject || studentModules.includes(selectedSubject);
-    
-    return groupMatch && yearMatch && diplomaMatch && moduleMatch;
-  });
+  const handleValidateAttendance = () => {
+    if (allAttended) {
+      setAttendanceSuccess(true);
+      addNotification("Appel enregistré et validé avec succès.");
+      
+      // Attempt to close the window after 1.5 seconds.
+      setTimeout(() => {
+        setIsFinished(true); // Show the success message in case window.close() is blocked
+        try {
+          window.close();
+        } catch (e) {
+          console.log("window.close() blocked by browser.");
+        }
+      }, 1500);
+    } else {
+      addNotification("Veuillez marquer l'état de présence de tous les stagiaires.");
+    }
+  };
 
   const handleGradeChange = (studentId, field, value) => {
     if (!selectedSubject) return;
@@ -133,8 +218,66 @@ const TeacherPortal = () => {
     return (c1 + c2) / 2;
   };
 
+  if (isFinished) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-main)' }}>
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card" style={{ padding: '64px 48px', textAlign: 'center', maxWidth: '420px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          <div style={{ width: '80px', height: '80px', background: '#16a34a', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', boxShadow: '0 8px 30px rgba(22, 163, 74, 0.3)' }}>
+            <i className="fa-solid fa-check"></i>
+          </div>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)' }}>Appel Validé</h1>
+          <p style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+            L'appel pour la séance d'aujourd'hui a été enregistré avec succès.
+          </p>
+          <p style={{ fontSize: '15px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+            Vous pouvez fermer cette fenêtre.
+          </p>
+          <button onClick={() => window.close()} className="btn-modern" style={{ marginTop: '12px', width: '100%', padding: '12px', fontSize: '13px' }}>
+            Fermer <i className="fa-solid fa-xmark" style={{ marginLeft: '6px' }}></i>
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-container section-padding">
+      {/* ── Context Info (New) ── */}
+      {activeTab === 'attendance' && currentSession && (
+        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+          className="glass-card" 
+          style={{ padding: '16px 24px', marginBottom: '24px', background: 'var(--primary-ultra-light)', border: '1px solid rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
+          
+          <div style={{ display: 'flex', gap: '32px' }}>
+            <div>
+              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Date</label>
+              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{selectedDate}</p>
+            </div>
+            <div>
+              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Heure</label>
+              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}><i className="fa-regular fa-clock" style={{ marginRight: '6px' }}></i>{currentSession.time}</p>
+            </div>
+            <div>
+              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Groupe</label>
+              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{currentSession.filiere} ({currentSession.annee})</p>
+            </div>
+            <div>
+              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Module</label>
+              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{currentSession.module}</p>
+            </div>
+          </div>
+
+          {todaysSessions.length > 1 && (
+            <div style={{ minWidth: '200px' }}>
+              <label style={lblStyle}>Changer de séance</label>
+              <select className="input-premium" style={{ ...selectStyle, width: '100%', background: 'white' }} value={selectedSessionId || currentSession.id} onChange={(e) => setSelectedSessionId(e.target.value)}>
+                {todaysSessions.map(s => <option key={s.id} value={s.id}>{s.time} - {s.module}</option>)}
+              </select>
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* ── Header ── */}
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
         className="glass-card"
@@ -145,33 +288,55 @@ const TeacherPortal = () => {
             <i className="fa-solid fa-chalkboard-user"></i>
           </div>
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.2 }}>{teacher.name}</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.2 }}>Bonjour, {teacher.name}</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-              <span className="badge-status success"><i className="fa-solid fa-wifi" style={{ fontSize: '8px' }}></i> Portail Formateur</span>
+              <span className="badge-status success"><i className="fa-solid fa-wifi" style={{ fontSize: '8px' }}></i> Session en direct</span>
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-          <div className="modern-tabs-container" style={{ marginBottom: '8px' }}>
-            <button onClick={() => setActiveTab('grades')} className={`modern-tab ${activeTab === 'grades' ? 'active' : ''}`}>
-              Saisie des Notes
-            </button>
-            <button onClick={() => setActiveTab('attendance')} className={`modern-tab ${activeTab === 'attendance' ? 'active' : ''}`}>
-              Saisie des Absences
-            </button>
-          </div>
+          {accessMode === 'full' && (
+            <div className="modern-tabs-container" style={{ marginBottom: '8px' }}>
+              <button onClick={() => setActiveTab('attendance')} className={`modern-tab ${activeTab === 'attendance' ? 'active' : ''}`}>
+                Saisie des Absences
+              </button>
+              <button onClick={() => setActiveTab('grades')} className={`modern-tab ${activeTab === 'grades' ? 'active' : ''}`}>
+                Saisie des Notes
+              </button>
+            </div>
+          )}
+          
+          {accessMode !== 'full' && (
+             <div style={{ marginBottom: '8px' }}>
+                <span className="badge-status" style={{ background: 'var(--primary-ultra-light)', color: 'var(--primary)', fontWeight: '800', fontSize: '11px', padding: '6px 12px' }}>
+                   {activeTab === 'attendance' ? 'MODÈLE ABSENCES' : 'MODÈLE NOTES'}
+                </span>
+             </div>
+          )}
           
           {activeTab === 'grades' && (
             <>
               <button onClick={handleSave} className="btn-modern primary" style={{ padding: '10px 20px', fontSize: '13px' }}>
                 Enregistrer <i className="fa-solid fa-cloud-arrow-up" style={{ marginLeft: '4px', fontSize: '12px' }}></i>
               </button>
+            </>
+          )}
+
+          {activeTab === 'attendance' && (
+            <>
+              <button 
+                onClick={handleValidateAttendance} 
+                className={`btn-modern ${allAttended ? 'primary' : ''}`} 
+                style={{ padding: '10px 20px', fontSize: '13px', opacity: allAttended ? 1 : 0.6, cursor: allAttended ? 'pointer' : 'not-allowed' }}
+              >
+                Valider l'appel <i className="fa-solid fa-check" style={{ marginLeft: '4px', fontSize: '12px' }}></i>
+              </button>
               <AnimatePresence>
-                {success && (
+                {attendanceSuccess && (
                   <motion.span initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                     style={{ fontSize: '11px', fontWeight: '600', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <i className="fa-solid fa-circle-check"></i> Synchronisé
+                    <i className="fa-solid fa-circle-check"></i> Validé
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -185,43 +350,55 @@ const TeacherPortal = () => {
         className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lblStyle}>Diplôme</label>
-            <select className="input-premium" style={selectStyle} value={selectedDiploma} onChange={(e) => setSelectedDiploma(e.target.value)}>
-              {(teacher.diplomas || (teacher.diploma ? [teacher.diploma] : [])).map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+            <label style={lblStyle}>Date du jour</label>
+            <input type="date" className="input-premium" style={{ width: '100%', padding: '7px 12px', fontSize: '13px', cursor: 'not-allowed', background: 'var(--bg-subtle)' }}
+              value={selectedDate} disabled />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lblStyle}>Module</label>
-            <select className="input-premium" style={selectStyle} value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
-              {(teacher.subjects || [teacher.subject]).map(sub => (
-                <option key={sub} value={sub}>{sub}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lblStyle}>Groupe (Filière)</label>
-            <select className="input-premium" style={selectStyle} value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
-              {(teacher.groups || []).map(g => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lblStyle}>Année</label>
-            <select className="input-premium" style={selectStyle} value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
-              {(teacher.years && teacher.years.length > 0 ? teacher.years : ['1ère année', '2ème année']).map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-          {activeTab === 'attendance' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={lblStyle}>Date de la séance</label>
-              <input type="date" className="input-premium" style={{ width: '100%', padding: '7px 12px', fontSize: '13px', cursor: 'pointer' }}
-                value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
-            </div>
+          
+          {activeTab === 'grades' && (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={lblStyle}>Diplôme</label>
+                <select className="input-premium" style={selectStyle} value={selectedDiploma} onChange={(e) => setSelectedDiploma(e.target.value)}>
+                  {(teacher.diplomas || (teacher.diploma ? [teacher.diploma] : [])).map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={lblStyle}>Module</label>
+                <select className="input-premium" style={selectStyle} value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
+                  {(teacher.subjects || [teacher.subject]).map(sub => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={lblStyle}>Groupe (Filière)</label>
+                <select className="input-premium" style={selectStyle} value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
+                  {(teacher.groups || []).map(g => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={lblStyle}>Année</label>
+                <select className="input-premium" style={selectStyle} value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
+                  {(teacher.years && teacher.years.length > 0 ? teacher.years : ['1ère année', '2ème année']).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'attendance' && !currentSession && (
+             <div style={{ gridColumn: 'span 2', padding: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px dashed #f87171', borderRadius: 'var(--radius-md)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <p style={{ fontSize: '13px', color: '#dc2626', fontWeight: '600' }}>
+                  <i className="fa-solid fa-calendar-xmark" style={{ marginRight: '8px' }}></i>
+                  Aucune séance planifiée pour ce jour ({dayOfWeek}).
+                </p>
+             </div>
           )}
         </div>
       </motion.div>
@@ -232,12 +409,13 @@ const TeacherPortal = () => {
       >
         {relevantStudents.length === 0 ? (
           <div style={{ padding: '64px', textAlign: 'center' }}>
-            <i className="fa-solid fa-users-slash" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
-            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Aucun stagiaire dans le groupe sélectionné.</p>
+            <i className="fa-solid fa-users-slash" style={{ fontSize: '42px', color: 'var(--border)', display: 'block', marginBottom: '16px', opacity: 0.5 }}></i>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>Liste vide</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Aucun stagiaire ne correspond aux critères actuels.</p>
           </div>
         ) : !selectedSubject ? (
           <div style={{ padding: '64px', textAlign: 'center' }}>
-            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Veuillez sélectionner un module.</p>
+            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Veuillez sélectionner un module pour continuer.</p>
           </div>
         ) : activeTab === 'grades' ? (
           <div style={{ overflowX: 'auto' }}>

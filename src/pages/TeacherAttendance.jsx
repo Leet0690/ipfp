@@ -14,18 +14,27 @@ const MiniStat = ({ label, value }) => (
 );
 
 const TeacherAttendance = () => {
-  const { teachers, teacherAttendance, updateTeacherAttendance, addNotification } = useApp();
+  const { teachers, teacherAttendance, updateTeacherAttendance, addNotification, schedules } = useApp();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const dayOfWeek = useMemo(() => {
+    const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+    return days[new Date(selectedDate).getDay()];
+  }, [selectedDate]);
+
   const filteredTeachers = useMemo(() => {
     return (teachers || []).filter(t => {
+      // Only show teachers who have at least one session scheduled today (dayOfWeek)
+      const hasSession = (schedules || []).some(s => s.teacherId === t.id && s.day === dayOfWeek);
+      if (!hasSession) return false;
+
       if (searchTerm) {
         if (!t.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       }
       return true;
     }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [teachers, searchTerm]);
+  }, [teachers, searchTerm, dayOfWeek, schedules]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -191,14 +200,35 @@ const TeacherAttendance = () => {
                           <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{teacher.name}</p>
                         </td>
                         <td style={tdStyle}>
-                          <select className="input-premium" 
-                            style={{ fontSize: '11px', padding: '4px 8px', width: '100%', cursor: 'pointer', appearance: 'auto' }}
-                            value={record?.moduleId || teacher.subjects?.[0] || ''}
-                            onChange={(e) => handleModuleChange(teacher.id, e.target.value)}>
-                            {(teacher.subjects || [teacher.subject]).map(sub => (
-                              <option key={sub} value={sub}>{sub}</option>
-                            ))}
-                          </select>
+                          {(() => {
+                            const scheduledSessions = (schedules || []).filter(s => s.teacherId === teacher.id && s.day === dayOfWeek);
+                            const currentModuleId = record?.moduleId || (scheduledSessions.length > 0 ? scheduledSessions[0].module : (teacher.subjects?.[0] || ''));
+                            
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <select className="input-premium" 
+                                  style={{ fontSize: '11px', padding: '4px 8px', width: '100%', cursor: 'pointer', appearance: 'auto' }}
+                                  value={currentModuleId}
+                                  onChange={(e) => handleModuleChange(teacher.id, e.target.value)}>
+                                  {/* Prioritize scheduled modules */}
+                                  {scheduledSessions.map(s => (
+                                    <option key={s.id} value={s.module}>📅 {s.module} ({s.time})</option>
+                                  ))}
+                                  {/* Rest of teacher subjects */}
+                                  <optgroup label="Autres modules">
+                                    {(teacher.subjects || [teacher.subject]).map(sub => (
+                                      <option key={sub} value={sub}>{sub}</option>
+                                    ))}
+                                  </optgroup>
+                                </select>
+                                {scheduledSessions.length > 0 && (
+                                  <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase' }}>
+                                    Planifié aujourd'hui
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', padding: '3px' }}>

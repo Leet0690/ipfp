@@ -16,7 +16,7 @@ const MiniStat = ({ label, value }) => (
 );
 
 const StudentAttendance = () => {
-  const { students, studentAttendance, updateStudentAttendance, addNotification, loading } = useApp();
+  const { students, studentAttendance, updateStudentAttendance, addNotification, loading, schedules } = useApp();
   const [filterDiploma, setFilterDiploma] = useState('');
   const [filterMajor, setFilterMajor] = useState('');
   const [filterYear, setFilterYear] = useState('');
@@ -25,8 +25,17 @@ const StudentAttendance = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [success, setSuccess] = useState('');
 
+  const dayOfWeek = useMemo(() => {
+    const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+    return days[new Date(selectedDate).getDay()];
+  }, [selectedDate]);
+
   const filteredStudents = useMemo(() => {
     return (students || []).filter(s => {
+      // Find if this student's group has a class today
+      const hasClassToday = (schedules || []).some(sc => sc.filiere === s.major && sc.annee === s.year && sc.day === dayOfWeek);
+      if (!hasClassToday) return false;
+
       if (filterDiploma && s.diploma !== filterDiploma) return false;
       if (filterMajor && s.major !== filterMajor) return false;
       if (filterYear && s.year !== filterYear) return false;
@@ -36,16 +45,24 @@ const StudentAttendance = () => {
       }
       return true;
     }).sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
-  }, [students, filterDiploma, filterMajor, filterYear, searchTerm]);
+  }, [students, filterDiploma, filterMajor, filterYear, searchTerm, schedules, dayOfWeek]);
 
   const availableMajors = filterDiploma ? (FILIERES[filterDiploma] || []) : Array.from(new Set(students.map(s => s.major)));
   
   const availableModules = useMemo(() => {
-    if (filterDiploma && filterMajor && filterYear) {
-      return getModulesForFiliere(filterDiploma, filterMajor, filterYear);
+    if (filterMajor && filterYear) {
+      // Show modules actually scheduled for this group on this day
+      const scheduledModules = (schedules || [])
+        .filter(sc => sc.filiere === filterMajor && sc.annee === filterYear && sc.day === dayOfWeek)
+        .map(sc => sc.module);
+      
+      if (scheduledModules.length > 0) return Array.from(new Set(scheduledModules));
+      
+      // Fallback to academic curriculum if no specific schedule found (though filtering above might hide students anyway)
+      if (filterDiploma) return getModulesForFiliere(filterDiploma, filterMajor, filterYear);
     }
     return [];
-  }, [filterDiploma, filterMajor, filterYear]);
+  }, [filterDiploma, filterMajor, filterYear, schedules, dayOfWeek]);
 
   // Statistics for currently filtered students and current date/module
   const stats = useMemo(() => {

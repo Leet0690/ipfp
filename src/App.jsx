@@ -1,14 +1,11 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
-import AdminLayout from './components/AdminLayout';
-import AdminLogin from './pages/AdminLogin';
-import Dashboard from './pages/AdminDashboard/Dashboard';
-import StudentManagement from './pages/StudentManagement';
-import TeacherManagement from './pages/TeacherManagement';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
+import DashboardLayout from './layouts/DashboardLayout';
+
+import Login from './pages/Login';
+import AdminDashboard from './pages/AdminDashboard';
 import AddStudent from './pages/AddStudent';
 import AddTeacher from './pages/AddTeacher';
 import TeacherPortal from './pages/TeacherPortal';
@@ -16,6 +13,7 @@ import StudentResults from './pages/StudentResults';
 import GradeManagement from './pages/GradeManagement';
 import StudentAttendance from './pages/StudentAttendance';
 import TeacherAttendance from './pages/TeacherAttendance';
+import ScheduleManagement from './pages/ScheduleManagement';
 import Maintenance from './pages/Maintenance';
 
 // Set to true to block the site and show "Under Construction"
@@ -48,13 +46,14 @@ const ProtectedAdminRoute = ({ children }) => {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/login" replace />;
   }
 
-  return <AdminLayout>{children}</AdminLayout>;
+  return <DashboardLayout>{children}</DashboardLayout>;
 };
 
 const AppContent = () => {
+  const { isAuthenticated } = useApp();
   const location = useLocation();
 
   if (IS_UNDER_MAINTENANCE) {
@@ -62,42 +61,34 @@ const AppContent = () => {
   }
 
   // Public routes (no authentication needed)
-  const isPublicRoute = location.pathname.startsWith('/teacher/') || location.pathname.startsWith('/results/');
-
+  const isPublicRoute = location.pathname === '/login' || location.pathname.startsWith('/portal/') || location.pathname.startsWith('/results/');
+  
+  if (isPublicRoute) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-page)', display: 'flex', flexDirection: 'column' }}>
+        <main style={{ flex: 1 }}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/portal/:teacherId" element={<TeacherPortal />} />
+            <Route path="/results/:studentId" element={<StudentResults />} />
+          </Routes>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <Routes>
-      {/* Admin Login - Public */}
-      <Route path="/admin/login" element={<AdminLogin />} />
-
-      {/* Admin Routes - Protected */}
-      <Route path="/admin/dashboard" element={<ProtectedAdminRoute><Dashboard /></ProtectedAdminRoute>} />
-      
-      {/* Management Tables */}
-      <Route path="/admin/students" element={<ProtectedAdminRoute><StudentManagement /></ProtectedAdminRoute>} />
-      <Route path="/admin/teachers" element={<ProtectedAdminRoute><TeacherManagement /></ProtectedAdminRoute>} />
-      
-      {/* Forms (Add entities) */}
+      <Route path="/" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
+      <Route path="/admin/students" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
+      <Route path="/admin/teachers" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
       <Route path="/admin/add-student" element={<ProtectedAdminRoute><AddStudent /></ProtectedAdminRoute>} />
       <Route path="/admin/add-teacher" element={<ProtectedAdminRoute><AddTeacher /></ProtectedAdminRoute>} />
-      
-      {/* Other Tools */}
+      <Route path="/admin/schedules" element={<ProtectedAdminRoute><ScheduleManagement /></ProtectedAdminRoute>} />
       <Route path="/admin/grades" element={<ProtectedAdminRoute><GradeManagement /></ProtectedAdminRoute>} />
       <Route path="/admin/attendance-students" element={<ProtectedAdminRoute><StudentAttendance /></ProtectedAdminRoute>} />
       <Route path="/admin/attendance-teachers" element={<ProtectedAdminRoute><TeacherAttendance /></ProtectedAdminRoute>} />
-      
-      {/* Additional Features */}
-      <Route path="/admin/reports" element={<ProtectedAdminRoute><Reports /></ProtectedAdminRoute>} />
-      <Route path="/admin/settings" element={<ProtectedAdminRoute><Settings /></ProtectedAdminRoute>} />
-
-      {/* Public Token-Based Routes */}
-      <Route path="/teacher/:teacherId" element={<TeacherPortal />} />
-      <Route path="/results/:studentId" element={<StudentResults />} />
-
-      {/* Default Routes */}
-      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/admin/login" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

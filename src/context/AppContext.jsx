@@ -25,6 +25,7 @@ export const AppProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [studentAttendance, setStudentAttendance] = useState([]);
   const [teacherAttendance, setTeacherAttendance] = useState([]);
+  const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -67,6 +68,11 @@ export const AppProvider = ({ children }) => {
       setTeacherAttendance(data);
     });
 
+    const unsubSchedules = onSnapshot(collection(db, 'schedules'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSchedules(data);
+    });
+
     setLoading(false);
 
     return () => {
@@ -76,6 +82,7 @@ export const AppProvider = ({ children }) => {
       unsubNotifs();
       unsubStudentAttendance();
       unsubTeacherAttendance();
+      unsubSchedules();
     };
   }, []);
 
@@ -139,11 +146,12 @@ export const AppProvider = ({ children }) => {
   };
 
   const addTeacher = async (teacherData) => {
-    const token = `prof-${teacherData.name.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substr(2, 5)}`;
-    const newTeacher = { ...teacherData, token, createdAt: serverTimestamp() };
+    const tokenGrades = Math.random().toString(36).substring(2, 11);
+    const tokenAttendance = Math.random().toString(36).substring(2, 12);
+    const newTeacher = { ...teacherData, tokenGrades, tokenAttendance, createdAt: serverTimestamp() };
     await addDoc(collection(db, 'teachers'), newTeacher);
     addNotification(`Nouveau formateur ajouté : ${teacherData.name}.`);
-    return token;
+    return { tokenGrades, tokenAttendance };
   };
 
   const updateStudent = async (id, data) => {
@@ -164,6 +172,41 @@ export const AppProvider = ({ children }) => {
   const deleteTeacher = async (id) => {
     await deleteDoc(doc(db, 'teachers', id));
     addNotification(`Formateur supprimé de la base.`);
+  };
+
+  const migrateTeacherTokens = async () => {
+    const batch = [];
+    teachers.forEach(t => {
+      if (!t.tokenGrades || !t.tokenAttendance) {
+        const tokenGrades = Math.random().toString(36).substring(2, 11);
+        const tokenAttendance = Math.random().toString(36).substring(2, 12);
+        batch.push(updateDoc(doc(db, 'teachers', t.id), { tokenGrades, tokenAttendance }));
+      }
+    });
+    if (batch.length > 0) {
+      await Promise.all(batch);
+      addNotification(`${batch.length} formateur(s) mis à jour avec de nouveaux jetons.`);
+    } else {
+      addNotification("Tous les formateurs ont déjà leurs jetons.");
+    }
+  };
+
+  const addSchedule = async (scheduleData) => {
+    await addDoc(collection(db, 'schedules'), { ...scheduleData, createdAt: serverTimestamp() });
+    addNotification(`Séance de ${scheduleData.module} ajoutée.`);
+  };
+
+  const deleteSchedule = async (id) => {
+    await deleteDoc(doc(db, 'schedules', id));
+    addNotification(`Séance supprimée.`);
+  };
+
+  const clearAllSchedules = async () => {
+    const q = query(collection(db, 'schedules'));
+    const snapshot = await getDocs(q);
+    const batch = snapshot.docs.map(d => deleteDoc(d.ref));
+    await Promise.all(batch);
+    addNotification(`Emploi du temps vidé.`);
   };
 
   const updateGrades = async (studentId, subject, gradeData) => {
@@ -245,7 +288,12 @@ export const AppProvider = ({ children }) => {
       studentAttendance,
       teacherAttendance,
       updateStudentAttendance,
-      updateTeacherAttendance
+      updateTeacherAttendance,
+      schedules,
+      addSchedule,
+      deleteSchedule,
+      clearAllSchedules,
+      migrateTeacherTokens
     }}>
       {!loading && children}
     </AppContext.Provider>
