@@ -20,7 +20,7 @@ const GradeInput = ({ value, onChange, placeholder = '—' }) => (
 const TeacherPortal = () => {
   const { teacherId } = useParams();
   const navigate = useNavigate();
-  const { teachers, students, updateGrades, grades, addNotification, loading, studentAttendance, updateStudentAttendance, schedules } = useApp();
+  const { teachers, students, updateGrades, grades, addNotification, loading, studentAttendance, updateStudentAttendance, schedules, updateTeacherAttendance } = useApp();
   
   const teacher = useMemo(() => {
     return teachers.find(t => t.tokenGrades === teacherId || t.tokenAttendance === teacherId || t.id === teacherId);
@@ -154,10 +154,25 @@ const TeacherPortal = () => {
     );
   }
 
-  const handleValidateAttendance = () => {
+  const handleValidateAttendance = async () => {
     if (allAttended) {
       setAttendanceSuccess(true);
-      addNotification("Appel enregistré et validé avec succès.");
+      
+      // Automatically mark teacher as present when they validate the students' attendance
+      try {
+        await updateTeacherAttendance(
+          teacher.id, 
+          selectedDate, 
+          'present', 
+          `Appel validé pour le module: ${selectedSubject}`,
+          4, // Default session hours
+          selectedSubject
+        );
+      } catch (e) {
+        console.error("Error updating teacher presence:", e);
+      }
+
+      addNotification("Appel enregistré et votre présence a été validée.");
       
       // Attempt to close the window after 1.5 seconds.
       setTimeout(() => {
