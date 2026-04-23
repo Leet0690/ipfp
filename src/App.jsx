@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
-import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
+import { AdminAuthProvider } from './context/AdminAuthContext';
 import DashboardLayout from './layouts/DashboardLayout';
 
 import Login from './pages/Login';
@@ -19,77 +19,66 @@ import Maintenance from './pages/Maintenance';
 // Set to true to block the site and show "Under Construction"
 const IS_UNDER_MAINTENANCE = false;
 
-// Protected Admin Routes Wrapper
-const ProtectedAdminRoute = ({ children }) => {
-  const { isAdmin, loading } = useAdminAuth();
-
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: 'var(--bg-page)'
-      }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          border: '3px solid var(--border)',
-          borderTopColor: 'var(--primary)',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <DashboardLayout>{children}</DashboardLayout>;
-};
-
 const AppContent = () => {
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, loading } = useApp();
   const location = useLocation();
 
   if (IS_UNDER_MAINTENANCE) {
     return <Maintenance />;
   }
 
-  // Public routes (no authentication needed)
-  const isPublicRoute = location.pathname === '/login' || location.pathname.startsWith('/portal/') || location.pathname.startsWith('/results/');
+  const isPublicRoute = location.pathname === '/login' || 
+                        location.pathname.startsWith('/portal/') || 
+                        location.pathname.startsWith('/results/') ||
+                        location.pathname.startsWith('/teacher/'); // Backward compatibility for old links
   
-  if (isPublicRoute) {
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-page)' }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && !isPublicRoute) {
+    return <Navigate to="/login" />;
+  }
+
+  const appRoutes = (
+    <Routes>
+      <Route path="/" element={<AdminDashboard />} />
+      <Route path="/admin/students" element={<AdminDashboard />} />
+      <Route path="/admin/teachers" element={<AdminDashboard />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/admin/add-student" element={<AddStudent />} />
+      <Route path="/admin/add-teacher" element={<AddTeacher />} />
+      <Route path="/admin/schedules" element={<ScheduleManagement />} />
+      <Route path="/admin/grades" element={<GradeManagement />} />
+      <Route path="/admin/attendance-students" element={<StudentAttendance />} />
+      <Route path="/admin/attendance-teachers" element={<TeacherAttendance />} />
+      <Route path="/portal/:teacherId" element={<TeacherPortal />} />
+      <Route path="/teacher/:teacherId" element={<TeacherPortal />} />
+      <Route path="/results/:studentId" element={<StudentResults />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+
+  // If it's a public route or user not authenticated, show directly without the layout sidebar
+  if (!isAuthenticated || isPublicRoute) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-page)', display: 'flex', flexDirection: 'column' }}>
         <main style={{ flex: 1 }}>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/portal/:teacherId" element={<TeacherPortal />} />
-            <Route path="/results/:studentId" element={<StudentResults />} />
-          </Routes>
+          {appRoutes}
         </main>
       </div>
     );
   }
 
+  // Wrapper layout for Private Admin pages
   return (
-    <Routes>
-      <Route path="/" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
-      <Route path="/admin/students" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
-      <Route path="/admin/teachers" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
-      <Route path="/admin/add-student" element={<ProtectedAdminRoute><AddStudent /></ProtectedAdminRoute>} />
-      <Route path="/admin/add-teacher" element={<ProtectedAdminRoute><AddTeacher /></ProtectedAdminRoute>} />
-      <Route path="/admin/schedules" element={<ProtectedAdminRoute><ScheduleManagement /></ProtectedAdminRoute>} />
-      <Route path="/admin/grades" element={<ProtectedAdminRoute><GradeManagement /></ProtectedAdminRoute>} />
-      <Route path="/admin/attendance-students" element={<ProtectedAdminRoute><StudentAttendance /></ProtectedAdminRoute>} />
-      <Route path="/admin/attendance-teachers" element={<ProtectedAdminRoute><TeacherAttendance /></ProtectedAdminRoute>} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <DashboardLayout>
+      {appRoutes}
+    </DashboardLayout>
   );
 };
 
