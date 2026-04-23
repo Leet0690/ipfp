@@ -67,6 +67,19 @@ const TeacherPortal = () => {
     return todaysSessions[0];
   }, [todaysSessions, selectedSessionId]);
 
+  const sessionDuration = useMemo(() => {
+    if (!currentSession || !currentSession.time) return 4;
+    try {
+      const [start, end] = currentSession.time.split('-');
+      const [h1, m1] = start.split(':').map(Number);
+      const [h2, m2] = end.split(':').map(Number);
+      const diffMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
+      return Math.max(0, Math.round((diffMinutes / 60) * 100) / 100);
+    } catch (e) {
+      return 4;
+    }
+  }, [currentSession]);
+
   // Sync group/module when session changes
   React.useEffect(() => {
     if (currentSession) {
@@ -165,7 +178,7 @@ const TeacherPortal = () => {
           selectedDate, 
           'present', 
           `Appel validé pour le module: ${selectedSubject}`,
-          4, // Default session hours
+          sessionDuration,
           selectedSubject
         );
       } catch (e) {
