@@ -395,29 +395,39 @@ const TeacherPortal = () => {
   return (
     <div className="max-w-container section-padding">
       {/* ── Context Info (New) ── */}
-      {activeTab === 'attendance' && currentSession && (
+      {activeTab === 'attendance' && todaysSessions.length > 0 && (
         <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
           className="glass-card" 
           style={{ padding: '16px 24px', marginBottom: '24px', background: 'var(--primary-ultra-light)', border: '1px solid rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
           
-          <div style={{ display: 'flex', gap: '32px' }}>
-            <div>
-              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Jour</label>
-              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{dayOfWeek}</p>
+          {currentSession ? (
+            <div style={{ display: 'flex', gap: '32px' }}>
+              <div>
+                <label style={{ ...lblStyle, color: 'var(--primary)' }}>Jour</label>
+                <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{dayOfWeek}</p>
+              </div>
+              <div>
+                <label style={{ ...lblStyle, color: 'var(--primary)' }}>Heure</label>
+                <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}><i className="fa-regular fa-clock" style={{ marginRight: '6px' }}></i>{currentSession.time?.replace(/\s/g, '').replace(/h/gi, ':')}</p>
+              </div>
+              <div>
+                <label style={{ ...lblStyle, color: 'var(--primary)' }}>Groupe</label>
+                <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{currentSession.filiere} ({currentSession.annee})</p>
+              </div>
+              <div>
+                <label style={{ ...lblStyle, color: 'var(--primary)' }}>Module</label>
+                <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{currentSession.module}</p>
+              </div>
             </div>
-            <div>
-              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Heure</label>
-              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}><i className="fa-regular fa-clock" style={{ marginRight: '6px' }}></i>{currentSession.time?.replace(/\s/g, '').replace(/h/gi, ':')}</p>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <i className="fa-solid fa-hand-pointer" style={{ fontSize: '20px', color: 'var(--primary)', opacity: 0.5 }}></i>
+              <div>
+                <p style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>Sélectionnez une séance</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{todaysSessions.length} séance(s) disponible(s) aujourd'hui ({dayOfWeek})</p>
+              </div>
             </div>
-            <div>
-              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Groupe</label>
-              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{currentSession.filiere} ({currentSession.annee})</p>
-            </div>
-            <div>
-              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Module</label>
-              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{currentSession.module}</p>
-            </div>
-          </div>
+          )}
 
           {todaysSessions.length > 0 && (
             <div style={{ minWidth: '200px' }}>
@@ -557,11 +567,11 @@ const TeacherPortal = () => {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
         style={{ background: 'white', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: 'var(--shadow-xs)' }}
       >
-        {activeTab === 'attendance' && !currentSession ? (
+        {activeTab === 'attendance' && !currentSession && todaysSessions.length === 0 ? (
           <div style={{ padding: '64px', textAlign: 'center' }}>
-            <i className="fa-solid fa-calendar-check" style={{ fontSize: '42px', color: 'var(--primary)', display: 'block', marginBottom: '16px', opacity: 0.3 }}></i>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>Prise d'absence</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Veuillez sélectionner l'une de vos séances d'aujourd'hui pour commencer.</p>
+            <i className="fa-solid fa-calendar-xmark" style={{ fontSize: '42px', color: 'var(--border)', display: 'block', marginBottom: '16px', opacity: 0.5 }}></i>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>Aucune séance</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Aucune séance n'est planifiée pour vous ce jour ({dayOfWeek}).</p>
           </div>
         ) : relevantStudents.length === 0 ? (
           <div style={{ padding: '64px', textAlign: 'center' }}>

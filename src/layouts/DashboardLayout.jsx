@@ -3,18 +3,104 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 
-const NAV_LINKS = [
-  { to: "/", icon: "fa-chart-pie", label: "Dashboard" },
-  { to: "/admin/students", icon: "fa-users", label: "Stagiaires" },
-  { to: "/admin/teachers", icon: "fa-chalkboard-user", label: "Formateurs" },
-  { to: "/admin/schedules", icon: "fa-calendar-days", label: "Emplois du Temps" },
-  { to: "/admin/grades", icon: "fa-pen-ruler", label: "Notes" },
-  { to: "/admin/modules", icon: "fa-cubes", label: "Gestion Modules" },
-  { to: "/admin/attendance-students", icon: "fa-user-clock", label: "Absences Stagiaires" },
-  { to: "/admin/reports", icon: "fa-chart-line", label: "Rapports" },
-  { to: "/admin/attendance-teachers", icon: "fa-calendar-check", label: "Présences Formateurs" },
-  { to: "/admin/finance", icon: "fa-wallet", label: "Finance" }
+const NAV_CATEGORIES = [
+  {
+    label: "Tableau de Bord",
+    icon: "fa-chart-pie",
+    items: [
+      { to: "/", icon: "fa-chart-pie", label: "Dashboard" },
+    ]
+  },
+  {
+    label: "Pôle Académique",
+    icon: "fa-graduation-cap",
+    items: [
+      { to: "/admin/modules", icon: "fa-cubes", label: "Gestion des Modules" },
+      { to: "/admin/grades", icon: "fa-pen-ruler", label: "Notes & Rapports" },
+      { to: "/admin/reports", icon: "fa-chart-line", label: "Rapports" },
+      { to: "/admin/schedules", icon: "fa-calendar-days", label: "Emplois du Temps" },
+    ]
+  },
+  {
+    label: "Suivi de Présence",
+    icon: "fa-user-clock",
+    items: [
+      { to: "/admin/attendance-students", icon: "fa-user-clock", label: "Absences Stagiaires" },
+      { to: "/admin/attendance-teachers", icon: "fa-calendar-check", label: "Présences Formateurs" },
+    ]
+  },
+  {
+    label: "Administration",
+    icon: "fa-gear",
+    items: [
+      { to: "/admin/students", icon: "fa-users", label: "Stagiaires" },
+      { to: "/admin/teachers", icon: "fa-chalkboard-user", label: "Formateurs" },
+      { to: "/admin/finance", icon: "fa-wallet", label: "Finance" },
+    ]
+  }
 ];
+
+const SidebarCategory = ({ cat, isSidebarOpen, renderNavLink, location, isMobile }) => {
+  // Dashboard has only 1 item, render directly
+  if (cat.items.length === 1) {
+    return renderNavLink(cat.items[0]);
+  }
+  
+  const isAnyActive = cat.items.some(item => location.pathname === item.to);
+  const [open, setOpen] = React.useState(isAnyActive);
+  
+  // Auto-open if navigating to a child
+  React.useEffect(() => {
+    if (isAnyActive) setOpen(true);
+  }, [isAnyActive]);
+
+  if (!isSidebarOpen && !isMobile) {
+    // Collapsed: show only icons
+    return cat.items.map(item => renderNavLink(item));
+  }
+
+  return (
+    <div style={{ marginBottom: '4px' }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '10px 16px',
+          borderRadius: 'var(--radius-lg)',
+          fontSize: '11px',
+          fontWeight: '800',
+          color: isAnyActive ? 'var(--primary)' : 'var(--text-muted)',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          transition: 'all 0.2s',
+        }}
+      >
+        <i className={`fa-solid ${cat.icon}`} style={{ fontSize: '11px', width: '16px', textAlign: 'center' }}></i>
+        <span style={{ flex: 1, textAlign: 'left' }}>{cat.label}</span>
+        <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: '9px', opacity: 0.5 }}></i>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            style={{ overflow: 'hidden', paddingLeft: '8px' }}
+          >
+            {cat.items.map(item => renderNavLink(item))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export default function DashboardLayout({ children }) {
   const { logout, notifications, markNotificationAsRead, clearNotifications } = useApp();
@@ -137,8 +223,10 @@ export default function DashboardLayout({ children }) {
           </Link>
         </div>
 
-        <nav style={{ flex: 1, padding: '24px 12px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }} className="no-scrollbar">
-          {NAV_LINKS.map(item => renderNavLink(item))}
+        <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }} className="no-scrollbar">
+          {NAV_CATEGORIES.map((cat, ci) => (
+            <SidebarCategory key={ci} cat={cat} isSidebarOpen={isSidebarOpen} renderNavLink={renderNavLink} location={location} />
+          ))}
         </nav>
 
         <div style={{ padding: '16px 12px', borderTop: '1px solid var(--border-light)' }}>
@@ -355,8 +443,10 @@ export default function DashboardLayout({ children }) {
               </button>
             </div>
             
-            <nav style={{ flex: 1, padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}>
-              {NAV_LINKS.map(item => renderNavLink(item, true))}
+            <nav style={{ flex: 1, padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
+              {NAV_CATEGORIES.map((cat, ci) => (
+                <SidebarCategory key={ci} cat={cat} isSidebarOpen={true} renderNavLink={(item) => renderNavLink(item, true)} location={location} isMobile={true} />
+              ))}
             </nav>
             
             <div style={{ padding: '20px 16px', borderTop: '1px solid var(--border-light)' }}>
