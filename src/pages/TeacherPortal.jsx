@@ -304,23 +304,6 @@ const TeacherPortal = () => {
     updateGrades(studentId, selectedSubject, { ...current, [field]: value });
   };
 
-    const handleMarkAllPresent = async () => {
-    if (!selectedSubject) return;
-    try {
-      const batchPromises = relevantStudents.map(student => {
-        const docId = `${student.id}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
-        const record = studentAttendance.find(a => a.id === docId);
-        if (!record || !['present', 'absent', 'retard'].includes(record.status)) {
-          return updateStudentAttendance(student.id, selectedSubject, selectedDate, 'present', '', teacher.id);
-        }
-        return Promise.resolve();
-      });
-      await Promise.all(batchPromises);
-      addNotification("Tous les stagiaires restants ont été marqués comme présents.");
-    } catch (e) {
-      addNotification("Erreur de sauvegarde.");
-    }
-  };
 
   const handleSave = () => {
     if (!selectedSubject) return;
@@ -652,14 +635,7 @@ const TeacherPortal = () => {
               <thead>
                 <tr>
                   <th style={thStyle}>Stagiaire</th>
-                  <th style={{ ...thStyle, textAlign: 'center', width: '220px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                      <span>Statut</span>
-                      <button onClick={handleMarkAllPresent} style={{ background: 'var(--primary-ultra-light)', color: 'var(--primary)', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '800', cursor: 'pointer' }} title="Marquer les restants comme présents">
-                        TOUS PRÉSENTS
-                      </button>
-                    </div>
-                  </th>
+                  <th style={{ ...thStyle, textAlign: 'center', width: '220px' }}>Statut</th>
                   <th style={thStyle}>Motif / Commentaire</th>
                 </tr>
               </thead>
