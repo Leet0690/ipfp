@@ -478,18 +478,18 @@ const TeacherPortal = () => {
                 </select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={lblStyle}>Groupe (Filière)</label>
-                <select className="input-premium" style={selectStyle} value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
-                  {filteredGroups.map(g => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={lblStyle}>Année</label>
                 <select className="input-premium" style={selectStyle} value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
                   {(teacher.years && teacher.years.length > 0 ? teacher.years : ['1ère année', '2ème année']).map(y => (
                     <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={lblStyle}>Groupe (Filière)</label>
+                <select className="input-premium" style={selectStyle} value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
+                  {filteredGroups.map(g => (
+                    <option key={g} value={g}>{g}</option>
                   ))}
                 </select>
               </div>
