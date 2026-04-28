@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   query,
   orderBy,
-  getDocs
+  getDocs,
+  limit
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -41,6 +42,7 @@ export const AppProvider = ({ children }) => {
 
   // Real-time listeners
   useEffect(() => {
+    // 1. Données Publiques / Essentielles (Chargées pour tout le monde pour le portail formateur)
     const unsubStudents = onSnapshot(query(collection(db, 'students'), orderBy('createdAt', 'desc')), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setStudents(data);
@@ -59,20 +61,9 @@ export const AppProvider = ({ children }) => {
       setGrades(data);
     });
 
-    const q = query(collection(db, 'notifications'), orderBy('timestamp', 'desc'));
-    const unsubNotifs = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setNotifications(data);
-    });
-
     const unsubStudentAttendance = onSnapshot(collection(db, 'attendance_stagiaires'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setStudentAttendance(data);
-    });
-
-    const unsubTeacherAttendance = onSnapshot(collection(db, 'attendance_formateurs'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTeacherAttendance(data);
     });
 
     const unsubSchedules = onSnapshot(collection(db, 'schedules'), (snapshot) => {
@@ -80,20 +71,46 @@ export const AppProvider = ({ children }) => {
       setSchedules(data);
     });
 
-    const unsubPayments = onSnapshot(query(collection(db, 'payments'), orderBy('createdAt', 'desc')), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPayments(data);
-    });
+    let unsubNotifs, unsubTeacherAttendance, unsubPayments, unsubSalaries, unsubModules;
 
-    const unsubSalaries = onSnapshot(query(collection(db, 'salaries'), orderBy('createdAt', 'desc')), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setSalaries(data);
-    });
+    // 2. Données Admin Sensibles & Lourdes (Chargées UNIQUEMENT si l'admin/directrice est connecté)
+    if (isAuthenticated || isDirectorAuth) {
+      const qNotifs = query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(100));
+      unsubNotifs = onSnapshot(qNotifs, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setNotifications(data);
+      });
 
-    const unsubModules = onSnapshot(query(collection(db, 'modules'), orderBy('name', 'asc')), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setModules(data);
-    });
+      unsubTeacherAttendance = onSnapshot(collection(db, 'attendance_formateurs'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setTeacherAttendance(data);
+      });
+
+      const qPayments = query(collection(db, 'payments'), orderBy('createdAt', 'desc'), limit(100));
+      unsubPayments = onSnapshot(qPayments, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setPayments(data);
+      });
+
+      const qSalaries = query(collection(db, 'salaries'), orderBy('createdAt', 'desc'), limit(100));
+      unsubSalaries = onSnapshot(qSalaries, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setSalaries(data);
+      });
+
+      const qModules = query(collection(db, 'modules'), orderBy('name', 'asc'));
+      unsubModules = onSnapshot(qModules, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setModules(data);
+      });
+    } else {
+      // Vider les données si déconnecté pour libérer la mémoire
+      setNotifications([]);
+      setTeacherAttendance([]);
+      setPayments([]);
+      setSalaries([]);
+      setModules([]);
+    }
 
     setLoading(false);
 
@@ -101,15 +118,16 @@ export const AppProvider = ({ children }) => {
       unsubStudents();
       unsubTeachers();
       unsubGrades();
-      unsubNotifs();
       unsubStudentAttendance();
-      unsubTeacherAttendance();
       unsubSchedules();
-      unsubPayments();
-      unsubSalaries();
-      unsubModules();
+      
+      if (unsubNotifs) unsubNotifs();
+      if (unsubTeacherAttendance) unsubTeacherAttendance();
+      if (unsubPayments) unsubPayments();
+      if (unsubSalaries) unsubSalaries();
+      if (unsubModules) unsubModules();
     };
-  }, []);
+  }, [isAuthenticated, isDirectorAuth]);
 
   // Data Migration (Local -> Firestore)
   useEffect(() => {

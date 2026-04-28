@@ -17,9 +17,9 @@ import Reports from './pages/Reports';
 import ScheduleManagement from './pages/ScheduleManagement';
 import FinanceDashboard from './pages/FinanceDashboard';
 import ModuleManagement from './pages/ModuleManagement';
+import Maintenance from './pages/Maintenance';
 
-
-// Component to scroll to top on route change
+const IS_MAINTENANCE = true; // Set to true to activate maintenance mode// Component to scroll to top on route change
 const ScrollToTop = () => {
   const { pathname } = useLocation();
   React.useEffect(() => {
@@ -40,6 +40,10 @@ const AppContent = () => {
                         location.pathname.startsWith('/portal/') || 
                         location.pathname.startsWith('/results/') ||
                         location.pathname.startsWith('/teacher/'); // Backward compatibility for old links
+  
+  if (IS_MAINTENANCE) {
+    return <Maintenance />;
+  }
   
   if (loading) {
     return (

@@ -137,6 +137,11 @@ const ModuleManagement = () => {
 
       {/* --- Filters --- */}
       <div className="glass-card" style={{ padding: '20px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+        <select className="input-premium" style={{ flex: 1 }} value={filterYear} onChange={e => setFilterYear(e.target.value)}>
+          <option value="">Toutes les années</option>
+          <option value="1ère année">1ère année</option>
+          <option value="2ème année">2ème année</option>
+        </select>
         <select className="input-premium" style={{ flex: 1 }} value={filterDiploma} onChange={e => setFilterDiploma(e.target.value)}>
           <option value="">Tous les niveaux</option>
           {diplomas.map(d => <option key={d} value={d}>{d}</option>)}
@@ -144,11 +149,6 @@ const ModuleManagement = () => {
         <select className="input-premium" style={{ flex: 1 }} value={filterMajor} onChange={e => setFilterMajor(e.target.value)}>
           <option value="">Toutes les filières</option>
           {majors.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <select className="input-premium" style={{ flex: 1 }} value={filterYear} onChange={e => setFilterYear(e.target.value)}>
-          <option value="">Toutes les années</option>
-          <option value="1ère année">1ère année</option>
-          <option value="2ème année">2ème année</option>
         </select>
       </div>
 
@@ -221,16 +221,16 @@ const ModuleManagement = () => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Niveau</label>
-                    <select className="input-premium" value={formData.diploma} onChange={e => setFormData({...formData, diploma: e.target.value, major: Object.keys(MODULES_DATA[e.target.value] || {})[0] || ''})}>
-                      {diplomas.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Année</label>
                     <select className="input-premium" value={formData.year} onChange={e => setFormData({...formData, year: e.target.value})}>
                       <option value="1ère année">1ère année</option>
                       <option value="2ème année">2ème année</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Niveau</label>
+                    <select className="input-premium" value={formData.diploma} onChange={e => setFormData({...formData, diploma: e.target.value, major: Object.keys(MODULES_DATA[e.target.value] || {})[0] || ''})}>
+                      {diplomas.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
                 </div>
