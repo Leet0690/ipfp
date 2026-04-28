@@ -5,7 +5,7 @@ import { jsPDF } from 'jspdf';
 import { logoBase64 } from '../utils/logoBase64';
 
 const FinanceDashboard = () => {
-  const isMaintenanceMode = true;
+  const isMaintenanceMode = false;
 
   if (isMaintenanceMode) {
     return (

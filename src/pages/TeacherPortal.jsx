@@ -46,7 +46,7 @@ const GradeInput = ({ value, onChange, placeholder = '—' }) => {
 const TeacherPortal = () => {
   const { teacherId } = useParams();
   const navigate = useNavigate();
-  const { teachers, students, updateGrades, grades, addNotification, loading, studentAttendance, updateStudentAttendance, schedules, updateTeacherAttendance } = useApp();
+  const { teachers, students, updateGrades, grades, addNotification, loading, studentAttendance, updateStudentAttendance, schedules, updateTeacherAttendance, loadAttendanceForSession } = useApp();
   
   const teacher = useMemo(() => {
     return teachers.find(t => t.tokenGrades === teacherId || t.tokenAttendance === teacherId || t.id === teacherId);
@@ -121,6 +121,13 @@ const TeacherPortal = () => {
       }
     }
   }, [currentSession]);
+
+  // Load attendance data for the current session on-demand (not via global listener)
+  React.useEffect(() => {
+    if (activeTab === 'attendance' && selectedSubject && selectedDate) {
+      loadAttendanceForSession(selectedSubject, selectedDate);
+    }
+  }, [activeTab, selectedSubject, selectedDate, loadAttendanceForSession]);
 
   // ── Filtering Logic ──
   const availableDiplomas = useMemo(() => {
@@ -295,6 +302,24 @@ const TeacherPortal = () => {
     if (!selectedSubject) return;
     const current = grades[studentId]?.[selectedSubject.replace(/\./g, '_')] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
     updateGrades(studentId, selectedSubject, { ...current, [field]: value });
+  };
+
+    const handleMarkAllPresent = async () => {
+    if (!selectedSubject) return;
+    try {
+      const batchPromises = relevantStudents.map(student => {
+        const docId = `${student.id}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
+        const record = studentAttendance.find(a => a.id === docId);
+        if (!record || !['present', 'absent', 'retard'].includes(record.status)) {
+          return updateStudentAttendance(student.id, selectedSubject, selectedDate, 'present', '', teacher.id);
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(batchPromises);
+      addNotification("Tous les stagiaires restants ont été marqués comme présents.");
+    } catch (e) {
+      addNotification("Erreur de sauvegarde.");
+    }
   };
 
   const handleSave = () => {
@@ -627,7 +652,14 @@ const TeacherPortal = () => {
               <thead>
                 <tr>
                   <th style={thStyle}>Stagiaire</th>
-                  <th style={{ ...thStyle, textAlign: 'center', width: '220px' }}>Statut</th>
+                  <th style={{ ...thStyle, textAlign: 'center', width: '220px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <span>Statut</span>
+                      <button onClick={handleMarkAllPresent} style={{ background: 'var(--primary-ultra-light)', color: 'var(--primary)', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '800', cursor: 'pointer' }} title="Marquer les restants comme présents">
+                        TOUS PRÉSENTS
+                      </button>
+                    </div>
+                  </th>
                   <th style={thStyle}>Motif / Commentaire</th>
                 </tr>
               </thead>

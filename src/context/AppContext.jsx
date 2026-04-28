@@ -11,6 +11,8 @@ import {
   query,
   orderBy,
   getDocs,
+  getDoc,
+  where,
   limit
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -42,94 +44,79 @@ export const AppProvider = ({ children }) => {
 
   // Real-time listeners
   useEffect(() => {
-    // 1. Données Publiques / Essentielles (Chargées pour tout le monde pour le portail formateur)
-    const unsubStudents = onSnapshot(query(collection(db, 'students'), orderBy('createdAt', 'desc')), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStudents(data);
-    });
+    const unsubs = [];
 
-    const unsubTeachers = onSnapshot(query(collection(db, 'teachers'), orderBy('createdAt', 'desc')), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTeachers(data);
-    });
+    // ──────────────────────────────────────────────────────────
+    // 1. DONNÉES PUBLIQUES (chargées pour tout le monde)
+    //    - students, teachers, grades, modules, schedules
+    //    Ces collections sont légères et nécessaires pour le portail formateur et les résultats stagiaire.
+    // ──────────────────────────────────────────────────────────
 
-    const unsubGrades = onSnapshot(collection(db, 'grades'), (snapshot) => {
+    unsubs.push(onSnapshot(query(collection(db, 'students'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setStudents(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }));
+
+    unsubs.push(onSnapshot(query(collection(db, 'teachers'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setTeachers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }));
+
+    unsubs.push(onSnapshot(collection(db, 'grades'), (snapshot) => {
       const data = {};
-      snapshot.docs.forEach(doc => {
-        data[doc.id] = doc.data();
-      });
+      snapshot.docs.forEach(d => { data[d.id] = d.data(); });
       setGrades(data);
-    });
+    }));
 
-    const unsubStudentAttendance = onSnapshot(collection(db, 'attendance_stagiaires'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStudentAttendance(data);
-    });
+    unsubs.push(onSnapshot(collection(db, 'schedules'), (snapshot) => {
+      setSchedules(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }));
 
-    const unsubSchedules = onSnapshot(collection(db, 'schedules'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setSchedules(data);
-    });
+    unsubs.push(onSnapshot(query(collection(db, 'modules'), orderBy('name', 'asc')), (snapshot) => {
+      setModules(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }));
 
-    let unsubNotifs, unsubTeacherAttendance, unsubPayments, unsubSalaries, unsubModules;
+    // ──────────────────────────────────────────────────────────
+    // 2. DONNÉES ADMIN UNIQUEMENT (chargées si admin/directrice connecté)
+    //    - studentAttendance, teacherAttendance, notifications, payments, salaries
+    //    Ces collections sont lourdes et ne doivent PAS être chargées pour les visiteurs publics.
+    // ──────────────────────────────────────────────────────────
 
-    // 2. Données Admin Sensibles & Lourdes (Chargées UNIQUEMENT si l'admin/directrice est connecté)
     if (isAuthenticated || isDirectorAuth) {
-      const qNotifs = query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(100));
-      unsubNotifs = onSnapshot(qNotifs, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setNotifications(data);
-      });
+      unsubs.push(onSnapshot(collection(db, 'attendance_stagiaires'), (snapshot) => {
+        setStudentAttendance(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }));
 
-      unsubTeacherAttendance = onSnapshot(collection(db, 'attendance_formateurs'), (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTeacherAttendance(data);
-      });
+      unsubs.push(onSnapshot(collection(db, 'attendance_formateurs'), (snapshot) => {
+        setTeacherAttendance(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }));
 
-      const qPayments = query(collection(db, 'payments'), orderBy('createdAt', 'desc'), limit(100));
-      unsubPayments = onSnapshot(qPayments, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setPayments(data);
-      });
+      unsubs.push(onSnapshot(query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(100)), (snapshot) => {
+        setNotifications(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }));
 
-      const qSalaries = query(collection(db, 'salaries'), orderBy('createdAt', 'desc'), limit(100));
-      unsubSalaries = onSnapshot(qSalaries, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setSalaries(data);
-      });
+      unsubs.push(onSnapshot(query(collection(db, 'payments'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
+        setPayments(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }));
 
-      const qModules = query(collection(db, 'modules'), orderBy('name', 'asc'));
-      unsubModules = onSnapshot(qModules, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setModules(data);
-      });
+      unsubs.push(onSnapshot(query(collection(db, 'salaries'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
+        setSalaries(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }));
     } else {
-      // Vider les données si déconnecté pour libérer la mémoire
+      // Vider les données admin si déconnecté
       setNotifications([]);
       setTeacherAttendance([]);
       setPayments([]);
       setSalaries([]);
-      setModules([]);
+      setStudentAttendance([]);
     }
 
     setLoading(false);
 
     return () => {
-      unsubStudents();
-      unsubTeachers();
-      unsubGrades();
-      unsubStudentAttendance();
-      unsubSchedules();
-      
-      if (unsubNotifs) unsubNotifs();
-      if (unsubTeacherAttendance) unsubTeacherAttendance();
-      if (unsubPayments) unsubPayments();
-      if (unsubSalaries) unsubSalaries();
-      if (unsubModules) unsubModules();
+      unsubs.forEach(unsub => unsub());
     };
   }, [isAuthenticated, isDirectorAuth]);
 
-  // Data Migration (Local -> Firestore)
+  // Data Migration (Local -> Firestore) — runs once
   useEffect(() => {
     const migrateData = async () => {
       try {
@@ -304,6 +291,46 @@ export const AppProvider = ({ children }) => {
       formateurId,
       timestamp: serverTimestamp()
     }, { merge: true });
+
+    // If we're on a teacher portal (not admin), update the local state immediately
+    // so the UI reflects the change without waiting for the global listener
+    if (!isAuthenticated) {
+      setStudentAttendance(prev => {
+        const existingIdx = prev.findIndex(a => a.id === docId);
+        const newRecord = { id: docId, studentId, moduleId, date, status, comment: comment || '', formateurId };
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = newRecord;
+          return updated;
+        }
+        return [...prev, newRecord];
+      });
+    }
+  };
+
+  // Teacher portal: load attendance for a specific teacher's session on demand
+  const loadAttendanceForSession = async (moduleId, date) => {
+    try {
+      const q = query(
+        collection(db, 'attendance_stagiaires'),
+        where('moduleId', '==', moduleId),
+        where('date', '==', date)
+      );
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setStudentAttendance(prev => {
+        // Merge new data with existing, avoiding duplicates
+        const existingIds = new Set(prev.map(a => a.id));
+        const newRecords = data.filter(a => !existingIds.has(a.id));
+        const updatedExisting = prev.map(a => {
+          const fresh = data.find(d => d.id === a.id);
+          return fresh || a;
+        });
+        return [...updatedExisting, ...newRecords];
+      });
+    } catch (e) {
+      console.error("Error loading session attendance:", e);
+    }
   };
 
   const updateTeacherAttendance = async (teacherId, date, status, comment, hours = 0, moduleId = '') => {
@@ -390,6 +417,7 @@ export const AppProvider = ({ children }) => {
       teacherAttendance,
       updateStudentAttendance,
       updateTeacherAttendance,
+      loadAttendanceForSession,
       schedules,
       addSchedule,
       deleteSchedule,

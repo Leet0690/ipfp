@@ -59,6 +59,9 @@ const StudentResults = () => {
   );
   const modules = studentModules.map(m => m.name || '');
 
+  // Helper to sanitize module name for grade lookup (dots → underscores)
+  const sanitize = (name) => name.replace(/\./g, '_');
+
   const isValidGrade = (val) => {
     if (val === '' || val === undefined || val === null) return true;
     const num = parseFloat(val);
@@ -84,7 +87,7 @@ const StudentResults = () => {
   // General average (CC*0.4 + EFC*0.6 for complete modules)
   let weightedSum = 0, totalCoeff = 0;
   studentModules.forEach(mod => {
-    const g = studentGrades[mod.name.replace(/\./g, '_')];
+    const g = studentGrades[sanitize(mod.name)];
     const cc = calcMoyenneCC(g);
     if (cc === null || !g || g.efcfp === '' || g.efcft === '') return;
     if (!isValidGrade(g.c1) || !isValidGrade(g.c2) || !isValidGrade(g.c3) || !isValidGrade(g.efcfp) || !isValidGrade(g.efcft)) return;
@@ -98,7 +101,7 @@ const StudentResults = () => {
   });
   const generalAvg = totalCoeff > 0 ? (weightedSum / totalCoeff).toFixed(2) : '—';
   const completedModules = modules.filter(mod => {
-    const g = studentGrades[mod.replace(/\./g, '_')];
+    const g = studentGrades[sanitize(mod)];
     return g && g.c1 !== '' && g.c2 !== '' && g.efcfp !== '' && g.efcft !== '';
   }).length;
 
@@ -186,7 +189,7 @@ const StudentResults = () => {
                 </thead>
                 <tbody>
                   {modules.map((mod, idx) => {
-                    const g = studentGrades[mod] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
+                    const g = studentGrades[sanitize(mod)] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
                     const moyCC = calcMoyenneCC(g);
 
                     return (
@@ -239,7 +242,7 @@ const StudentResults = () => {
       </div>
 
       {/* General Average */}
-      {validCount > 0 && (
+      {totalCoeff > 0 && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           className="glass-card" style={{ padding: '24px', textAlign: 'center', marginBottom: '32px' }}>
           <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Moyenne Générale</p>

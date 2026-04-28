@@ -27,7 +27,7 @@ export const generateToken = (length = 32) => {
  * @returns {string} Full URL
  */
 export const generateStudentResultsLink = (studentId, token) => {
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ipfp.manager.com';
+  const baseUrl = typeof window !== 'undefined' ? "https://portail-ipfp.web.app" : 'https://ipfp.manager.com';
   return `${baseUrl}/results/${studentId}?token=${token}`;
 };
 
@@ -38,7 +38,7 @@ export const generateStudentResultsLink = (studentId, token) => {
  * @returns {string} Full URL
  */
 export const generateTeacherEntryLink = (teacherId, token) => {
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ipfp.manager.com';
+  const baseUrl = typeof window !== 'undefined' ? "https://portail-ipfp.web.app" : 'https://ipfp.manager.com';
   return `${baseUrl}/teacher/${teacherId}?token=${token}`;
 };
 

@@ -258,7 +258,7 @@ export default function DashboardLayout({ children }) {
                       <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }} className="no-scrollbar">
                         {(notifications || []).length === 0 ? (
                           <p style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '32px 0' }}>Aucune notification.</p>
-                        ) : (notifications || []).map(n => (
+                        ) : (notifications || []).slice(0, 5).map(n => (
                           <div key={n.id} onClick={() => markNotificationAsRead(n.id)} style={{ padding: '12px 14px', borderRadius: 'var(--radius-lg)', cursor: 'pointer', background: n.read ? 'var(--bg-page)' : 'var(--primary-ultra-light)', border: `1px solid ${n.read ? 'var(--border-light)' : 'rgba(176,104,185,0.1)'}`, transition: 'all 0.2s' }}>
                             <p style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', lineHeight: '1.4' }}>{n.message}</p>
                             <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '600' }}>{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>

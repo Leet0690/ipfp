@@ -404,7 +404,7 @@ const AdminDashboard = () => {
     {
       accessorKey: 'token', header: activeTab === 'students' ? 'Lien' : 'Liens Formateur',
       cell: ({ row }) => {
-        const base = window.location.origin;
+        const base = "https://portail-ipfp.web.app";
         if (activeTab === 'students') {
           const cleanToken = (row.original.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
           const fullLink = base + `/results/${cleanToken}`;
@@ -445,7 +445,7 @@ const AdminDashboard = () => {
       id: 'actions', header: '',
       cell: ({ row }) => {
         const copyLink = () => {
-          const base = window.location.origin;
+          const base = "https://portail-ipfp.web.app";
           if (activeTab === 'students') {
             const cleanToken = (row.original.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
             navigator.clipboard?.writeText(base + `/results/${cleanToken}`);
@@ -799,10 +799,10 @@ const AdminDashboard = () => {
                     {activeTab === 'students' ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', fontFamily: 'monospace', padding: '8px 12px', background: 'white' }}
-                          value={`${window.location.origin}/results/${(selectedItem.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '')}`} />
+                          value={`${"https://portail-ipfp.web.app"}/results/${(selectedItem.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '')}`} />
                         <button className="btn-modern primary" style={{ padding: '8px 14px', fontSize: '11px', flexShrink: 0 }}
                           onClick={() => {
-                            const link = `${window.location.origin}/results/${(selectedItem.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '')}`;
+                            const link = `${"https://portail-ipfp.web.app"}/results/${(selectedItem.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '')}`;
                             navigator.clipboard?.writeText(link);
                             alert('Lien copié !');
                           }}>
@@ -814,13 +814,13 @@ const AdminDashboard = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '10px', fontWeight: '700', width: '80px', color: 'var(--text-muted)' }}>NOTES:</span>
                           <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', fontFamily: 'monospace', padding: '6px 10px', background: 'white' }}
-                            value={`${window.location.origin}/portal/${selectedItem.tokenGrades}`} />
+                            value={`${"https://portail-ipfp.web.app"}/portal/${selectedItem.tokenGrades}`} />
                           {/* Copy icon removed for teachers */}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '10px', fontWeight: '700', width: '80px', color: 'var(--text-muted)' }}>ABSENCES:</span>
                           <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', fontFamily: 'monospace', padding: '6px 10px', background: 'white' }}
-                            value={`${window.location.origin}/portal/${selectedItem.tokenAttendance}`} />
+                            value={`${"https://portail-ipfp.web.app"}/portal/${selectedItem.tokenAttendance}`} />
                           {/* Copy icon removed for teachers */}
                         </div>
                       </div>

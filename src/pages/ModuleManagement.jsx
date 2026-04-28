@@ -13,12 +13,14 @@ const ModuleManagement = () => {
     coefficient: '1',
     diploma: 'Technicien Spécialisé',
     major: 'Développement Informatique',
-    year: '1ère année'
+    year: '1ère année',
+    semester: 'S1'
   });
 
   const [filterDiploma, setFilterDiploma] = useState('');
   const [filterMajor, setFilterMajor] = useState('');
   const [filterYear, setFilterYear] = useState('');
+  const [filterSemester, setFilterSemester] = useState('');
 
   // --- Helpers ---
   const diplomas = Object.keys(MODULES_DATA);
@@ -29,12 +31,13 @@ const ModuleManagement = () => {
       if (filterDiploma && m.diploma !== filterDiploma) return false;
       if (filterMajor && m.major !== filterMajor) return false;
       if (filterYear && m.year !== filterYear) return false;
+      if (filterSemester && m.semester !== filterSemester) return false;
       return true;
     });
 
     const groups = {};
     f.forEach(m => {
-      const key = `${m.name}_${m.diploma}_${m.coefficient}`;
+      const key = `${m.name}_${m.diploma}_${m.coefficient}_${m.semester || 'S1'}`;
       if (!groups[key]) {
         groups[key] = {
           ...m,
@@ -94,7 +97,8 @@ const ModuleManagement = () => {
       coefficient: '1',
       diploma: Object.keys(MODULES_DATA)[0],
       major: Object.keys(MODULES_DATA[Object.keys(MODULES_DATA)[0]])[0],
-      year: '1ère année'
+      year: '1ère année',
+      semester: 'S1'
     });
     setIsEditing(false);
     setSelectedIds([]);
@@ -106,7 +110,8 @@ const ModuleManagement = () => {
       coefficient: m.coefficient.toString(),
       diploma: m.diploma,
       major: m.major,
-      year: m.year
+      year: m.year,
+      semester: m.semester || 'S1'
     });
     setSelectedIds(m.ids || [m.id]);
     setIsEditing(true);
@@ -150,6 +155,11 @@ const ModuleManagement = () => {
           <option value="">Toutes les filières</option>
           {majors.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
+        <select className="input-premium" style={{ flex: 1, maxWidth: '120px' }} value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
+          <option value="">Tous Semestres</option>
+          <option value="S1">S1</option>
+          <option value="S2">S2</option>
+        </select>
       </div>
 
       {/* --- Modules Table --- */}
@@ -159,6 +169,7 @@ const ModuleManagement = () => {
             <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-light)' }}>
               <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)' }}>Nom du Module</th>
               <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)' }}>Niveau</th>
+              <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', textAlign: 'center' }}>Sem.</th>
               <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)' }}>Classes</th>
               <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', textAlign: 'center' }}>Coeff.</th>
               <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', textAlign: 'right' }}>Actions</th>
@@ -176,6 +187,9 @@ const ModuleManagement = () => {
                 </td>
                 <td style={{ padding: '16px' }}>
                   <p style={{ fontSize: '12px', fontWeight: '600' }}>{m.diploma}</p>
+                </td>
+                <td style={{ padding: '16px', textAlign: 'center' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--primary)', fontSize: '12px' }}>{m.semester || 'S1'}</span>
                 </td>
                 <td style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -215,9 +229,18 @@ const ModuleManagement = () => {
                   <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Nom du Module</label>
                   <input className="input-premium" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Coefficient</label>
-                  <input className="input-premium" type="number" step="0.25" min="0.25" value={formData.coefficient} onChange={e => setFormData({...formData, coefficient: e.target.value})} required />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Coefficient</label>
+                    <input className="input-premium" type="number" step="0.25" min="0.25" value={formData.coefficient} onChange={e => setFormData({...formData, coefficient: e.target.value})} required />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Semestre</label>
+                    <select className="input-premium" value={formData.semester} onChange={e => setFormData({...formData, semester: e.target.value})}>
+                      <option value="S1">S1</option>
+                      <option value="S2">S2</option>
+                    </select>
+                  </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
