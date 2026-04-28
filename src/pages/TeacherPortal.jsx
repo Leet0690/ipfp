@@ -123,12 +123,44 @@ const TeacherPortal = () => {
   }, [currentSession]);
 
   // ── Filtering Logic ──
-  const filteredGroups = useMemo(() => {
+  const availableDiplomas = useMemo(() => {
+    if (!teacher) return [];
+    const teacherDiplomas = teacher.diplomas || (teacher.diploma ? [teacher.diploma] : []);
+    const teacherSubjects = teacher.subjects || [teacher.subject] || [];
+    
+    return teacherDiplomas.filter(dip => {
+      const diplomaData = MODULES_DATA[dip] || {};
+      return Object.values(diplomaData).some(filiere => 
+        Object.values(filiere).some(yearModules => 
+          teacherSubjects.some(s => yearModules.includes(s))
+        )
+      );
+    });
+  }, [teacher]);
+
+  const availableYears = useMemo(() => {
     if (!teacher || !selectedDiploma) return [];
-    const teacherGroups = teacher.groups || [];
-    const diplomaGroups = Object.keys(MODULES_DATA[selectedDiploma] || {});
-    return teacherGroups.filter(g => diplomaGroups.includes(g));
+    const teacherYears = teacher.years || ['1ère année', '2ème année'];
+    const teacherSubjects = teacher.subjects || [teacher.subject] || [];
+    const diplomaData = MODULES_DATA[selectedDiploma] || {};
+
+    return teacherYears.filter(y => 
+      Object.values(diplomaData).some(filiere => 
+        (filiere[y] || []).some(m => teacherSubjects.includes(m))
+      )
+    );
   }, [teacher, selectedDiploma]);
+
+  const filteredGroups = useMemo(() => {
+    if (!teacher || !selectedDiploma || !filterYear) return [];
+    const teacherGroups = teacher.groups || [];
+    const teacherSubjects = teacher.subjects || [teacher.subject] || [];
+    const diplomaData = MODULES_DATA[selectedDiploma] || {};
+    
+    return teacherGroups.filter(g => 
+      (diplomaData[g]?.[filterYear] || []).some(m => teacherSubjects.includes(m))
+    );
+  }, [teacher, selectedDiploma, filterYear]);
 
   const filteredSubjects = useMemo(() => {
     if (!teacher || !selectedDiploma || !selectedGroup || !filterYear) return [];
@@ -139,13 +171,16 @@ const TeacherPortal = () => {
 
   // Sync selections
   React.useEffect(() => {
-    if (teacher) {
-      const diplomas = teacher.diplomas || (teacher.diploma ? [teacher.diploma] : []);
-      if (diplomas.length > 0 && !selectedDiploma) {
-        setSelectedDiploma(diplomas[0]);
-      }
+    if (availableDiplomas.length > 0 && (!selectedDiploma || !availableDiplomas.includes(selectedDiploma))) {
+      setSelectedDiploma(availableDiplomas[0]);
     }
-  }, [teacher, selectedDiploma]);
+  }, [availableDiplomas, selectedDiploma]);
+
+  React.useEffect(() => {
+    if (availableYears.length > 0 && (!filterYear || !availableYears.includes(filterYear))) {
+      setFilterYear(availableYears[0]);
+    }
+  }, [availableYears, filterYear]);
 
   React.useEffect(() => {
     if (activeTab === 'grades' || !currentSession) {
@@ -162,14 +197,6 @@ const TeacherPortal = () => {
       }
     }
   }, [filteredSubjects, selectedSubject, activeTab, currentSession]);
-
-  React.useEffect(() => {
-    if (teacher && activeTab === 'grades') {
-      if (teacher.years && teacher.years.length > 0 && !teacher.years.includes(filterYear)) {
-        setFilterYear(teacher.years[0]);
-      }
-    }
-  }, [teacher, activeTab, filterYear]);
 
   // Filter students based on selected group AND year AND diploma
   // Module match is relaxed: we only require group + year + diploma
@@ -472,7 +499,7 @@ const TeacherPortal = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={lblStyle}>Diplôme</label>
                 <select className="input-premium" style={selectStyle} value={selectedDiploma} onChange={(e) => setSelectedDiploma(e.target.value)}>
-                  {(teacher.diplomas || (teacher.diploma ? [teacher.diploma] : [])).map(d => (
+                  {availableDiplomas.map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
@@ -480,7 +507,7 @@ const TeacherPortal = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={lblStyle}>Année</label>
                 <select className="input-premium" style={selectStyle} value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
-                  {(teacher.years && teacher.years.length > 0 ? teacher.years : ['1ère année', '2ème année']).map(y => (
+                  {availableYears.map(y => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
