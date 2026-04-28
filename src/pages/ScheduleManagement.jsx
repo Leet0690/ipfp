@@ -22,7 +22,7 @@ const getGroupAbbreviation = (filiere, annee) => {
 };
 
 const ScheduleManagement = () => {
-  const { teachers, schedules, addSchedule, deleteSchedule } = useApp();
+  const { teachers, schedules, addSchedule, deleteSchedule, modules: allModules } = useApp();
   
   const allFilieres = useMemo(() => Array.from(new Set(Object.values(FILIERES).flat())), []);
   const allAnnees = ['1ère année', '2ème année'];
@@ -42,20 +42,18 @@ const ScheduleManagement = () => {
     type: 'Cours'
   });
 
-  const modules = useMemo(() => {
-    for (const dip in MODULES_DATA) {
-      if (MODULES_DATA[dip][filiere] && MODULES_DATA[dip][filiere][annee]) {
-        return MODULES_DATA[dip][filiere][annee];
-      }
-    }
-    return [];
-  }, [filiere, annee]);
+  const currentModules = useMemo(() => {
+    return allModules.filter(m => 
+      m.major === filiere && 
+      m.year === annee
+    ).map(m => m.name);
+  }, [filiere, annee, allModules]);
 
   // Filter schedules that belong to selected filiere and annee
   const filteredSchedules = schedules.filter(s => s.filiere === filiere && s.annee === annee);
   
-  const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-  const timeSlots = ['08h30 - 10h30', '10h30 - 12h30', '14h00 - 16h00', '16h00 - 18h00'];
+  const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+  const timeSlots = ['08:30-10:30', '10:30-12:30', '14:00-16:00', '16:00-18:00'];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -112,9 +110,9 @@ const ScheduleManagement = () => {
                   return daySessions.map((session) => {
                      const teacher = teachers.find(t => t.id === session.teacherId);
                      return (
-                      <div key={session.id} style={{ position: 'relative', background: 'var(--bg-page)', padding: '14px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xs)', border: '1px solid var(--border-light)', borderLeft: `3px solid ${session.type === 'TP' ? 'var(--primary)' : 'var(--accent)'}`, transition: 'transform 0.2s' }} className="group">
-                        <button onClick={() => deleteSchedule(session.id)} style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: 0, transition: 'opacity 0.2s' }} className="group-hover-show">
-                           <i className="fa-solid fa-xmark" style={{ fontSize: '10px' }}></i>
+                      <div key={session.id} style={{ position: 'relative', background: 'var(--bg-page)', padding: '14px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xs)', border: '1px solid var(--border-light)', borderLeft: `3px solid ${session.type === 'TP' ? 'var(--primary)' : 'var(--accent)'}`, transition: 'transform 0.2s' }}>
+                        <button onClick={() => { if(window.confirm('Voulez-vous vraiment supprimer cette séance ?')) deleteSchedule(session.id) }} style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: 0.7, transition: 'all 0.2s' }} title="Supprimer" onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = 'white'; }} onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.7; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#ef4444'; }}>
+                           <i className="fa-solid fa-trash-can" style={{ fontSize: '11px' }}></i>
                         </button>
                         <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}><i className="fa-regular fa-clock" style={{marginRight: '4px'}}></i> {session.time}</div>
                         <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.3', marginBottom: '8px' }}>{session.module}</div>
@@ -178,15 +176,14 @@ const ScheduleManagement = () => {
                       <option value="">Sélectionner un module...</option>
                       {(() => {
                         const teacher = teachers.find(t => t.id === formData.teacherId);
-                        const teacherModules = teacher ? (teacher.subjects || [teacher.subject]) : [];
                         // Filter academic modules to only show what the teacher teaches
-                        return teacherModules.filter(m => modules.includes(m)).map(m => <option key={m} value={m}>{m}</option>);
+                        return teacherModules.filter(m => currentModules.includes(m)).map(m => <option key={m} value={m}>{m}</option>);
                       })()}
                       {/* If the teacher teaches something NOT in the curriculum selection for this filiere/year, we show it anyway as fallback */}
                       {(() => {
                         const teacher = teachers.find(t => t.id === formData.teacherId);
                         const teacherModules = teacher ? (teacher.subjects || [teacher.subject]) : [];
-                        return teacherModules.filter(m => !modules.includes(m)).map(m => <option key={m} value={m}>{m} (Hors prog.)</option>);
+                        return teacherModules.filter(m => !currentModules.includes(m)).map(m => <option key={m} value={m}>{m} (Hors prog.)</option>);
                       })()}
                    </select>
                  </div>
@@ -200,10 +197,6 @@ const ScheduleManagement = () => {
            </div>
         )}
       </AnimatePresence>
-      <style>{`
-        .group-hover-show { opacity: 0; }
-        .group:hover .group-hover-show { opacity: 1; }
-      `}</style>
     </div>
   );
 };

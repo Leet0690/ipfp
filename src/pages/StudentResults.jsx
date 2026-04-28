@@ -2,8 +2,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import { getModulesForStudent } from '../data/modules';
-import TokenProtection from '../components/TokenProtection';
+
 
 /* ── Styles ── */
 const thStyle = { padding: '10px 12px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-subtle)', whiteSpace: 'nowrap' };
@@ -11,9 +10,25 @@ const tdStyle = { padding: '10px 12px', borderBottom: '1px solid var(--border-li
 
 const StudentResults = () => {
   const { studentId } = useParams();
-  const { students, grades, loading } = useApp();
+  const { students = [], grades = {}, loading = false, modules: allModules = [] } = useApp() || {};
   
-  const student = students.find(s => s.token === studentId || s.id === studentId);
+  const student = students.find(s => {
+    if (!s) return false;
+    const sToken = String(s.token || '');
+    const sId = String(s.id || '');
+    const urlId = String(studentId || '');
+    
+    const clean = (str) => {
+      if (!str) return '';
+      try {
+        return decodeURIComponent(str).toLowerCase().replace(/[^a-z0-9-]/g, '');
+      } catch(e) {
+        return String(str).toLowerCase().replace(/[^a-z0-9-]/g, '');
+      }
+    };
+    
+    return clean(sToken) === clean(urlId) || clean(sId) === clean(urlId);
+  });
   
   if (loading && students.length === 0) {
     return (
@@ -36,11 +51,25 @@ const StudentResults = () => {
   }
 
   const studentGrades = grades[student.id] || {};
-  const modules = getModulesForStudent(student);
+  const studentModules = (allModules || []).filter(m => 
+    m && student &&
+    m.diploma === student.diploma && 
+    m.major === student.major && 
+    m.year === student.year
+  );
+  const modules = studentModules.map(m => m.name || '');
+
+  const isValidGrade = (val) => {
+    if (val === '' || val === undefined || val === null) return true;
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0 && num <= 20;
+  };
 
   // Moyenne CC: if C3 exists → (C1+C2+C3)/3, else (C1+C2)/2
   const calcMoyenneCC = (g) => {
     if (!g || g.c1 === '' || g.c2 === '') return null;
+    if (!isValidGrade(g.c1) || !isValidGrade(g.c2) || !isValidGrade(g.c3)) return null;
+    
     const c1 = parseFloat(g.c1), c2 = parseFloat(g.c2);
     if (isNaN(c1) || isNaN(c2)) return null;
     if (g.c3 !== '' && g.c3 !== undefined && g.c3 !== null) {
@@ -53,20 +82,23 @@ const StudentResults = () => {
   const hasC3 = (g) => g && g.c3 !== '' && g.c3 !== undefined && g.c3 !== null && !isNaN(parseFloat(g.c3));
 
   // General average (CC*0.4 + EFC*0.6 for complete modules)
-  let totalPoints = 0, validCount = 0;
-  modules.forEach(mod => {
-    const g = studentGrades[mod];
+  let weightedSum = 0, totalCoeff = 0;
+  studentModules.forEach(mod => {
+    const g = studentGrades[mod.name.replace(/\./g, '_')];
     const cc = calcMoyenneCC(g);
     if (cc === null || !g || g.efcfp === '' || g.efcft === '') return;
+    if (!isValidGrade(g.c1) || !isValidGrade(g.c2) || !isValidGrade(g.c3) || !isValidGrade(g.efcfp) || !isValidGrade(g.efcft)) return;
+
     const efcfp = parseFloat(g.efcfp), efcft = parseFloat(g.efcft);
     if (isNaN(efcfp) || isNaN(efcft)) return;
     const efc = (efcfp + efcft) / 2;
-    totalPoints += (cc * 0.4 + efc * 0.6);
-    validCount++;
+    const coeff = mod.coefficient || 1;
+    weightedSum += (cc * 0.4 + efc * 0.6) * coeff;
+    totalCoeff += coeff;
   });
-  const generalAvg = validCount > 0 ? (totalPoints / validCount).toFixed(2) : '—';
+  const generalAvg = totalCoeff > 0 ? (weightedSum / totalCoeff).toFixed(2) : '—';
   const completedModules = modules.filter(mod => {
-    const g = studentGrades[mod];
+    const g = studentGrades[mod.replace(/\./g, '_')];
     return g && g.c1 !== '' && g.c2 !== '' && g.efcfp !== '' && g.efcft !== '';
   }).length;
 
@@ -232,10 +264,4 @@ const StudentResults = () => {
   );
 };
 
-export default function StudentResultsPage() {
-  return (
-    <TokenProtection tokenType="student_results">
-      <StudentResults />
-    </TokenProtection>
-  );
-}
+export default StudentResults;

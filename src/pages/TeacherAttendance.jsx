@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { MODULES_DATA } from '../data/modules';
 
 const thStyle = { padding: '10px 12px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-subtle)', whiteSpace: 'nowrap' };
 const tdStyle = { padding: '10px 12px', borderBottom: '1px solid var(--border-light)' };
@@ -13,6 +14,49 @@ const MiniStat = ({ label, value }) => (
   </div>
 );
 
+// Calculate duration in hours from a time range string like "08:00-11:30" or "08h30-11h30"
+const calcDuration = (timeStr) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d{1,2})[h:]?(\d{2})?\s*[-–—]\s*(\d{1,2})[h:]?(\d{2})?/i);
+  if (!match) return 0;
+  try {
+    const h1 = parseInt(match[1] || 0, 10);
+    const m1 = parseInt(match[2] || 0, 10);
+    const h2 = parseInt(match[3] || 0, 10);
+    const m2 = parseInt(match[4] || 0, 10);
+    const diffMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
+    return Math.max(0, Math.round((diffMinutes / 60) * 100) / 100);
+  } catch {
+    return 0;
+  }
+};
+
+// Format hours for display
+const formatHours = (h) => {
+  if (!h || h === 0) return '0h';
+  const hrs = Math.floor(h);
+  const mins = Math.round((h - hrs) * 60);
+  return mins > 0 ? `${hrs}h${mins}min` : `${hrs}h`;
+};
+
+const getGroupAbbreviation = (filiere, annee) => {
+  let diplomaAbbr = "";
+  let majorAbbr = "";
+  for (const dip in MODULES_DATA) {
+    if (MODULES_DATA[dip][filiere]) {
+      diplomaAbbr = dip.includes('Spécialisé') ? "TS" : "T";
+      break;
+    }
+  }
+  if (filiere.includes('Développement')) majorAbbr = "DI";
+  else if (filiere.includes('Gestion Informatisée')) majorAbbr = "GI";
+  else if (filiere.includes('Logistique')) majorAbbr = "GTL";
+  else if (filiere.includes('Entreprises')) majorAbbr = "GE";
+  else majorAbbr = filiere.split(' ').map(w => w[0]).join('').toUpperCase();
+  const yearNum = annee.includes('1') ? "1" : "2";
+  return diplomaAbbr + majorAbbr + yearNum;
+};
+
 const TeacherAttendance = () => {
   const { teachers, teacherAttendance, updateTeacherAttendance, addNotification, schedules } = useApp();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -23,89 +67,104 @@ const TeacherAttendance = () => {
     return days[new Date(selectedDate).getDay()];
   }, [selectedDate]);
 
-  const filteredTeachers = useMemo(() => {
-    return (teachers || []).filter(t => {
-      // Only show teachers who have at least one session scheduled today (dayOfWeek)
-      const hasSession = (schedules || []).some(s => s.teacherId === t.id && s.day === dayOfWeek);
-      if (!hasSession) return false;
+  // Build a flat list of rows: one per unique (teacher × time) for this day
+  const sessionRows = useMemo(() => {
+    const todaySessions = (schedules || []).filter(s => s.day === dayOfWeek);
+    const slotsMap = new Map(); // teacherId_normalizedTime -> row object
+    
+    todaySessions.forEach(session => {
+      const teacher = (teachers || []).find(t => t.id === session.teacherId);
+      if (!teacher) return;
+      
+      const normalizedTime = (session.time || '').replace(/[^0-9]/g, '');
+      const safeTeacherName = (teacher.name || 'inconnu').toLowerCase().trim();
+      const slotKey = `${safeTeacherName}_${normalizedTime}`;
+      
+      const abbr = getGroupAbbreviation(session.filiere, session.annee);
 
-      if (searchTerm) {
-        if (!t.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      if (slotsMap.has(slotKey)) {
+        const existingRow = slotsMap.get(slotKey);
+        if (!existingRow.groups.includes(abbr)) {
+          existingRow.groups.push(abbr);
+        }
+        return;
       }
-      return true;
-    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [teachers, searchTerm, dayOfWeek, schedules]);
+      
+      // Search filter
+      if (searchTerm && !teacher.name.toLowerCase().includes(searchTerm.toLowerCase())) return;
+
+      const duration = calcDuration(session.time);
+      const safeModule = (session.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+      const docId = `${teacher.id}_${safeModule}_${selectedDate}`;
+      
+      slotsMap.set(slotKey, {
+        key: slotKey,
+        session,
+        teacher,
+        duration,
+        docId,
+        module: session.module,
+        time: session.time,
+        groups: [abbr],
+      });
+    });
+
+    const rows = Array.from(slotsMap.values());
+
+    // Sort by teacher name, then by time
+    rows.sort((a, b) => {
+      const nameComp = (a.teacher.name || '').localeCompare(b.teacher.name || '');
+      if (nameComp !== 0) return nameComp;
+      return (a.time || '').localeCompare(b.time || '');
+    });
+
+    return rows;
+  }, [schedules, teachers, dayOfWeek, searchTerm, selectedDate]);
 
   // Statistics
   const stats = useMemo(() => {
-    let presents = 0, absents = 0, totalHours = 0;
-    filteredTeachers.forEach(t => {
-      const docId = `${t.id}_${selectedDate}`;
-      const record = teacherAttendance.find(a => a.id === docId);
+    let presents = 0, absents = 0, totalHours = 0, total = sessionRows.length;
+    sessionRows.forEach(row => {
+      const record = teacherAttendance.find(a => a.id === row.docId);
       if (record) {
         if (record.status === 'present') {
           presents++;
-          // record.hours should be the numeric value (1.5, 2, 3.5, 4)
           totalHours += (record.hours || 0);
+        } else if (record.status === 'absent') {
+          absents++;
         }
-        else if (record.status === 'absent') absents++;
       }
     });
-    return { presents, absents, totalHours, total: filteredTeachers.length };
-  }, [filteredTeachers, teacherAttendance, selectedDate]);
+    return { presents, absents, totalHours, total };
+  }, [sessionRows, teacherAttendance]);
 
-  const handleStatusChange = async (teacherId, status) => {
+  const handleStatusChange = async (row, status) => {
     try {
-      const docId = `${teacherId}_${selectedDate}`;
-      const record = teacherAttendance.find(a => a.id === docId);
-      let hours = status === 'present' ? (record?.hours || 1.5) : 0; // Default to 1.5h (1h30)
-      const moduleId = record?.moduleId || (teachers.find(t => t.id === teacherId)?.subjects?.[0] || '');
-      await updateTeacherAttendance(teacherId, selectedDate, status, record?.comment || '', hours, moduleId);
+      const hours = status === 'present' ? row.duration : 0;
+      await updateTeacherAttendance(row.teacher.id, selectedDate, status, '', hours, row.module);
     } catch (error) {
       console.error(error);
       addNotification("Erreur lors de l'enregistrement.");
     }
   };
 
-  const handleModuleChange = async (teacherId, moduleId) => {
+  const handleHoursChange = async (row, hours) => {
     try {
-      const docId = `${teacherId}_selectedDate`; // Note: This doesn't match firestore ID, just logic check
-      const record = teacherAttendance.find(a => a.id === `${teacherId}_${selectedDate}`);
-      let status = record ? record.status : 'present';
-      await updateTeacherAttendance(teacherId, selectedDate, status, record?.comment || '', record?.hours || 1.5, moduleId);
+      const record = teacherAttendance.find(a => a.id === row.docId);
+      const status = record?.status || 'present';
+      await updateTeacherAttendance(row.teacher.id, selectedDate, status, record?.comment || '', hours, row.module);
     } catch (error) {
       console.error(error);
     }
-  };
-
-  const handleHoursChange = async (teacherId, hours) => {
-    try {
-      const docId = `${teacherId}_${selectedDate}`;
-      const record = teacherAttendance.find(a => a.id === docId);
-      if (record?.status === 'present') {
-        await updateTeacherAttendance(teacherId, selectedDate, 'present', record?.comment || '', hours, record?.moduleId || '');
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleCommentChange = async (teacherId, comment) => {
-    const docId = `${teacherId}_${selectedDate}`;
-    let record = teacherAttendance.find(a => a.id === docId);
-    let status = record ? record.status : 'present'; 
-    await updateTeacherAttendance(teacherId, selectedDate, status, comment, record?.hours || 1.5, record?.moduleId || '');
   };
 
   const exportCSV = () => {
-    if (!filteredTeachers.length) return alert('Aucune donnée à exporter.');
-    const headers = "\uFEFFFormateur,Module Enseigné,Date,Statut,Heures,Commentaire\n";
-    const rows = filteredTeachers.map(t => {
-      const docId = `${t.id}_${selectedDate}`;
-      const r = teacherAttendance.find(a => a.id === docId) || {};
-      const module = r.moduleId || (t.subjects || [t.subject])[0] || '';
+    if (!sessionRows.length) return alert('Aucune donnée à exporter.');
+    const headers = "\uFEFFFormateur,Module,Horaire,Filière,Année,Date,Statut,Heures\n";
+    const rows = sessionRows.map(row => {
+      const r = teacherAttendance.find(a => a.id === row.docId) || {};
       const hours = r.status === 'present' ? (r.hours || 0) : 0;
-      return `"${t.name}","${module}","${selectedDate}","${r.status || 'non défini'}","${hours}","${r.comment || ''}"`;
+      return `"${row.teacher.name}","${row.module}","${row.time}","${row.filiere}","${row.annee}","${selectedDate}","${r.status || 'non défini'}","${hours}"`;
     }).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
@@ -121,7 +180,7 @@ const TeacherAttendance = () => {
             Présences Formateurs
           </h1>
           <p style={{ color: 'var(--text-tertiary)', fontSize: '15px', marginBottom: '28px' }}>
-            Suivi journalier du corps enseignant.
+            Suivi journalier par séance — chaque module est suivi indépendamment.
           </p>
         </div>
         <button onClick={exportCSV} className="btn-modern secondary" style={{ padding: '8px 16px', fontSize: '12px' }}>
@@ -138,6 +197,12 @@ const TeacherAttendance = () => {
               value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={lbl}>Jour</label>
+            <div className="input-premium" style={{ padding: '7px 12px', fontSize: '13px', background: 'var(--bg-subtle)', fontWeight: '700', color: 'var(--primary)' }}>
+              {dayOfWeek}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={lbl}>Recherche</label>
             <div style={{ position: 'relative' }}>
                <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', fontSize: '12px' }}></i>
@@ -148,129 +213,89 @@ const TeacherAttendance = () => {
       </motion.div>
 
       {/* Stats Summary */}
-      {filteredTeachers.length > 0 && (
+      {sessionRows.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          <MiniStat label="Effectif Total" value={stats.total} />
+          <MiniStat label="Séances" value={stats.total} />
           <MiniStat label="Présents" value={stats.presents} />
           <MiniStat label="Absents" value={stats.absents} />
-          <MiniStat label="Total Heures" value={(() => {
-            const h = Math.floor(stats.totalHours);
-            const m = Math.round((stats.totalHours - h) * 60);
-            return m > 0 ? `${h}h${m}min` : `${h}h`;
-          })()} />
+          <MiniStat label="Total Heures" value={formatHours(stats.totalHours)} />
           <MiniStat label="Taux Présence" value={stats.total > 0 ? `${Math.round((stats.presents / stats.total) * 100)}%` : '—'} />
         </motion.div>
       )}
 
       {/* Table */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-        {filteredTeachers.length === 0 ? (
+        {sessionRows.length === 0 ? (
           <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
             <i className="fa-solid fa-chalkboard-user" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
-            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Aucun formateur trouvé.</p>
+            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Aucune séance planifiée pour {dayOfWeek}.</p>
           </div>
         ) : (
           <div style={{ background: 'white', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: 'var(--shadow-xs)' }}>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '600px' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '700px' }}>
                 <thead>
                   <tr>
                     <th style={{ ...thStyle, width: '40px', textAlign: 'center' }}>#</th>
                     <th style={thStyle}>Formateur</th>
-                    <th style={thStyle}>Module de la Séance</th>
+                    <th style={thStyle}>Module</th>
+                    <th style={thStyle}>Horaire</th>
+                    <th style={thStyle}>Groupe</th>
+                    <th style={{ ...thStyle, textAlign: 'center', width: '90px' }}>Durée</th>
                     <th style={{ ...thStyle, textAlign: 'center', width: '150px' }}>Statut</th>
-                    <th style={{ ...thStyle, textAlign: 'center', width: '130px' }}>Durée</th>
-                    <th style={thStyle}>Remarque</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTeachers.map((teacher, idx) => {
-                    const docId = `${teacher.id}_${selectedDate}`;
-                    const record = teacherAttendance.find(a => a.id === docId);
+                  {sessionRows.map((row, idx) => {
+                    const record = teacherAttendance.find(a => a.id === row.docId);
                     const status = record?.status || '';
-                    const comment = record?.comment || '';
 
                     return (
-                      <motion.tr key={teacher.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                      <motion.tr key={row.key} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(idx * 0.02, 0.3) }}
                         style={{ background: idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.5)' }}>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-faint)' }}>{idx + 1}</span>
                         </td>
                         <td style={tdStyle}>
-                          <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{teacher.name}</p>
+                          <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{row.teacher.name}</p>
                         </td>
                         <td style={tdStyle}>
-                          {(() => {
-                            const scheduledSessions = (schedules || []).filter(s => s.teacherId === teacher.id && s.day === dayOfWeek);
-                            const currentModuleId = record?.moduleId || (scheduledSessions.length > 0 ? scheduledSessions[0].module : (teacher.subjects?.[0] || ''));
-                            
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <select className="input-premium" 
-                                  style={{ fontSize: '11px', padding: '4px 8px', width: '100%', cursor: 'pointer', appearance: 'auto' }}
-                                  value={currentModuleId}
-                                  onChange={(e) => handleModuleChange(teacher.id, e.target.value)}>
-                                  {/* Prioritize scheduled modules */}
-                                  {scheduledSessions.map(s => (
-                                    <option key={s.id} value={s.module}>📅 {s.module} ({s.time})</option>
-                                  ))}
-                                  {/* Rest of teacher subjects */}
-                                  <optgroup label="Autres modules">
-                                    {(teacher.subjects || [teacher.subject]).map(sub => (
-                                      <option key={sub} value={sub}>{sub}</option>
-                                    ))}
-                                  </optgroup>
-                                </select>
-                                {scheduledSessions.length > 0 && (
-                                  <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase' }}>
-                                    Planifié aujourd'hui
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })()}
+                          <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{row.module}</p>
+                        </td>
+                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '3px 8px', borderRadius: 'var(--radius-sm)' }}>
+                            <i className="fa-regular fa-clock" style={{ marginRight: '4px', fontSize: '10px' }}></i>
+                            {row.time?.replace(/\s/g, '').replace(/h/gi, ':')}
+                          </span>
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{ fontSize: '11px', fontWeight: '500', color: 'var(--text-secondary)' }}>
+                            {row.groups.join(', ')}
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          <input 
+                            type="number" 
+                            min="0" max="12" step="0.5" 
+                            className="input-premium"
+                            style={{ width: '60px', textAlign: 'center', fontSize: '12px', fontWeight: '800', padding: '4px', margin: '0 auto', display: 'block' }}
+                            value={record?.hours !== undefined ? record.hours : row.duration}
+                            onChange={(e) => handleHoursChange(row, parseFloat(e.target.value) || 0)}
+                          />
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
-                            <button onClick={() => handleStatusChange(teacher.id, 'present')}
+                            <button onClick={() => handleStatusChange(row, 'present')}
                               style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
                                 background: status === 'present' ? '#16a34a' : 'transparent', color: status === 'present' ? 'white' : 'var(--text-muted)' }}>
                               Présent
                             </button>
-                            <button onClick={() => handleStatusChange(teacher.id, 'absent')}
+                            <button onClick={() => handleStatusChange(row, 'absent')}
                               style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
                                 background: status === 'absent' ? '#dc2626' : 'transparent', color: status === 'absent' ? 'white' : 'var(--text-muted)' }}>
                               Absent
                             </button>
                           </div>
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          {status === 'present' ? (
-                            <div style={{ display: 'flex', gap: '4px', justifyItems: 'center' }}>
-                              {[
-                                { label: '1h30', val: 1.5 },
-                                { label: '2h', val: 2 },
-                                { label: '3h30', val: 3.5 },
-                                { label: '4h', val: 4 }
-                              ].map(h => (
-                                <button key={h.label} onClick={() => handleHoursChange(teacher.id, h.val)}
-                                  style={{ padding: '3px 6px', borderRadius: 'var(--radius-sm)', border: `1px solid ${record?.hours === h.val ? 'var(--primary)' : 'var(--border)'}`, 
-                                    background: record?.hours === h.val ? 'var(--primary-ultra-light)' : 'white', 
-                                    color: record?.hours === h.val ? 'var(--primary)' : 'var(--text-muted)', 
-                                    fontSize: '10px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                  {h.label}
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>—</span>
-                          )}
-                        </td>
-                        <td style={tdStyle}>
-                          <input type="text" className="input-premium" placeholder="Optionnel..." 
-                            style={{ width: '100%', fontSize: '12px', padding: '6px 10px', background: 'transparent' }}
-                            value={comment}
-                            onChange={(e) => handleCommentChange(teacher.id, e.target.value)} />
                         </td>
                       </motion.tr>
                     );

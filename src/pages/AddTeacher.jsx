@@ -118,11 +118,18 @@ const AddTeacher = () => {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Nom */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={labelStyle}>Nom complet</label>
-              <input required className="input-premium" placeholder="Ex: Prof. Alami Mohamed"
-                value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+            {/* Nom & Tarif */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={labelStyle}>Nom complet</label>
+                <input required className="input-premium" placeholder="Ex: Prof. Alami Mohamed"
+                  value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={labelStyle}>Tarif horaire (DH)</label>
+                <input type="number" required className="input-premium" placeholder="Ex: 100"
+                  value={formData.hourlyRate || ''} onChange={(e) => setFormData({...formData, hourlyRate: parseFloat(e.target.value) || 0})} />
+              </div>
             </div>
 
             {/* Step 0: Diplômes */}

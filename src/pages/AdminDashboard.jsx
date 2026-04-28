@@ -51,7 +51,7 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
   }, [selectedFiliere, selectedAnnee]);
 
   const scheduleData = useMemo(() => {
-    const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+    const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
     
     // Check real schedules
     const filteredReal = realSchedules.filter(s => s.filiere === selectedFiliere && s.annee === selectedAnnee);
@@ -91,30 +91,85 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
       
       <div style={{ width: '100%', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto', paddingBottom: '8px' }} className="no-scrollbar">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(130px, 1fr))', gap: '8px', minWidth: '100%' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${scheduleData.length}, minmax(140px, 1fr))`, gap: '8px', minWidth: '100%', padding: '4px' }}>
           {scheduleData.map((dayPlan, i) => (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '16px', border: '1px solid var(--border-light)' }}>
-              <div style={{ textAlign: 'center', fontWeight: '800', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
+            <div key={i} style={{ 
+              display: 'flex', flexDirection: 'column', 
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 100%)', 
+              borderRadius: '20px', padding: '6px', border: '1px solid rgba(255,255,255,0.8)',
+              boxShadow: '0 4px 16px -4px rgba(0,0,0,0.03)' 
+            }}>
+              <div style={{ 
+                margin: '4px 4px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '10px', background: 'var(--white)', borderRadius: '12px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)', fontWeight: '800', fontSize: '13px', color: 'var(--text-primary)'
+              }}>
                 {dayPlan.day}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                {dayPlan.sessions.length > 0 ? dayPlan.sessions.map((session, j) => (
-                  <div key={j} style={{ background: 'var(--bg-page)', padding: '14px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xs)', border: '1px solid var(--border-light)', borderLeft: `3px solid ${session.type === 'TP' ? 'var(--primary)' : 'var(--accent)'}`, transition: 'transform 0.2s', cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}><i className="fa-regular fa-clock" style={{marginRight: '4px'}}></i> {session.time}</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.3', marginBottom: '6px' }}>{session.title}</div>
-                    {session.teacherId && (
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '10px', fontWeight: '600' }}>
-                        <i className="fa-solid fa-user-tie" style={{ marginRight: '4px' }}></i>
-                        {teachers.find(t => t.id === session.teacherId)?.name || 'Formateur'}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 4px 10px', flex: 1 }}>
+                {(() => {
+                  const daySessions = dayPlan.sessions.filter(s => parseInt(s.time.split(':')[0]) < 18);
+                  const eveningSessions = dayPlan.sessions.filter(s => parseInt(s.time.split(':')[0]) >= 18);
+                  
+                  const renderSession = (session, j) => (
+                    <motion.div key={j} whileHover={{ scale: 1.02, y: -2 }} style={{ 
+                      background: 'var(--white)', padding: '12px', borderRadius: '14px', 
+                      boxShadow: '0 2px 10px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.04)', 
+                      position: 'relative', overflow: 'hidden', cursor: 'pointer'
+                    }}>
+                      {/* Color stripe */}
+                      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: session.type === 'TP' ? 'var(--primary)' : 'var(--accent)' }}></div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#475569', background: '#f1f5f9', padding: '4px 8px', borderRadius: '6px' }}>
+                          <i className="fa-regular fa-clock" style={{marginRight: '4px', color: session.type === 'TP' ? '#8b5cf6' : '#d97706'}}></i>{session.time}
+                        </span>
+                        {session.type && session.type !== 'Cours' && session.type.toLowerCase() !== 'cours' && (
+                          <span style={{ fontSize: '9px', fontWeight: '800', color: session.type === 'TP' ? '#8b5cf6' : '#d97706', background: session.type === 'TP' ? '#f3e8ff' : '#fef3c7', padding: '3px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {session.type}
+                          </span>
+                        )}
                       </div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '10px', background: 'var(--primary-ultra-light)', padding: '2px 6px', borderRadius: '4px', fontWeight: '800', color: 'var(--primary)', border: '1px solid rgba(139, 92, 246, 0.1)' }}>{groupLabel}</span>
+
+                      <h4 style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: '1.4', marginBottom: '10px' }}>
+                        {session.title}
+                      </h4>
+
+                      {session.teacherId && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px dashed var(--border-light)' }}>
+                          <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                             <i className="fa-solid fa-user-tie"></i>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                             {teachers.find(t => t.id === session.teacherId)?.name || 'Formateur'}
+                          </span>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex' }}>
+                        <span style={{ fontSize: '9px', background: 'rgba(0,0,0,0.03)', padding: '4px 8px', borderRadius: '6px', fontWeight: '800', color: 'var(--text-muted)' }}>
+                          <i className="fa-solid fa-users" style={{ marginRight: '4px', opacity: 0.5 }}></i>{groupLabel}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+
+                  return dayPlan.sessions.length === 0 ? (
+                    <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: '12px', fontWeight: '700', minHeight: '100px', background: 'rgba(255,255,255,0.4)', borderRadius: '14px', border: '1px dashed rgba(0,0,0,0.05)' }}>
+                      Libre
                     </div>
-                  </div>
-                )) : (
-                  <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: '13px', fontWeight: '600' }}>Libre</div>
-                )}
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {daySessions.map((session, j) => renderSession(session, `day-${j}`))}
+                      
+                      {daySessions.length > 0 && eveningSessions.length > 0 && (
+                        <div style={{ margin: '4px 24px', borderBottom: '1px dashed var(--border)', opacity: 0.5 }}></div>
+                      )}
+                      
+                      {eveningSessions.map((session, j) => renderSession(session, `ev-${j}`))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))}
@@ -351,7 +406,8 @@ const AdminDashboard = () => {
       cell: ({ row }) => {
         const base = window.location.origin;
         if (activeTab === 'students') {
-          const fullLink = base + `/results/${row.original.token}`;
+          const cleanToken = (row.original.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+          const fullLink = base + `/results/${cleanToken}`;
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', maxWidth: '260px' }}
               onClick={() => { navigator.clipboard?.writeText(fullLink); }} title="Copier le lien">
@@ -390,12 +446,19 @@ const AdminDashboard = () => {
       cell: ({ row }) => {
         const copyLink = () => {
           const base = window.location.origin;
-          const path = activeTab === 'students' ? `/results/${row.original.token}` : `/portal/${row.original.token}`;
-          navigator.clipboard?.writeText(base + path);
+          if (activeTab === 'students') {
+            const cleanToken = (row.original.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+            navigator.clipboard?.writeText(base + `/results/${cleanToken}`);
+            alert('Lien Stagiaire copié !');
+          } else {
+            // For teachers, copying grades link by default in the generic action
+            navigator.clipboard?.writeText(base + `/portal/${row.original.tokenGrades}`);
+            alert('Lien Notes Formateur copié !');
+          }
         };
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'flex-end' }}>
-            <ActionBtn icon="fa-share-nodes" title="Copier le lien" color="var(--primary)" onClick={copyLink} />
+            {activeTab === 'students' && <ActionBtn icon="fa-share-nodes" title="Copier le lien" color="var(--primary)" onClick={copyLink} />}
             <ActionBtn icon="fa-eye" title="Détails" onClick={() => openDetails(row.original)} />
             <ActionBtn icon="fa-pen" title="Modifier" onClick={() => openEdit(row.original)} />
             {activeTab === 'students' && <ActionBtn icon="fa-download" title="Bulletin" onClick={() => generateBulletinGlobal(row.original, grades, getModulesForStudent(row.original))} />}
@@ -519,9 +582,27 @@ const AdminDashboard = () => {
           </div>
           
           {activeTab === 'students' ? (
-             <Link to="/admin/add-student" className="btn-modern primary" style={{ padding: '10px 16px', fontSize: '13px' }}>
-               <i className="fa-solid fa-plus"></i> Ajouter un stagiaire
-             </Link>
+             <div style={{ display: 'flex', gap: '12px' }}>
+               <button className="btn-modern primary" style={{ background: '#6366f1', padding: '10px 16px', fontSize: '13px' }} onClick={async () => {
+                 if (window.confirm("Voulez-vous regénérer tous les liens des stagiaires au nouveau format ? Les anciens liens ne fonctionneront plus.")) {
+                   const { db } = await import('../firebase');
+                   const { collection, getDocs, updateDoc, doc } = await import('firebase/firestore');
+                   const querySnapshot = await getDocs(collection(db, 'students'));
+                   let count = 0;
+                   for (const document of querySnapshot.docs) {
+                     const token = Math.random().toString(36).substring(2, 11);
+                     await updateDoc(doc(db, 'students', document.id), { token });
+                     count++;
+                   }
+                   alert(`${count} liens ont été regénérés avec succès. Veuillez rafraîchir la page.`);
+                 }
+               }}>
+                 <i className="fa-solid fa-rotate"></i> Regénérer les liens
+               </button>
+               <Link to="/admin/add-student" className="btn-modern primary" style={{ padding: '10px 16px', fontSize: '13px' }}>
+                 <i className="fa-solid fa-plus"></i> Ajouter un stagiaire
+               </Link>
+             </div>
           ) : (
              <Link to="/admin/add-teacher" className="btn-modern primary" style={{ padding: '10px 16px', fontSize: '13px' }}>
                <i className="fa-solid fa-plus"></i> Ajouter un formateur
@@ -558,7 +639,6 @@ const AdminDashboard = () => {
             <StatCard delay={0.15} icon="fa-user-check" iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={`${studentAttendanceRate}%`} label="Présence Stagiaires" />
             <StatCard delay={0.2} icon="fa-user-tie" iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={`${teacherAttendanceRate}%`} label="Présence Formateurs" />
             <StatCard delay={0.25} icon="fa-check-double" iconColor="var(--accent)" iconBg="rgba(254, 205, 8, 0.1)" value={`${gradesProgress}%`} label="Saisie des Notes" />
-            <StatCard delay={0.3} icon="fa-award" iconColor="#8b5cf6" iconBg="rgba(139, 92, 246, 0.1)" value={`${moduleValidationRate}%`} label="Réussite Modules" />
           </div>
           
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
@@ -702,7 +782,11 @@ const AdminDashboard = () => {
                         <InfoBox label="Groupes" value={(selectedItem.groups || []).join(', ')} icon="fa-users" />
                       </>
                     )}
-                    <InfoBox label="Token" value={selectedItem.token} icon="fa-key" />
+                    {activeTab === 'students' ? (
+                      <InfoBox label="Token" value={selectedItem.token} icon="fa-key" />
+                    ) : (
+                      <InfoBox label="ID" value={selectedItem.id.substring(0, 8)} icon="fa-fingerprint" />
+                    )}
                     <InfoBox label="Statut" value="ACTIF" icon="fa-circle-check" valueColor="var(--primary)" />
                   </div>
 
@@ -712,17 +796,35 @@ const AdminDashboard = () => {
                       <i className="fa-solid fa-link" style={{ marginRight: '4px' }}></i>
                       {activeTab === 'students' ? 'Lien de consultation (stagiaire)' : 'Lien de saisie des notes (formateur)'}
                     </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', fontFamily: 'monospace', padding: '8px 12px', background: 'white' }}
-                        value={`${window.location.origin}${activeTab === 'students' ? `/results/${selectedItem.token}` : `/portal/${selectedItem.token}`}`} />
-                      <button className="btn-modern primary" style={{ padding: '8px 14px', fontSize: '11px', flexShrink: 0 }}
-                        onClick={() => {
-                          const link = `${window.location.origin}${activeTab === 'students' ? `/results/${selectedItem.token}` : `/portal/${selectedItem.token}`}`;
-                          navigator.clipboard?.writeText(link);
-                        }}>
-                        <i className="fa-solid fa-copy"></i> Copier
-                      </button>
-                    </div>
+                    {activeTab === 'students' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', fontFamily: 'monospace', padding: '8px 12px', background: 'white' }}
+                          value={`${window.location.origin}/results/${(selectedItem.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '')}`} />
+                        <button className="btn-modern primary" style={{ padding: '8px 14px', fontSize: '11px', flexShrink: 0 }}
+                          onClick={() => {
+                            const link = `${window.location.origin}/results/${(selectedItem.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '')}`;
+                            navigator.clipboard?.writeText(link);
+                            alert('Lien copié !');
+                          }}>
+                          <i className="fa-solid fa-copy"></i> Copier
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '10px', fontWeight: '700', width: '80px', color: 'var(--text-muted)' }}>NOTES:</span>
+                          <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', fontFamily: 'monospace', padding: '6px 10px', background: 'white' }}
+                            value={`${window.location.origin}/portal/${selectedItem.tokenGrades}`} />
+                          {/* Copy icon removed for teachers */}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '10px', fontWeight: '700', width: '80px', color: 'var(--text-muted)' }}>ABSENCES:</span>
+                          <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', fontFamily: 'monospace', padding: '6px 10px', background: 'white' }}
+                            value={`${window.location.origin}/portal/${selectedItem.tokenAttendance}`} />
+                          {/* Copy icon removed for teachers */}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
@@ -796,9 +898,15 @@ const AdminDashboard = () => {
                     </>
                   ) : (
                     <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={labelStyle}>Nom du formateur</label>
-                        <input type="text" className="input-premium" required value={editFormData.name || ''} onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={labelStyle}>Nom du formateur</label>
+                          <input type="text" className="input-premium" required value={editFormData.name || ''} onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={labelStyle}>Tarif (DH/h)</label>
+                          <input type="number" className="input-premium" required value={editFormData.hourlyRate || ''} onChange={(e) => setEditFormData({...editFormData, hourlyRate: parseFloat(e.target.value) || 0})} />
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

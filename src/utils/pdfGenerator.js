@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { logoBase64 } from './logoBase64.js';
 
 /* ── Constants ── */
 const ACCREDITATION_TEXT = [
@@ -10,14 +11,20 @@ const ACCREDITATION_TEXT = [
 /**
  * Common header for all official documents
  */
-const drawHeader = (doc, title) => {
+const drawHeader = (doc, title, withLine = true) => {
   const w = doc.internal.pageSize.getWidth();
+  const h = doc.internal.pageSize.getHeight();
   const margin = 15;
-  
-  // Logo (Public folder)
-  try { 
-    doc.addImage('/logo.jpg', 'JPEG', margin, 8, 50, 22); 
-  } catch(e) {
+
+  // Set white background for the entire page
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, w, h, 'F');
+  doc.setTextColor(0); // Reset text color to black
+
+  // Logo
+  try {
+    doc.addImage(logoBase64, 'JPEG', margin, 8, 50, 22);
+  } catch (e) {
     console.error("Logo not found", e);
   }
 
@@ -32,29 +39,45 @@ const drawHeader = (doc, title) => {
   });
 
   // Main Title
-  doc.setTextColor(0);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text(title, w / 2, 35, { align: 'center' });
-  
-  // Separator
-  doc.setDrawColor(220, 220, 220);
-  doc.setLineWidth(0.2);
-  doc.line(margin, 40, w - margin, 40);
+  if (title === "Notes d'obtention de diplôme") {
+    doc.setTextColor(91, 155, 213); // Light Blue
+    doc.setFont('times', 'normal');
+    doc.setFontSize(26);
+    doc.text(title, w / 2, 40, { align: 'center' });
+    doc.setDrawColor(91, 155, 213);
+    doc.setLineWidth(0.5);
+    doc.line(margin + 20, 42, w - margin - 20, 42);
+  } else {
+    doc.setTextColor(91, 155, 213); // Changed to match blue theme for Releve
+    if (title === "RELEVÉ DES NOTES") {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+    } else {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+    }
+    doc.text(title, w / 2, 45, { align: 'center' });
+    if (withLine) {
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.2);
+      doc.line(margin, 50, w - margin, 50);
+    }
+  }
 
-  return 45; // Returns next Y position
+  return title === "Notes d'obtention de diplôme" ? 55 : 55;
 };
 
 /* ════════════════════════════════════════════════════════════════════
  *  1. FICHE DE SIGNATURE — Par module / par CC
  * ════════════════════════════════════════════════════════════════════ */
-export const generateFicheSignature = ({ students, filiere, niveau, module, ccNumber, formateur }) => {
+export const generateFicheSignature = ({ students, filiere, niveau, module, ccNumber, formateur, allGrades }) => {
   const doc = new jsPDF();
   const w = doc.internal.pageSize.getWidth();
   const margin = 15;
   const tableW = w - margin * 2;
 
   let y = drawHeader(doc, 'FICHE DES NOTES');
+  doc.setTextColor(0); // Ensure black text after header
 
   // ── Header Info ──
   const rowH = 10;
@@ -69,15 +92,11 @@ export const generateFicheSignature = ({ students, filiere, niveau, module, ccNu
   doc.setFontSize(9);
   doc.text('Filière : ', margin + 3, y + 7);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(176, 104, 185);
   doc.text(filiere || '', margin + 22, y + 7);
-  doc.setTextColor(0);
   doc.setFont('helvetica', 'normal');
   doc.text('Niveau : ', margin + tableW / 2 + 3, y + 7);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(176, 104, 185);
   doc.text(niveau || '', margin + tableW / 2 + 22, y + 7);
-  doc.setTextColor(0);
 
   // Row 2: Formateur | UF N°
   y += rowH;
@@ -101,9 +120,7 @@ export const generateFicheSignature = ({ students, filiere, niveau, module, ccNu
   doc.setFontSize(9);
   doc.text(`Séquence pédagogique N°: `, margin + 3, y + 7);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(176, 104, 185);
   doc.text(`CC${ccNumber}`, margin + 55, y + 7);
-  doc.setTextColor(0);
   doc.setFont('helvetica', 'normal');
   doc.text('SQ. Intitulé :', margin + tableW / 2 + 3, y + 7);
 
@@ -117,9 +134,9 @@ export const generateFicheSignature = ({ students, filiere, niveau, module, ccNu
 
   // ── Table Header ──
   y += rowH + 4;
-  const col1W = 35; 
-  const col3W = 50; 
-  const col2W = tableW - col1W - col3W; 
+  const col1W = 35;
+  const col3W = 50;
+  const col2W = tableW - col1W - col3W;
 
   doc.setFillColor(245, 245, 245);
   doc.rect(margin, y, col1W, rowH, 'FD');
@@ -151,7 +168,12 @@ export const generateFicheSignature = ({ students, filiere, niveau, module, ccNu
     doc.text(student.regNo || '', margin + 3, y + 7);
     doc.setFont('helvetica', 'normal');
     doc.text(`${student.lastName || ''} ${student.firstName || ''}`, margin + col1W + 3, y + 7);
-    doc.text('..................../20', margin + col1W + col2W + 5, y + 7);
+
+    const studentGrades = allGrades && allGrades[student.id] && allGrades[student.id][module] ? allGrades[student.id][module] : {};
+    const gradeVal = studentGrades[`c${ccNumber}`];
+    const displayGrade = gradeVal !== undefined && gradeVal !== '' ? `${parseFloat(gradeVal).toFixed(2).replace('.', ',')} / 20` : '..................../20';
+
+    doc.text(displayGrade, margin + col1W + col2W + 5, y + 7);
 
     y += rowH;
   });
@@ -176,13 +198,14 @@ export const generateFicheSignature = ({ students, filiere, niveau, module, ccNu
 /* ════════════════════════════════════════════════════════════════════
  *  2. FICHE DES NOTES — Par module, EFCFP & EFCFT seulement
  * ════════════════════════════════════════════════════════════════════ */
-export const generateFicheNotes = ({ students, filiere, classe, anneeFormation, module, formateur }) => {
+export const generateFicheNotes = ({ students, filiere, classe, anneeFormation, module, formateur, allGrades }) => {
   const doc = new jsPDF();
   const w = doc.internal.pageSize.getWidth();
   const margin = 15;
   const tableW = w - margin * 2;
 
   let y = drawHeader(doc, 'FICHE DES NOTES');
+  doc.setTextColor(0); // Ensure black text after header
 
   // ── Header Info ──
   const rowH = 12;
@@ -191,7 +214,7 @@ export const generateFicheNotes = ({ students, filiere, classe, anneeFormation, 
   const col1H = tableW * 0.5;
   const col2H = tableW * 0.25;
   const col3H = tableW * 0.25;
-  
+
   doc.setDrawColor(0);
   doc.rect(margin, y, col1H, rowH);
   doc.rect(margin + col1H, y, col2H, rowH);
@@ -231,10 +254,10 @@ export const generateFicheNotes = ({ students, filiere, classe, anneeFormation, 
 
   // ── Table Header ──
   y += rowH + 4;
-  const tCol1 = 35; 
-  const tCol3 = 30; 
-  const tCol4 = 30; 
-  const tCol2 = tableW - tCol1 - tCol3 - tCol4; 
+  const tCol1 = 35;
+  const tCol3 = 30;
+  const tCol4 = 30;
+  const tCol2 = tableW - tCol1 - tCol3 - tCol4;
 
   doc.setFillColor(245, 245, 245);
   doc.rect(margin, y, tCol1, rowH, 'FD');
@@ -269,8 +292,16 @@ export const generateFicheNotes = ({ students, filiere, classe, anneeFormation, 
     doc.text(student.regNo || '', margin + tCol1 / 2, y + 8, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     doc.text(`${student.lastName || ''} ${student.firstName || ''}`, margin + tCol1 + 3, y + 8);
-    doc.text('........./20', margin + tCol1 + tCol2 + 5, y + 8);
-    doc.text('........./20', margin + tCol1 + tCol2 + tCol3 + 5, y + 8);
+
+    const studentGrades = allGrades && allGrades[student.id] && allGrades[student.id][module] ? allGrades[student.id][module] : {};
+    const valEFCFP = studentGrades.efcfp;
+    const valEFCFT = studentGrades.efcft;
+
+    const displayEFCFP = valEFCFP !== undefined && valEFCFP !== '' ? `${parseFloat(valEFCFP).toFixed(2).replace('.', ',')} / 20` : '........./20';
+    const displayEFCFT = valEFCFT !== undefined && valEFCFT !== '' ? `${parseFloat(valEFCFT).toFixed(2).replace('.', ',')} / 20` : '........./20';
+
+    doc.text(displayEFCFP, margin + tCol1 + tCol2 + 5, y + 8);
+    doc.text(displayEFCFT, margin + tCol1 + tCol2 + tCol3 + 5, y + 8);
 
     y += rowH;
   });
@@ -292,153 +323,236 @@ export const generateFicheNotes = ({ students, filiere, classe, anneeFormation, 
 
 
 /* ════════════════════════════════════════════════════════════════════
- *  3. BULLETIN GLOBAL — Par stagiaire, toutes les notes
+ *  3. RELEVÉ DES NOTES — Par stagiaire, toutes les notes
  * ════════════════════════════════════════════════════════════════════ */
 export const generateBulletinGlobal = (student, allGrades, modules) => {
   const doc = new jsPDF();
   const w = doc.internal.pageSize.getWidth();
-  const margin = 15;
+  const margin = 10;
   const tableW = w - margin * 2;
   const grades = allGrades[student.id] || {};
 
-  let y = drawHeader(doc, 'BULLETIN DE NOTES OFFICIEL');
+  let y = drawHeader(doc, 'RELEVÉ DES NOTES');
 
-  // ── Student Info ──
-  y += 15;
-  doc.setTextColor(176, 104, 185);
-  doc.setFontSize(15);
+  // ── Student Info Table ──
+  y += 3;
+  const infoH = 8;
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.setFontSize(8);
+
+  // Row 1: NOM ET PRENOM | N° d'inscription
+  doc.setFillColor(230, 230, 245);
+  doc.rect(margin, y, tableW * 0.5, infoH, 'FD');
+  doc.rect(margin + tableW * 0.5, y, tableW * 0.25, infoH, 'FD');
+  doc.rect(margin + tableW * 0.75, y, tableW * 0.25, infoH, 'FD');
   doc.setFont('helvetica', 'bold');
-  doc.text(`${student.lastName.toUpperCase()} ${student.firstName}`, margin, y);
-
-  y += 8;
   doc.setTextColor(0);
-  doc.setFontSize(9);
+  doc.text('NOM ET PRENOM :', margin + 2, y + 5.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Matricule: ${student.regNo}`, margin, y);
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, w - margin, y, { align: 'right' });
-  
-  y += 6;
-  doc.text(`Filière: ${student.major}`, margin, y);
-  doc.text(`Niveau: ${student.diploma} · ${student.year}`, w - margin, y, { align: 'right' });
+  doc.text(`${student.lastName.toUpperCase()} ${student.firstName}`, margin + 38, y + 5.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text("N° d'inscription", margin + tableW * 0.5 + 2, y + 5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(student.regNo || '', margin + tableW * 0.75 + 2, y + 5.5);
 
-  // ── Table Header ──
-  y += 12;
+  // Row 2: Classement | empty
+  y += infoH;
+  doc.setFillColor(230, 230, 245);
+  doc.rect(margin, y, tableW * 0.5, infoH, 'FD');
+  doc.rect(margin + tableW * 0.5, y, tableW * 0.5, infoH, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.text('Classement par ordre de mérite :', margin + 2, y + 5.5);
+
+  // Row 3: FILIERE | Niveau
+  y += infoH;
+  doc.setFillColor(230, 230, 245);
+  doc.rect(margin, y, tableW * 0.5, infoH, 'FD');
+  doc.rect(margin + tableW * 0.5, y, tableW * 0.25, infoH, 'FD');
+  doc.rect(margin + tableW * 0.75, y, tableW * 0.25, infoH, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.text('FILIERE :', margin + 2, y + 5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(student.major || '', margin + 20, y + 5.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Niveau:', margin + tableW * 0.5 + 2, y + 5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(student.year || '', margin + tableW * 0.75 + 2, y + 5.5);
+
+  // Year bar
+  y += infoH;
+  doc.setFillColor(210, 210, 230);
+  doc.rect(margin, y, tableW, infoH, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('ANNEE DE FORMATION : 2024-2025', w / 2, y + 5.5, { align: 'center' });
+
+  // ── Grades Table ──
+  y += infoH + 2;
   const rH = 9;
-  const cols = [70, 14, 14, 14, 20, 16, 16, 16]; 
-  const headers = ['MATIÈRE', 'C1', 'C2', 'C3', 'MOY CC', 'EFCFP', 'EFCFT', 'MOY'];
+  const c = [14, 62, 11, 20, 20, 20, 20, 23];
+  const hdr = ['N° UF', 'Unité de formation', 'Coeff', 'Contrôles\ncontinus', 'EFCF\nthéorique', 'EFCF\nPratique', 'Moyenne\ngénérale', 'Appréciations des\nformateurs'];
 
-  doc.setFillColor(245, 240, 250);
-  let xPos = margin;
-  cols.forEach((cw, i) => {
-    doc.rect(xPos, y, cw, rH, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.text(headers[i], xPos + cw / 2, y + 6, { align: 'center' });
-    xPos += cw;
+  // Table header
+  doc.setFillColor(210, 210, 230);
+  let xP = margin;
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'bold');
+  hdr.forEach((h, i) => {
+    doc.setFillColor(210, 210, 230);
+    doc.rect(xP, y, c[i], rH * 1.5, 'FD');
+    const lines = h.split('\n');
+    if (lines.length > 1) {
+      doc.text(lines[0], xP + c[i] / 2, y + 5, { align: 'center' });
+      doc.text(lines[1], xP + c[i] / 2, y + 9, { align: 'center' });
+    } else {
+      doc.text(h, xP + c[i] / 2, y + 7, { align: 'center' });
+    }
+    xP += c[i];
   });
 
-  // ── Table Body ──
-  y += rH;
-  let totalPoints = 0;
-  let validCount = 0;
+  y += rH * 1.5;
+  let totalWeighted = 0, totalCoeff = 0;
+  let sumCC = 0, sumEFCFT = 0, sumEFCFP = 0, sumAvg = 0;
+  let countCC = 0, countEFCFT = 0, countEFCFP = 0, countAvg = 0;
 
-  modules.forEach((mod, index) => {
-    if (y > 270) {
-      doc.addPage();
-      y = drawHeader(doc, 'BULLETIN DE NOTES (Suite)');
-      y += 15;
-    }
+  modules.forEach((mod, idx) => {
+    if (y > 265) { doc.addPage(); y = drawHeader(doc, 'RELEVÉ DES NOTES (Suite)'); y += 10; }
 
     const g = grades[mod] || {};
     const { c1 = '', c2 = '', c3 = '', efcfp = '', efcft = '' } = g;
+    const coeff = 2;
 
     let moyCC = null;
     if (c1 !== '' && c2 !== '') {
       const n1 = parseFloat(c1), n2 = parseFloat(c2);
       if (!isNaN(n1) && !isNaN(n2)) {
-        if (c3 !== '' && c3 !== undefined && c3 !== null) {
-          const n3 = parseFloat(c3);
-          moyCC = !isNaN(n3) ? (n1 + n2 + n3) / 3 : (n1 + n2) / 2;
-        } else {
-          moyCC = (n1 + n2) / 2;
-        }
+        const n3 = (c3 !== '' && c3 != null) ? parseFloat(c3) : NaN;
+        moyCC = !isNaN(n3) ? (n1 + n2 + n3) / 3 : (n1 + n2) / 2;
+        sumCC += moyCC; countCC++;
       }
     }
+
+    const nP = efcfp !== '' ? parseFloat(efcfp) : NaN;
+    const nT = efcft !== '' ? parseFloat(efcft) : NaN;
+    if (!isNaN(nT)) { sumEFCFT += nT; countEFCFT++; }
+    if (!isNaN(nP)) { sumEFCFP += nP; countEFCFP++; }
 
     let avg = null;
-    if (moyCC !== null && efcfp !== '' && efcft !== '') {
-      const nP = parseFloat(efcfp), nT = parseFloat(efcft);
-      if (!isNaN(nP) && !isNaN(nT)) {
-        const efc = (nP + nT) / 2;
-        avg = moyCC * 0.4 + efc * 0.6;
-        totalPoints += avg;
-        validCount++;
-      }
+    if (moyCC !== null && !isNaN(nP) && !isNaN(nT)) {
+      avg = moyCC * 0.4 + ((nP + nT) / 2) * 0.6;
+      totalWeighted += avg * coeff;
+      totalCoeff += coeff;
+      sumAvg += avg; countAvg++;
     }
 
-    if (index % 2 === 0) {
-      doc.setFillColor(252, 252, 255);
-      let rx = margin;
-      cols.forEach(cw => { doc.rect(rx, y, cw, rH, 'F'); rx += cw; });
+    // Appreciation
+    let appreciation = '';
+    if (avg !== null) {
+      if (avg >= 16) appreciation = 'T.Bien';
+      else if (avg >= 14) appreciation = 'Bien';
+      else if (avg >= 12) appreciation = 'A.Bien';
+      else if (avg >= 10) appreciation = 'Passable';
+      else appreciation = 'Faible';
     }
 
-    xPos = margin;
-    cols.forEach(cw => { doc.rect(xPos, y, cw, rH); xPos += cw; });
+    // Alternate row color
+    if (idx % 2 === 0) {
+      doc.setFillColor(245, 245, 252);
+      let rx = margin; c.forEach(cw => { doc.rect(rx, y, cw, rH, 'F'); rx += cw; });
+    }
 
+    xP = margin;
+    c.forEach(cw => { doc.rect(xP, y, cw, rH); xP += cw; });
+
+    doc.setFontSize(6.5);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    const displayMod = mod.length > 35 ? mod.substring(0, 33) + '…' : mod;
-    doc.text(displayMod, margin + 2, y + 6);
-
-    const vals = [
-      c1 || '—', c2 || '—', c3 || '—',
-      moyCC !== null ? moyCC.toFixed(2) : '—',
-      efcfp || '—', efcft || '—',
-      avg !== null ? avg.toFixed(2) : '—'
-    ];
-
-    xPos = margin + cols[0];
-    vals.forEach((v, i) => {
-      doc.setFont('helvetica', i === 3 || i === 6 ? 'bold' : 'normal');
-      doc.text(String(v), xPos + cols[i + 1] / 2, y + 6, { align: 'center' });
-      xPos += cols[i + 1];
-    });
+    xP = margin;
+    const ufNum = `UF ${(idx + 1).toString().padStart(1, '0')}.${idx + 1}`;
+    doc.text(ufNum, xP + c[0] / 2, y + 6, { align: 'center' });
+    xP += c[0];
+    const dispMod = mod.length > 32 ? mod.substring(0, 30) + '…' : mod;
+    doc.text(dispMod, xP + 1.5, y + 6);
+    xP += c[1];
+    doc.text(String(coeff), xP + c[2] / 2, y + 6, { align: 'center' });
+    xP += c[2];
+    doc.setFont('helvetica', 'bold');
+    doc.text(moyCC !== null ? moyCC.toFixed(2) : '', xP + c[3] / 2, y + 6, { align: 'center' });
+    xP += c[3];
+    doc.text(!isNaN(nT) ? nT.toFixed(2) : '', xP + c[4] / 2, y + 6, { align: 'center' });
+    xP += c[4];
+    doc.text(!isNaN(nP) ? nP.toFixed(2) : '', xP + c[5] / 2, y + 6, { align: 'center' });
+    xP += c[5];
+    doc.text(avg !== null ? avg.toFixed(2) : '', xP + c[6] / 2, y + 6, { align: 'center' });
+    xP += c[6];
+    doc.setFont('helvetica', 'normal');
+    doc.text(appreciation, xP + c[7] / 2, y + 6, { align: 'center' });
 
     y += rH;
   });
 
-  // ── Summary ──
-  const finalAvg = validCount > 0 ? (totalPoints / validCount).toFixed(2) : '—';
-  y += 10;
-  if (y > 260) { doc.addPage(); y = 40; }
+  // ── Moyennes pondérées row ──
+  const avgCC = countCC > 0 ? (sumCC / countCC).toFixed(2) : '';
+  const avgEFCFT = countEFCFT > 0 ? (sumEFCFT / countEFCFT).toFixed(2) : '';
+  const avgEFCFP = countEFCFP > 0 ? (sumEFCFP / countEFCFP).toFixed(2) : '';
+  const avgMoy = countAvg > 0 ? (sumAvg / countAvg).toFixed(2) : '';
 
-  doc.setDrawColor(176, 104, 185);
-  doc.setLineWidth(1);
-  doc.line(margin, y, w - margin, y);
-
-  y += 12;
-  doc.setFontSize(12);
-  doc.setTextColor(0);
+  if (y > 265) { doc.addPage(); y = 40; }
+  doc.setFillColor(230, 230, 245);
+  const lblW = c[0] + c[1] + c[2];
+  doc.rect(margin, y, lblW, rH, 'FD');
+  doc.rect(margin + lblW, y, c[3], rH, 'FD');
+  doc.rect(margin + lblW + c[3], y, c[4], rH, 'FD');
+  doc.rect(margin + lblW + c[3] + c[4], y, c[5], rH, 'FD');
+  doc.rect(margin + lblW + c[3] + c[4] + c[5], y, c[6] + c[7], rH, 'FD');
   doc.setFont('helvetica', 'bold');
-  doc.text('MOYENNE GÉNÉRALE:', margin, y);
-  
-  doc.setFontSize(18);
-  doc.setTextColor(176, 104, 185);
-  doc.text(`${finalAvg} / 20`, w - margin, y, { align: 'right' });
+  doc.setFontSize(7);
+  doc.text(`Moyennes pondérées (${totalCoeff || 0})`, margin + 2, y + 6);
+  doc.text(avgCC, margin + lblW + c[3] / 2, y + 6, { align: 'center' });
+  doc.text(avgEFCFT, margin + lblW + c[3] + c[4] / 2, y + 6, { align: 'center' });
+  doc.text(avgEFCFP, margin + lblW + c[3] + c[4] + c[5] / 2, y + 6, { align: 'center' });
+  doc.text(avgMoy, margin + lblW + c[3] + c[4] + c[5] + (c[6] + c[7]) / 2, y + 6, { align: 'center' });
 
-  // Footer
-  y += 25;
-  doc.setTextColor(150);
+  // ── Moyenne générale ──
+  y += rH;
+  const finalAvg = totalCoeff > 0 ? (totalWeighted / totalCoeff).toFixed(2) : '—';
+  doc.setFillColor(200, 210, 230);
+  doc.rect(margin, y, lblW + c[3], rH, 'FD');
+  doc.rect(margin + lblW + c[3], y, c[4] + c[5] + c[6] + c[7], rH, 'FD');
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text("Cachet de l'Établissement", margin + 20, y);
-  doc.text('Signature du Secrétariat', w - margin - 50, y);
+  doc.text('Moyenne générale', margin + 2, y + 6);
+  doc.setFontSize(10);
+  doc.text(finalAvg, margin + lblW + c[3] + (c[4] + c[5] + c[6] + c[7]) / 2, y + 6.5, { align: 'center' });
+
+  // ── Décision jury ──
+  y += rH;
+  const isPassed = totalCoeff > 0 && parseFloat(finalAvg) >= 10;
+  doc.setFillColor(220, 210, 240);
+  doc.rect(margin, y, lblW + c[3], rH, 'FD');
+  doc.rect(margin + lblW + c[3], y, c[4] + c[5] + c[6] + c[7], rH, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text("Décision jury d'examen", margin + 2, y + 6);
+  doc.setTextColor(isPassed ? 0 : 200, isPassed ? 128 : 0, isPassed ? 0 : 0);
+  doc.text(isPassed ? 'Admis(e)' : 'Ajourné(e)', margin + lblW + c[3] + (c[4] + c[5] + c[6] + c[7]) / 2, y + 6.5, { align: 'center' });
+  doc.setTextColor(0);
+
+  // ── Footer ──
+  y += rH + 15;
+  if (y > 275) { doc.addPage(); y = 40; }
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text("Visa de l'administration", w / 2, y, { align: 'center' });
 
   const safeName = student.lastName.replace(/[^a-z0-9]/gi, '_');
-  doc.save(`Bulletin_${safeName}_${student.regNo.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+  doc.save(`Releve_Notes_${safeName}_${student.regNo.replace(/[^a-z0-9]/gi, '_')}.pdf`);
 };
 
 
+/* ════════════════════════════════════════════════════════════════════
+ *  4. NOTE D'OBTENTION DE DIPLÔME
+ * ════════════════════════════════════════════════════════════════════ */
 /* ════════════════════════════════════════════════════════════════════
  *  4. NOTE D'OBTENTION DE DIPLÔME
  * ════════════════════════════════════════════════════════════════════ */
@@ -448,90 +562,258 @@ export const generateNoteObtentionDiplome = (student, allGrades, modules) => {
   const margin = 20;
   const grades = allGrades[student.id] || {};
 
-  let y = drawHeader(doc, "NOTE D'OBTENTION DE DIPLÔME");
+  let y = drawHeader(doc, "Notes d'obtention de diplôme");
 
-  y += 20;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.text("L'Institut Polytechnique de la Formation Professionnelle atteste que :", margin, y);
+  // ── Student Info Blocks (Light Blue) ──
+  y += 5;
+  const iH = 9;
+  const cL = 60, cR = (w - margin * 2 - cL) / 2;
+  const lightBlue = [218, 235, 245];
 
-  y += 12;
+  // Block: Nom et prénom | Année de formation
+  doc.setFillColor(...lightBlue);
+  doc.rect(margin, y, cL, iH, 'F');
+  doc.rect(margin + cL + 10, y, cR - 10, iH, 'F');
+  doc.rect(margin + cL + cR + 10, y, cR - 10, iH, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(176, 104, 185);
-  doc.text(`${student.lastName.toUpperCase()} ${student.firstName}`, w / 2, y, { align: 'center' });
-
-  y += 10;
+  doc.setFontSize(8);
   doc.setTextColor(0);
-  doc.setFontSize(11);
+  doc.text('Nom et prénom :', margin + 2, y + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Né(e) le : ..................................................... à : .....................................................`, margin, y);
+  //const lastname = student.lastName && student.major.length > 30 ? student.major.substring(0, 25) + '…' : (student.major || '');
+  //const name = student.lastName.length + student.firstName.length > 30 ? margin += 40 : margin;
+  //const firstname =student.lastName && student.major.length > 30 ? student.major.substring(0, 25) + '…' : (student.major || '');
+  doc.text(`${student.lastName.toUpperCase()} ${student.firstName}`, margin + 25, y + 6);
 
-  y += 8;
-  doc.text(`Titulaire du Matricule : `, margin, y);
   doc.setFont('helvetica', 'bold');
-  doc.text(student.regNo, margin + 42, y);
-
-  y += 12;
+  doc.text('Année de formation', margin + cL + 12, y + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(`A suivi avec succès la formation de :`, margin, y);
-  
-  y += 8;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.text(student.major, margin, y);
-  
-  y += 8;
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(11);
-  doc.text(`Niveau : ${student.diploma}`, margin, y);
+  doc.text('2024-2025', margin + cL + cR + 12, y + 6);
 
-  // Results calculation
-  let totalPoints = 0;
-  let validCount = 0;
+  // Block: Filière | N° d'inscription
+  doc.setFillColor(...lightBlue);
+  y += iH + 4;
+  doc.rect(margin, y, cL, iH * 1.5, 'F');
+  doc.rect(margin + cL + 10, y, cR - 10, iH, 'F');
+  doc.rect(margin + cL + cR + 10, y, cR - 10, iH, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Filière :', margin + 2, y + 6);
+  doc.setFont('helvetica', 'normal');
+  const dispMajor = student.major && student.major.length > 30 ? student.major.substring(0, 25) + '…' : (student.major || '');
+  doc.text(dispMajor, margin + 14, y + 6);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text("N° d'inscription", margin + cL + 12, y + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.text(student.regNo || '', margin + cL + cR + 12, y + 6);
+
+  // Block: Niveau
+  doc.setFillColor(...lightBlue);
+  y += iH + 4;
+  doc.rect(margin + cL + 10, y, cR - 10, iH, 'F');
+  doc.rect(margin + cL + cR + 10, y, cR - 10, iH, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.text('Niveau', margin + cL + 12, y + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.text(student.year || '', margin + cL + cR + 12, y + 6);
+
+  // ── Compute averages ──
+  let sumCC = 0, sumEFCFT = 0, sumEFCFP = 0, cnt = 0;
   modules.forEach(mod => {
     const g = grades[mod] || {};
     const { c1, c2, c3, efcfp, efcft } = g;
     if (c1 && c2 && efcfp && efcft) {
       const n1 = parseFloat(c1), n2 = parseFloat(c2);
       const n3 = c3 ? parseFloat(c3) : null;
-      const moyCC = n3 !== null ? (n1 + n2 + n3) / 3 : (n1 + n2) / 2;
-      const avg = moyCC * 0.4 + ((parseFloat(efcfp) + parseFloat(efcft)) / 2) * 0.6;
-      totalPoints += avg;
-      validCount++;
+      const moyCC = n3 !== null && !isNaN(n3) ? (n1 + n2 + n3) / 3 : (n1 + n2) / 2;
+      sumCC += moyCC;
+      sumEFCFT += parseFloat(efcft);
+      sumEFCFP += parseFloat(efcfp);
+      cnt++;
     }
   });
+  const mCC = cnt > 0 ? (sumCC / cnt).toFixed(2) : '—';
+  const mEFCFT = cnt > 0 ? (sumEFCFT / cnt).toFixed(2) : '—';
+  const mEFCFP = cnt > 0 ? (sumEFCFP / cnt).toFixed(2) : '—';
 
-  const finalAvg = validCount > 0 ? (totalPoints / validCount).toFixed(2) : '—';
-  const isPassed = validCount > 0 && parseFloat(finalAvg) >= 10;
+  const firstYear = grades.firstYear || {};
+  const fyCC = firstYear.moyCC ? parseFloat(firstYear.moyCC).toFixed(2) : '—';
+  const fyEFCFT = firstYear.moyEFCFT ? parseFloat(firstYear.moyEFCFT).toFixed(2) : '—';
+  const fyEFCFP = firstYear.moyEFCFP ? parseFloat(firstYear.moyEFCFP).toFixed(2) : '—';
+  const nstiFinalAvg = firstYear.nsti ? parseFloat(firstYear.nsti).toFixed(2).replace('.', ',') : '—';
 
+  // Average combined computation
+  const calcAvgY = (cc, efcft, efcfp) => {
+    if (cc === '—' || efcft === '—' || efcfp === '—') return null;
+    return parseFloat(cc) * 0.4 + ((parseFloat(efcfp) + parseFloat(efcft)) / 2) * 0.6;
+  };
+
+  const avgY1 = calcAvgY(fyCC, fyEFCFT, fyEFCFP);
+  const avgY2 = calcAvgY(mCC, mEFCFT, mEFCFP);
+
+  const combinedCC = (fyCC !== '—' && mCC !== '—') ? ((parseFloat(fyCC) + parseFloat(mCC)) / 2).toFixed(2) : '—';
+  const combinedEFCFT = (fyEFCFT !== '—' && mEFCFT !== '—') ? ((parseFloat(fyEFCFT) + parseFloat(mEFCFT)) / 2).toFixed(2) : '—';
+  const combinedEFCFP = (fyEFCFP !== '—' && mEFCFP !== '—') ? ((parseFloat(fyEFCFP) + parseFloat(mEFCFP)) / 2).toFixed(2) : '—';
+
+  // ── Report Table ──
+  y += iH + 15;
+  const tblL = 75, colW = 22, nsti = 29;
+
+  // Header blocks
+  doc.setFillColor(...lightBlue);
+  doc.rect(margin + tblL + 5, y, colW, 12, 'F');
+  doc.rect(margin + tblL + 5 + colW + 2, y, colW, 12, 'F');
+  doc.rect(margin + tblL + 5 + colW * 2 + 4, y, colW, 12, 'F');
+  doc.rect(margin + tblL + 5 + colW * 3 + 6, y, nsti, 12, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.text('Contrôles\nContinus', margin + tblL + 5 + colW / 2, y + 5, { align: 'center' });
+  doc.text('EFCF\nThéorique', margin + tblL + 5 + colW + 2 + colW / 2, y + 5, { align: 'center' });
+  doc.text('EFCF\nPratique', margin + tblL + 5 + colW * 2 + 4 + colW / 2, y + 5, { align: 'center' });
+  doc.text('NSTI', margin + tblL + 5 + colW * 3 + 6 + nsti / 2, y + 7, { align: 'center' });
+
+  // 1st year row (dummy text to match template)
+  y += 15;
+  doc.setFillColor(...lightBlue);
+  doc.rect(margin, y, tblL, 10, 'F');
+  doc.rect(margin + tblL + 5, y, colW, 10, 'S');
+  doc.rect(margin + tblL + 5 + colW + 2, y, colW, 10, 'S');
+  doc.rect(margin + tblL + 5 + colW * 2 + 4, y, colW, 10, 'S');
+  doc.rect(margin + tblL + 5 + colW * 3 + 6, y, nsti, 22, 'S'); // Spans two rows
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text("Moyenne des notes obtenues en 1ère année", margin + 2, y + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(fyCC, margin + tblL + 5 + colW / 2, y + 6, { align: 'center' });
+  doc.text(fyEFCFT, margin + tblL + 5 + colW + 2 + colW / 2, y + 6, { align: 'center' });
+  doc.text(fyEFCFP, margin + tblL + 5 + colW * 2 + 4 + colW / 2, y + 6, { align: 'center' });
+
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'bold');
+  doc.text("Note Globale\nattribuée à la\nsoutenance des\ntravaux individuels\nde formation", margin + tblL + 5 + colW * 3 + 6 + nsti / 2, y + 6, { align: 'center' });
+
+  // 2nd year row
+  y += 12;
+  doc.setFillColor(...lightBlue);
+  doc.rect(margin, y, tblL, 10, 'F');
+  doc.rect(margin + tblL + 5, y, colW, 10, 'S');
+  doc.rect(margin + tblL + 5 + colW + 2, y, colW, 10, 'S');
+  doc.rect(margin + tblL + 5 + colW * 2 + 4, y, colW, 10, 'S');
+
+  doc.setFontSize(8);
+  doc.text("Moyenne des notes obtenues en 2ème année", margin + 2, y + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(mCC, margin + tblL + 5 + colW / 2, y + 6, { align: 'center' });
+  doc.text(mEFCFT, margin + tblL + 5 + colW + 2 + colW / 2, y + 6, { align: 'center' });
+  doc.text(mEFCFP, margin + tblL + 5 + colW * 2 + 4 + colW / 2, y + 6, { align: 'center' });
+
+  // Combined row
+  y += 14;
+  doc.setFillColor(...lightBlue);
+  doc.rect(margin, y, tblL, 10, 'F');
+  doc.rect(margin + tblL + 5, y, colW, 10, 'S');
+  doc.rect(margin + tblL + 5 + colW + 2, y, colW, 10, 'S');
+  doc.rect(margin + tblL + 5 + colW * 2 + 4, y, colW, 10, 'S');
+  doc.rect(margin + tblL + 5 + colW * 3 + 6, y, nsti, 10, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text("Moyenne des notes 1ère année + 2ème année", margin + 2, y + 6);
+  doc.setFontSize(9);
+  doc.text(combinedCC, margin + tblL + 5 + colW / 2, y + 6, { align: 'center' });
+  doc.text(combinedEFCFT, margin + tblL + 5 + colW + 2 + colW / 2, y + 6, { align: 'center' });
+  doc.text(combinedEFCFP, margin + tblL + 5 + colW * 2 + 4 + colW / 2, y + 6, { align: 'center' });
+  doc.text(nstiFinalAvg, margin + tblL + 5 + colW * 3 + 6 + nsti / 2, y + 6, { align: 'center' });
+
+  // ── Summary boxes ──
   y += 20;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(12);
-  doc.text(`Moyenne Générale obtenue : `, margin, y);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text(`${finalAvg} / 20`, margin + 55, y);
+  const boxLbl = 55, boxVal = 35, boxH = 10, gap = 6;
 
-  y += 10;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(12);
-  doc.text(`Décision du jury : `, margin, y);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(isPassed ? 22 : 217, isPassed ? 163 : 119, isPassed ? 74 : 6); // Green or Amber
-  doc.text(isPassed ? "ADMIS(E)" : "AJOURNÉ(E)", margin + 35, y);
+  // Compute final (combining 1st year + 2nd year if available, + NSTI)
+  // Weighted according to standard vocational training formula (typically avg(Y1, Y2) if applicable)
+  // Here we use the combined averages from the bottom row for the final average calculation.
+  let finalAvgNum = null;
 
-  y += 30;
+  if (avgY1 !== null && avgY2 !== null) {
+    const globalAvgY = (avgY1 + avgY2) / 2;
+    // The global note usually incorporates NSTI. Let's assume standard formula: (Moyenne Y1+Y2 + NSTI) / 2 or just standard weights.
+    if (firstYear.nsti) {
+      finalAvgNum = (globalAvgY + parseFloat(firstYear.nsti)) / 2; // Approximated typical global formula if NSTI is separate
+    } else {
+      finalAvgNum = globalAvgY;
+    }
+  } else if (avgY2 !== null) {
+    finalAvgNum = avgY2;
+    if (firstYear.nsti) {
+      finalAvgNum = (finalAvgNum + parseFloat(firstYear.nsti)) / 2;
+    }
+  }
+
+  const finalAvg = finalAvgNum !== null ? finalAvgNum.toFixed(2).replace('.', ',') : '—';
+  const isPassed = finalAvgNum !== null && finalAvgNum >= 10;
+
+  let mention = '';
+  if (finalAvgNum !== null) {
+    const fa = parseFloat(finalAvgNum.toFixed(2));
+    if (fa >= 16) mention = 'T.Bien';
+    else if (fa >= 14) mention = 'Bien';
+    else if (fa >= 12) mention = 'A.Bien';
+    else if (fa >= 10) mention = 'Passable';
+    else mention = 'Insuffisant';
+  }
+
+  const cx = margin + 30;
+  const vx = cx + boxLbl + 10;
+
+  // Moyenne Générale
+  doc.rect(cx, y, boxLbl, boxH, 'S');
+  doc.setFillColor(200, 200, 200); // Gray fill for values
+  doc.rect(vx, y, boxVal, boxH, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('Moyenne Générale', cx + boxLbl / 2, y + 6.5, { align: 'center' });
+  doc.setTextColor(0, 128, 0);
+  doc.text(finalAvg, vx + boxVal / 2, y + 6.5, { align: 'center' });
   doc.setTextColor(0);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Fait à Marrakech, le ${new Date().toLocaleDateString()}`, w - margin, y, { align: 'right' });
 
-  y += 20;
+  // Décision
+  y += boxH + gap;
+  doc.rect(cx, y, boxLbl, boxH, 'S');
+  doc.setFillColor(200, 200, 200);
+  doc.rect(vx, y, boxVal, boxH, 'FD');
   doc.setFont('helvetica', 'bold');
-  doc.text("Directeur de l'Établissement", margin + 20, y);
-  doc.text("Le Président du Jury", w - margin - 45, y);
+  doc.text('Décision', cx + boxLbl / 2, y + 6.5, { align: 'center' });
+  doc.setTextColor(isPassed ? 0 : 200, isPassed ? 128 : 0, 0);
+  doc.text(isPassed ? 'Admis' : 'Ajourné', vx + boxVal / 2, y + 6.5, { align: 'center' });
+  doc.setTextColor(0);
+
+  // Mention
+  y += boxH + gap;
+  doc.rect(cx, y, boxLbl, boxH, 'S');
+  doc.setFillColor(200, 200, 200);
+  doc.rect(vx, y, boxVal, boxH, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.text('Mention', cx + boxLbl / 2, y + 6.5, { align: 'center' });
+  doc.setTextColor(0, 128, 0);
+  doc.text(mention, vx + boxVal / 2, y + 6.5, { align: 'center' });
+  doc.setTextColor(0);
+
+  // Direction
+  y += boxH + gap;
+  doc.rect(cx, y, boxLbl, boxH, 'S');
+  doc.rect(vx, y, boxVal, boxH, 'S');
+  doc.setFont('helvetica', 'bold');
+  doc.text('Direction', cx + boxLbl / 2, y + 6.5, { align: 'center' });
+  doc.setTextColor(0, 128, 0);
+  doc.text("P.E d'examens", vx + boxVal / 2, y + 6.5, { align: 'center' });
+  doc.setTextColor(0);
 
   const safeName = student.lastName.replace(/[^a-z0-9]/gi, '_');
   doc.save(`Note_Obtention_Diplome_${safeName}.pdf`);
 };
+

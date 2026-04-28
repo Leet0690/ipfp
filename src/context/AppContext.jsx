@@ -26,10 +26,17 @@ export const AppProvider = ({ children }) => {
   const [studentAttendance, setStudentAttendance] = useState([]);
   const [teacherAttendance, setTeacherAttendance] = useState([]);
   const [schedules, setSchedules] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [salaries, setSalaries] = useState([]);
+  const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('eco_auth') === 'true';
+  });
+
+  const [isDirectorAuth, setIsDirectorAuth] = useState(() => {
+    return sessionStorage.getItem('ipfp_director_auth') === 'true';
   });
 
   // Real-time listeners
@@ -73,6 +80,21 @@ export const AppProvider = ({ children }) => {
       setSchedules(data);
     });
 
+    const unsubPayments = onSnapshot(query(collection(db, 'payments'), orderBy('createdAt', 'desc')), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPayments(data);
+    });
+
+    const unsubSalaries = onSnapshot(query(collection(db, 'salaries'), orderBy('createdAt', 'desc')), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSalaries(data);
+    });
+
+    const unsubModules = onSnapshot(query(collection(db, 'modules'), orderBy('name', 'asc')), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setModules(data);
+    });
+
     setLoading(false);
 
     return () => {
@@ -83,6 +105,9 @@ export const AppProvider = ({ children }) => {
       unsubStudentAttendance();
       unsubTeacherAttendance();
       unsubSchedules();
+      unsubPayments();
+      unsubSalaries();
+      unsubModules();
     };
   }, []);
 
@@ -127,6 +152,10 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('eco_auth', isAuthenticated);
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    sessionStorage.setItem('ipfp_director_auth', isDirectorAuth);
+  }, [isDirectorAuth]);
+
   const login = (password) => {
     if (password === 'admin123') {
       setIsAuthenticated(true);
@@ -135,10 +164,20 @@ export const AppProvider = ({ children }) => {
     return false;
   };
 
+  const loginDirector = (password) => {
+    if (password === 'directrice2026') {
+      setIsDirectorAuth(true);
+      return true;
+    }
+    return false;
+  };
+
+  const logoutDirector = () => setIsDirectorAuth(false);
+
   const logout = () => setIsAuthenticated(false);
 
   const addStudent = async (studentData) => {
-    const token = `stu-${studentData.lastName.toLowerCase()}-${Math.random().toString(36).substr(2, 5)}`;
+    const token = Math.random().toString(36).substring(2, 11);
     const newStudent = { ...studentData, token, createdAt: serverTimestamp() };
     await addDoc(collection(db, 'students'), newStudent);
     addNotification(`Nouveau stagiaire ajouté : ${studentData.lastName}.`);
@@ -212,7 +251,7 @@ export const AppProvider = ({ children }) => {
   const updateGrades = async (studentId, subject, gradeData) => {
     const gradeRef = doc(db, 'grades', studentId);
     await setDoc(gradeRef, {
-      [subject]: gradeData
+      [subject.replace(/\./g, '_')]: gradeData
     }, { merge: true });
   };
 
@@ -250,19 +289,60 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateTeacherAttendance = async (teacherId, date, status, comment, hours = 0, moduleId = '') => {
-    // Unique ID per teacher per date
-    const docId = `${teacherId}_${date}`;
+    // Unique ID per teacher per module per date (allows per-session tracking)
+    const safeModule = (moduleId || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+    const docId = `${teacherId}_${safeModule}_${date}`;
     const data = {
       teacherId,
       date,
       status,
       hours: status === 'present' ? hours : 0,
       comment: comment || '',
+      moduleId: moduleId || '',
       timestamp: serverTimestamp()
     };
-    if (moduleId) data.moduleId = moduleId;
     
     await setDoc(doc(db, 'attendance_formateurs', docId), data, { merge: true });
+  };
+
+  // ── Finance Functions ──
+  const addPayment = async (paymentData) => {
+    await addDoc(collection(db, 'payments'), { ...paymentData, createdAt: serverTimestamp() });
+  };
+
+  const updatePayment = async (id, data) => {
+    await updateDoc(doc(db, 'payments', id), data);
+  };
+
+  const deletePayment = async (id) => {
+    await deleteDoc(doc(db, 'payments', id));
+  };
+
+  const addSalary = async (salaryData) => {
+    await addDoc(collection(db, 'salaries'), { ...salaryData, createdAt: serverTimestamp() });
+  };
+
+  const updateSalary = async (id, data) => {
+    await updateDoc(doc(db, 'salaries', id), data);
+  };
+
+  const deleteSalary = async (id) => {
+    await deleteDoc(doc(db, 'salaries', id));
+  };
+
+  const addModule = async (moduleData) => {
+    await addDoc(collection(db, 'modules'), { ...moduleData, createdAt: serverTimestamp() });
+    addNotification(`Nouveau module ajouté : ${moduleData.name}.`);
+  };
+
+  const updateModule = async (id, data) => {
+    await updateDoc(doc(db, 'modules', id), data);
+    addNotification(`Module mis à jour : ${data.name || 'Identité'}.`);
+  };
+
+  const deleteModule = async (id) => {
+    await deleteDoc(doc(db, 'modules', id));
+    addNotification(`Module supprimé de la base.`);
   };
 
   return (
@@ -272,9 +352,12 @@ export const AppProvider = ({ children }) => {
       grades,
       notifications,
       isAuthenticated,
+      isDirectorAuth,
       loading,
       login,
       logout,
+      loginDirector,
+      logoutDirector,
       addStudent,
       addTeacher,
       updateStudent,
@@ -293,7 +376,19 @@ export const AppProvider = ({ children }) => {
       addSchedule,
       deleteSchedule,
       clearAllSchedules,
-      migrateTeacherTokens
+      migrateTeacherTokens,
+      payments,
+      salaries,
+      addPayment,
+      updatePayment,
+      deletePayment,
+      addSalary,
+      updateSalary,
+      deleteSalary,
+      modules,
+      addModule,
+      updateModule,
+      deleteModule
     }}>
       {!loading && children}
     </AppContext.Provider>

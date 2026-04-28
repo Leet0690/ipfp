@@ -2,20 +2,46 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import { getModulesForStudent } from '../data/modules';
+import { getModulesForStudent, MODULES_DATA } from '../data/modules';
 
 /* ── Styles & Constants ── */
 const thStyle = { padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-subtle)' };
 const tdStyle = { padding: '12px 16px', borderBottom: '1px solid var(--border-light)' };
 const selectStyle = { cursor: 'pointer', appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2394a3b8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px', paddingRight: '36px' };
 const lblStyle = { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' };
+const getGroupAbbreviation = (filiere, annee) => {
+  let diplomaAbbr = "";
+  let majorAbbr = "";
+  for (const dip in MODULES_DATA) {
+    if (MODULES_DATA[dip][filiere]) {
+      diplomaAbbr = dip.includes('Spécialisé') ? "TS" : "T";
+      break;
+    }
+  }
+  if (filiere.includes('Développement')) majorAbbr = "DI";
+  else if (filiere.includes('Gestion Informatisée')) majorAbbr = "GI";
+  else if (filiere.includes('Logistique')) majorAbbr = "GTL";
+  else if (filiere.includes('Entreprises')) majorAbbr = "GE";
+  else majorAbbr = filiere.split(' ').map(w => w[0]).join('').toUpperCase();
+  const yearNum = annee.includes('1') ? "1" : "2";
+  return diplomaAbbr + majorAbbr + yearNum;
+};
 
 /* ── Components ── */
-const GradeInput = ({ value, onChange, placeholder = '—' }) => (
-  <input type="number" min="0" max="20" step="0.25" className="input-premium"
-    style={{ width: '60px', textAlign: 'center', fontWeight: '600', padding: '5px 4px', fontSize: '13px', margin: '0 auto' }}
-    placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
-);
+const GradeInput = ({ value, onChange, placeholder = '—' }) => {
+  const num = parseFloat(value);
+  const isInvalid = value !== '' && value !== undefined && !isNaN(num) && (num < 0 || num > 20);
+  return (
+    <input type="number" step="0.25" className="input-premium"
+      style={{ 
+        width: '60px', textAlign: 'center', fontWeight: '600', padding: '5px 4px', fontSize: '13px', margin: '0 auto',
+        border: isInvalid ? '2px solid #ef4444' : undefined,
+        backgroundColor: isInvalid ? '#fef2f2' : undefined,
+        color: isInvalid ? '#dc2626' : undefined
+      }}
+      placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+  );
+};
 
 const TeacherPortal = () => {
   const { teacherId } = useParams();
@@ -86,41 +112,78 @@ const TeacherPortal = () => {
       setSelectedGroup(currentSession.filiere);
       setSelectedSubject(currentSession.module);
       setFilterYear(currentSession.annee);
+      // Auto-detect the correct diploma for this filiere
+      for (const dip in MODULES_DATA) {
+        if (MODULES_DATA[dip][currentSession.filiere]) {
+          setSelectedDiploma(dip);
+          break;
+        }
+      }
     }
   }, [currentSession]);
 
-  // Initialize selections once teacher is loaded
+  // ── Filtering Logic ──
+  const filteredGroups = useMemo(() => {
+    if (!teacher || !selectedDiploma) return [];
+    const teacherGroups = teacher.groups || [];
+    const diplomaGroups = Object.keys(MODULES_DATA[selectedDiploma] || {});
+    return teacherGroups.filter(g => diplomaGroups.includes(g));
+  }, [teacher, selectedDiploma]);
+
+  const filteredSubjects = useMemo(() => {
+    if (!teacher || !selectedDiploma || !selectedGroup || !filterYear) return [];
+    const teacherSubjects = teacher.subjects || [teacher.subject] || [];
+    const validModules = MODULES_DATA[selectedDiploma]?.[selectedGroup]?.[filterYear] || [];
+    return teacherSubjects.filter(s => validModules.includes(s));
+  }, [teacher, selectedDiploma, selectedGroup, filterYear]);
+
+  // Sync selections
   React.useEffect(() => {
     if (teacher) {
       const diplomas = teacher.diplomas || (teacher.diploma ? [teacher.diploma] : []);
       if (diplomas.length > 0 && !selectedDiploma) {
         setSelectedDiploma(diplomas[0]);
       }
-      if ((teacher.subjects || [teacher.subject]) && (teacher.subjects || [teacher.subject]).length > 0 && !selectedSubject) {
-        setSelectedSubject((teacher.subjects || [teacher.subject])[0]);
+    }
+  }, [teacher, selectedDiploma]);
+
+  React.useEffect(() => {
+    if (activeTab === 'grades' || !currentSession) {
+      if (filteredGroups.length > 0 && (!selectedGroup || !filteredGroups.includes(selectedGroup))) {
+        setSelectedGroup(filteredGroups[0]);
       }
-      if (teacher.groups && teacher.groups.length > 0 && !selectedGroup) {
-        setSelectedGroup(teacher.groups[0]);
+    }
+  }, [filteredGroups, selectedGroup, activeTab, currentSession]);
+
+  React.useEffect(() => {
+    if (activeTab === 'grades' || !currentSession) {
+      if (filteredSubjects.length > 0 && (!selectedSubject || !filteredSubjects.includes(selectedSubject))) {
+        setSelectedSubject(filteredSubjects[0]);
       }
-      if (teacher.years && teacher.years.length > 0 && filterYear === '1ère année' && !teacher.years.includes('1ère année')) {
+    }
+  }, [filteredSubjects, selectedSubject, activeTab, currentSession]);
+
+  React.useEffect(() => {
+    if (teacher && activeTab === 'grades') {
+      if (teacher.years && teacher.years.length > 0 && !teacher.years.includes(filterYear)) {
         setFilterYear(teacher.years[0]);
       }
     }
-  }, [teacher, selectedSubject, selectedGroup, filterYear, selectedDiploma]);
+  }, [teacher, activeTab, filterYear]);
 
-  // Filter students based on selected group AND year AND diploma AND module
+  // Filter students based on selected group AND year AND diploma
+  // Module match is relaxed: we only require group + year + diploma
+  // because the session module is already validated by the schedule
   const relevantStudents = useMemo(() => {
+    if (activeTab === 'attendance' && !currentSession) return [];
     return students.filter(s => {
       const groupMatch = s.major === selectedGroup;
       const yearMatch = s.year === filterYear;
       const diplomaMatch = !selectedDiploma || s.diploma === selectedDiploma;
       
-      const studentModules = getModulesForStudent(s);
-      const moduleMatch = !selectedSubject || studentModules.includes(selectedSubject);
-      
-      return groupMatch && yearMatch && diplomaMatch && moduleMatch;
+      return groupMatch && yearMatch && diplomaMatch;
     });
-  }, [students, selectedGroup, filterYear, selectedDiploma, selectedSubject]);
+  }, [students, selectedGroup, filterYear, selectedDiploma, activeTab, currentSession]);
 
   const allAttended = useMemo(() => {
     if (!relevantStudents || relevantStudents.length === 0 || !selectedSubject) return true;
@@ -203,11 +266,29 @@ const TeacherPortal = () => {
 
   const handleGradeChange = (studentId, field, value) => {
     if (!selectedSubject) return;
-    const current = grades[studentId]?.[selectedSubject] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
+    const current = grades[studentId]?.[selectedSubject.replace(/\./g, '_')] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
     updateGrades(studentId, selectedSubject, { ...current, [field]: value });
   };
 
   const handleSave = () => {
+    if (!selectedSubject) return;
+    
+    let hasInvalid = false;
+    relevantStudents.forEach(student => {
+      const g = grades[student.id]?.[selectedSubject.replace(/\./g, '_')] || {};
+      ['c1', 'c2', 'c3', 'efcfp', 'efcft'].forEach(field => {
+        if (g[field] !== '' && g[field] !== undefined) {
+          const num = parseFloat(g[field]);
+          if (num < 0 || num > 20) hasInvalid = true;
+        }
+      });
+    });
+
+    if (hasInvalid) {
+      alert("Validation impossible : certaines notes sont invalides (doivent être entre 0 et 20). Veuillez corriger les cases en rouge.");
+      return;
+    }
+
     setSuccess(true);
     addNotification(`Saisie synchronisée : ${teacher.name} — ${selectedSubject}.`);
     setTimeout(() => setSuccess(false), 2500);
@@ -235,8 +316,16 @@ const TeacherPortal = () => {
     } catch (e) {}
   };
 
+  const isValidGrade = (val) => {
+    if (val === '' || val === undefined || val === null) return true;
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0 && num <= 20;
+  };
+
   const calcMoyenneCC = (g) => {
     if (!g || g.c1 === '' || g.c2 === '') return null;
+    if (!isValidGrade(g.c1) || !isValidGrade(g.c2) || !isValidGrade(g.c3)) return null;
+
     const c1 = parseFloat(g.c1), c2 = parseFloat(g.c2);
     if (isNaN(c1) || isNaN(c2)) return null;
     if (g.c3 !== '' && g.c3 !== undefined && g.c3 !== null) {
@@ -278,12 +367,12 @@ const TeacherPortal = () => {
           
           <div style={{ display: 'flex', gap: '32px' }}>
             <div>
-              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Date</label>
-              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{selectedDate}</p>
+              <label style={{ ...lblStyle, color: 'var(--primary)' }}>Jour</label>
+              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>{dayOfWeek}</p>
             </div>
             <div>
               <label style={{ ...lblStyle, color: 'var(--primary)' }}>Heure</label>
-              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}><i className="fa-regular fa-clock" style={{ marginRight: '6px' }}></i>{currentSession.time}</p>
+              <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}><i className="fa-regular fa-clock" style={{ marginRight: '6px' }}></i>{currentSession.time?.replace(/\s/g, '').replace(/h/gi, ':')}</p>
             </div>
             <div>
               <label style={{ ...lblStyle, color: 'var(--primary)' }}>Groupe</label>
@@ -299,7 +388,7 @@ const TeacherPortal = () => {
             <div style={{ minWidth: '200px' }}>
               <label style={lblStyle}>Changer de séance</label>
               <select className="input-premium" style={{ ...selectStyle, width: '100%', background: 'white' }} value={selectedSessionId || currentSession.id} onChange={(e) => setSelectedSessionId(e.target.value)}>
-                {todaysSessions.map(s => <option key={s.id} value={s.id}>{s.time} - {s.module}</option>)}
+                {todaysSessions.map(s => <option key={s.id} value={s.id}>{s.time?.replace(/\s/g, '').replace(/h/gi, ':')} - {getGroupAbbreviation(s.filiere, s.annee)} - {s.module}</option>)}
               </select>
             </div>
           )}
@@ -377,11 +466,6 @@ const TeacherPortal = () => {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
         className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lblStyle}>Date du jour</label>
-            <input type="date" className="input-premium" style={{ width: '100%', padding: '7px 12px', fontSize: '13px', cursor: 'not-allowed', background: 'var(--bg-subtle)' }}
-              value={selectedDate} disabled />
-          </div>
           
           {activeTab === 'grades' && (
             <>
@@ -394,17 +478,9 @@ const TeacherPortal = () => {
                 </select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={lblStyle}>Module</label>
-                <select className="input-premium" style={selectStyle} value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
-                  {(teacher.subjects || [teacher.subject]).map(sub => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={lblStyle}>Groupe (Filière)</label>
                 <select className="input-premium" style={selectStyle} value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
-                  {(teacher.groups || []).map(g => (
+                  {filteredGroups.map(g => (
                     <option key={g} value={g}>{g}</option>
                   ))}
                 </select>
@@ -414,6 +490,14 @@ const TeacherPortal = () => {
                 <select className="input-premium" style={selectStyle} value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
                   {(teacher.years && teacher.years.length > 0 ? teacher.years : ['1ère année', '2ème année']).map(y => (
                     <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={lblStyle}>Module</label>
+                <select className="input-premium" style={selectStyle} value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
+                  {filteredSubjects.map(sub => (
+                    <option key={sub} value={sub}>{sub}</option>
                   ))}
                 </select>
               </div>
@@ -437,9 +521,15 @@ const TeacherPortal = () => {
       >
         {relevantStudents.length === 0 ? (
           <div style={{ padding: '64px', textAlign: 'center' }}>
-            <i className="fa-solid fa-users-slash" style={{ fontSize: '42px', color: 'var(--border)', display: 'block', marginBottom: '16px', opacity: 0.5 }}></i>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>Liste vide</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Aucun stagiaire ne correspond aux critères actuels.</p>
+            <i className={`fa-solid ${activeTab === 'attendance' && !currentSession ? 'fa-calendar-xmark' : 'fa-users-slash'}`} style={{ fontSize: '42px', color: 'var(--border)', display: 'block', marginBottom: '16px', opacity: 0.5 }}></i>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+              {activeTab === 'attendance' && !currentSession ? 'Aucune séance' : 'Liste vide'}
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+              {activeTab === 'attendance' && !currentSession 
+                ? `Aucune séance n'est planifiée pour vous ce jour (${dayOfWeek}).`
+                : 'Aucun stagiaire ne correspond aux critères actuels.'}
+            </p>
           </div>
         ) : !selectedSubject ? (
           <div style={{ padding: '64px', textAlign: 'center' }}>
@@ -461,7 +551,7 @@ const TeacherPortal = () => {
               </thead>
               <tbody>
                 {relevantStudents.map((student, idx) => {
-                  const g = grades[student.id]?.[selectedSubject] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
+                  const g = grades[student.id]?.[selectedSubject.replace(/\./g, '_')] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
                   const moyCC = calcMoyenneCC(g);
 
                   return (

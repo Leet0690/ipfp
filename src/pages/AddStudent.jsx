@@ -17,7 +17,12 @@ const AddStudent = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    addStudent(formData);
+    const trimmedData = {
+      ...formData,
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim()
+    };
+    addStudent(trimmedData);
     setIsSuccess(true);
     setTimeout(() => navigate('/admin/students'), 1200);
   };

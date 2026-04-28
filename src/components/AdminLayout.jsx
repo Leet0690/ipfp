@@ -20,6 +20,7 @@ const AdminLayout = ({ children }) => {
     { label: 'Students', icon: 'fa-user-graduate', path: '/admin/students' },
     { label: 'Teachers', icon: 'fa-chalkboard-user', path: '/admin/teachers' },
     { label: 'Classes', icon: 'fa-book', path: '/admin/classes' },
+    { label: 'Modules', icon: 'fa-cubes', path: '/admin/modules' },
     { label: 'Reports', icon: 'fa-chart-line', path: '/admin/reports' },
     { label: 'Settings', icon: 'fa-gear', path: '/admin/settings' }
   ];

@@ -5,7 +5,6 @@ export const MODULES_DATA = {
   'Technicien Spécialisé': {
     'Développement Informatique': {
       '1ère année': [
-        'Métier et formation',
         'Algorithmique et programmation structurée avec Python',
         'Conception et Modélisation d\'un SI avec UML',
         'Programmation Orientée Objet avec JAVA',

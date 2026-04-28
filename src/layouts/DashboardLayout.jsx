@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
@@ -9,8 +9,11 @@ const NAV_LINKS = [
   { to: "/admin/teachers", icon: "fa-chalkboard-user", label: "Formateurs" },
   { to: "/admin/schedules", icon: "fa-calendar-days", label: "Emplois du Temps" },
   { to: "/admin/grades", icon: "fa-pen-ruler", label: "Notes" },
+  { to: "/admin/modules", icon: "fa-cubes", label: "Gestion Modules" },
   { to: "/admin/attendance-students", icon: "fa-user-clock", label: "Absences Stagiaires" },
-  { to: "/admin/attendance-teachers", icon: "fa-calendar-check", label: "Présences Formateurs" }
+  { to: "/admin/reports", icon: "fa-chart-line", label: "Rapports" },
+  { to: "/admin/attendance-teachers", icon: "fa-calendar-check", label: "Présences Formateurs" },
+  { to: "/admin/finance", icon: "fa-wallet", label: "Finance" }
 ];
 
 export default function DashboardLayout({ children }) {
@@ -19,6 +22,14 @@ export default function DashboardLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const location = useLocation();
+  const scrollRef = useRef(null);
+
+  // Scroll to top on route change
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo(0, 0);
+    }
+  }, [location.pathname]);
 
   const unreadCount = (notifications || []).filter(n => !n.read).length;
 
@@ -100,7 +111,7 @@ export default function DashboardLayout({ children }) {
       
       {/* Desktop Sidebar */}
       <motion.aside
-        className="glass-premium"
+        className="glass-premium desktop-sidebar"
         initial={false}
         animate={{ width: isSidebarOpen ? '260px' : '80px' }}
         transition={{ duration: 0.3, type: 'spring', bounce: 0, stiffness: 200, damping: 25 }}
@@ -274,7 +285,7 @@ export default function DashboardLayout({ children }) {
         </header>
 
         {/* Content Scroll Area */}
-        <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '24px' }}>
+        <main ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '24px' }}>
           <div className="max-w-container" style={{ padding: 0 }}>
             <motion.div
                initial={{ opacity: 0, y: 20 }}
@@ -362,6 +373,7 @@ export default function DashboardLayout({ children }) {
         @media (max-width: 1024px) {
           .desktop-menu-btn { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
+          .desktop-sidebar { display: none !important; }
         }
       `}</style>
     </div>

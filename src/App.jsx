@@ -13,19 +13,28 @@ import StudentResults from './pages/StudentResults';
 import GradeManagement from './pages/GradeManagement';
 import StudentAttendance from './pages/StudentAttendance';
 import TeacherAttendance from './pages/TeacherAttendance';
+import Reports from './pages/Reports';
 import ScheduleManagement from './pages/ScheduleManagement';
-import Maintenance from './pages/Maintenance';
+import FinanceDashboard from './pages/FinanceDashboard';
+import ModuleManagement from './pages/ModuleManagement';
 
-// Set to true to block the site and show "Under Construction"
-const IS_UNDER_MAINTENANCE = false;
+
+// Component to scroll to top on route change
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+};
+
+
 
 const AppContent = () => {
   const { isAuthenticated, loading } = useApp();
   const location = useLocation();
 
-  if (IS_UNDER_MAINTENANCE) {
-    return <Maintenance />;
-  }
+
 
   const isPublicRoute = location.pathname === '/login' || 
                         location.pathname.startsWith('/portal/') || 
@@ -55,7 +64,10 @@ const AppContent = () => {
       <Route path="/admin/schedules" element={<ScheduleManagement />} />
       <Route path="/admin/grades" element={<GradeManagement />} />
       <Route path="/admin/attendance-students" element={<StudentAttendance />} />
+      <Route path="/admin/modules" element={<ModuleManagement />} />
+      <Route path="/admin/reports" element={<Reports />} />
       <Route path="/admin/attendance-teachers" element={<TeacherAttendance />} />
+      <Route path="/admin/finance" element={<FinanceDashboard />} />
       <Route path="/portal/:teacherId" element={<TeacherPortal />} />
       <Route path="/teacher/:teacherId" element={<TeacherPortal />} />
       <Route path="/results/:studentId" element={<StudentResults />} />
@@ -85,6 +97,7 @@ const AppContent = () => {
 const App = () => (
   <AppProvider>
     <AdminAuthProvider>
+      <ScrollToTop />
       <AppContent />
     </AdminAuthProvider>
   </AppProvider>

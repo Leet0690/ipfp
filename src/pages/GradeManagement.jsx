@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import { getModulesForStudent, getModulesForFiliere, FILIERES } from '../data/modules';
+import { FILIERES } from '../data/modules';
 import { generateFicheSignature, generateFicheNotes, generateBulletinGlobal, generateNoteObtentionDiplome } from '../utils/pdfGenerator';
 
 /* ── Styles & Constants ── */
@@ -11,11 +11,20 @@ const tdStyle = { padding: '10px 12px', borderBottom: '1px solid var(--border-li
 const selectStyle = { cursor: 'pointer', appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2394a3b8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px', paddingRight: '36px' };
 
 /* ── Components ── */
-const GradeInput = ({ value, onChange, placeholder = '—' }) => (
-  <input type="number" min="0" max="20" step="0.25" className="input-premium"
-    style={{ width: '60px', textAlign: 'center', fontWeight: '600', padding: '5px 4px', fontSize: '13px', margin: '0 auto' }}
-    placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
-);
+const GradeInput = ({ value, onChange, placeholder = '—' }) => {
+  const num = parseFloat(value);
+  const isInvalid = value !== '' && value !== undefined && !isNaN(num) && (num < 0 || num > 20);
+  return (
+    <input type="number" step="0.25" className="input-premium"
+      style={{ 
+        width: '60px', textAlign: 'center', fontWeight: '600', padding: '5px 4px', fontSize: '13px', margin: '0 auto',
+        border: isInvalid ? '2px solid #ef4444' : undefined,
+        backgroundColor: isInvalid ? '#fef2f2' : undefined,
+        color: isInvalid ? '#dc2626' : undefined
+      }}
+      placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+  );
+};
 
 const MiniStat = ({ label, value }) => (
   <div style={{ textAlign: 'center', padding: '6px 14px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-lg)' }}>
@@ -25,7 +34,7 @@ const MiniStat = ({ label, value }) => (
 );
 
 const GradeManagement = () => {
-  const { students, teachers, grades, updateGrades, loading } = useApp();
+  const { students = [], teachers = [], grades = {}, updateGrades, loading = false, modules: allModules = [] } = useApp() || {};
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [filterDiploma, setFilterDiploma] = useState('');
   const [filterMajor, setFilterMajor] = useState('');
@@ -49,16 +58,31 @@ const GradeManagement = () => {
   const availableMajors = filterDiploma ? (FILIERES[filterDiploma] || []) : Array.from(new Set(students.map(s => s.major)));
 
   const selectedStudent = students.find(s => s.id === selectedStudentId);
-  const modules = selectedStudent ? getModulesForStudent(selectedStudent) : [];
+  const studentModules = useMemo(() => {
+    if (!selectedStudent) return [];
+    return allModules.filter(m => 
+      m.diploma === selectedStudent.diploma && 
+      m.major === selectedStudent.major && 
+      m.year === selectedStudent.year
+    );
+  }, [selectedStudent, allModules]);
+  
+  const modules = studentModules.map(m => m.name);
   const studentGrades = selectedStudent ? (grades[selectedStudent.id] || {}) : {};
 
   // Modules for PDF (based on filters, not selected student)
-  const pdfModules = useMemo(() => {
+  const pdfModulesList = useMemo(() => {
     if (filterDiploma && filterMajor && filterYear) {
-      return getModulesForFiliere(filterDiploma, filterMajor, filterYear);
+      return allModules.filter(m => 
+        m.diploma === filterDiploma && 
+        m.major === filterMajor && 
+        m.year === filterYear
+      );
     }
     return [];
-  }, [filterDiploma, filterMajor, filterYear]);
+  }, [filterDiploma, filterMajor, filterYear, allModules]);
+  
+  const pdfModules = pdfModulesList.map(m => m.name);
 
   // Students for PDF (filtered)
   const pdfStudents = useMemo(() => {
@@ -71,14 +95,40 @@ const GradeManagement = () => {
   }, [students, filterDiploma, filterMajor, filterYear]);
 
   const handleGradeChange = (module, field, value) => {
-    const current = studentGrades[module] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
+    const current = studentGrades[module.replace(/\./g, '_')] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
     updateGrades(selectedStudentId, module, { ...current, [field]: value });
   };
 
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2500); };
+  const handleSave = () => {
+    let hasInvalid = false;
+    Object.values(studentGrades).forEach(g => {
+      ['c1', 'c2', 'c3', 'efcfp', 'efcft'].forEach(field => {
+        if (g[field] !== '' && g[field] !== undefined) {
+          const num = parseFloat(g[field]);
+          if (num < 0 || num > 20) hasInvalid = true;
+        }
+      });
+    });
+
+    if (hasInvalid) {
+      alert("Validation impossible : certaines notes sont invalides (doivent être entre 0 et 20). Veuillez corriger les cases en rouge.");
+      return;
+    }
+    
+    setSaved(true); 
+    setTimeout(() => setSaved(false), 2500); 
+  };
+
+  const isValidGrade = (val) => {
+    if (val === '' || val === undefined || val === null) return true;
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0 && num <= 20;
+  };
 
   const calcMoyenneCC = (g) => {
     if (!g || g.c1 === '' || g.c2 === '') return null;
+    if (!isValidGrade(g.c1) || !isValidGrade(g.c2) || !isValidGrade(g.c3)) return null;
+    
     const c1 = parseFloat(g.c1), c2 = parseFloat(g.c2);
     if (isNaN(c1) || isNaN(c2)) return null;
     if (g.c3 !== '' && g.c3 !== undefined && g.c3 !== null) {
@@ -89,9 +139,12 @@ const GradeManagement = () => {
   };
 
   const calcAvg = (g) => {
+    if (!g) return null;
+    if (!isValidGrade(g.c1) || !isValidGrade(g.c2) || !isValidGrade(g.c3) || !isValidGrade(g.efcfp) || !isValidGrade(g.efcft)) return null;
+    
     const cc = calcMoyenneCC(g);
     if (cc === null) return null;
-    if (!g || g.efcfp === '' || g.efcft === '') return null;
+    if (g.efcfp === '' || g.efcft === '') return null;
     const efcfp = parseFloat(g.efcfp), efcft = parseFloat(g.efcft);
     if (isNaN(efcfp) || isNaN(efcft)) return null;
     return (cc * 0.4 + ((efcfp + efcft) / 2) * 0.6);
@@ -103,15 +156,19 @@ const GradeManagement = () => {
   };
 
   const generalAvg = () => {
-    let total = 0, count = 0;
-    modules.forEach(mod => {
-      const avg = calcAvg(studentGrades[mod]);
-      if (avg !== null) { total += avg; count++; }
+    let weightedSum = 0, totalCoeff = 0;
+    studentModules.forEach(mod => {
+      const g = studentGrades[mod.name.replace(/\./g, '_')];
+      const avg = calcAvg(g);
+      if (avg !== null) {
+        weightedSum += avg * (mod.coefficient || 1);
+        totalCoeff += (mod.coefficient || 1);
+      }
     });
-    return count > 0 ? (total / count).toFixed(2) : '—';
+    return totalCoeff > 0 ? (weightedSum / totalCoeff).toFixed(2) : '—';
   };
 
-  const completedModules = modules.filter(mod => isComplete(studentGrades[mod])).length;
+  const completedModules = modules.filter(mod => isComplete(studentGrades[mod.replace(/\./g, '_')])).length;
 
   // ── PDF Handlers ──
   const findFormateur = (moduleName) => {
@@ -124,10 +181,11 @@ const GradeManagement = () => {
     generateFicheSignature({
       students: pdfStudents,
       filiere: filterMajor,
-      niveau: (filterYear || '').replace('ème', 'ᵉᵐᵉ').replace('ère', 'ᵉʳᵉ'),
+      niveau: filterYear || '',
       module: pdfModule,
       ccNumber: pdfCC,
       formateur: findFormateur(pdfModule),
+      allGrades: grades,
     });
   };
 
@@ -140,6 +198,7 @@ const GradeManagement = () => {
       anneeFormation: '2025-2026',
       module: pdfModule,
       formateur: findFormateur(pdfModule),
+      allGrades: grades,
     });
   };
 
@@ -386,6 +445,35 @@ const GradeManagement = () => {
               )}
             </AnimatePresence>
 
+            {/* Notes 1ère Année & NSTI Section */}
+            {selectedStudent.year === '2ème année' && (
+              <div className="glass-card" style={{ padding: '16px', marginBottom: '16px', background: 'var(--primary-ultra-light)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '12px', color: 'var(--primary)' }}>
+                  <i className="fa-solid fa-clock-rotate-left" style={{ marginRight: '6px' }}></i>
+                  Saisie des notes de la 1ère année et NSTI (Admin uniquement)
+                </h4>
+                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={lbl}>Moy CC (1ère année)</label>
+                    <GradeInput value={(studentGrades.firstYear || {}).moyCC || ''} onChange={(v) => handleGradeChange('firstYear', 'moyCC', v)} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={lbl}>Moy EFCFT (1ère année)</label>
+                    <GradeInput value={(studentGrades.firstYear || {}).moyEFCFT || ''} onChange={(v) => handleGradeChange('firstYear', 'moyEFCFT', v)} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={lbl}>Moy EFCFP (1ère année)</label>
+                    <GradeInput value={(studentGrades.firstYear || {}).moyEFCFP || ''} onChange={(v) => handleGradeChange('firstYear', 'moyEFCFP', v)} />
+                  </div>
+                  <div style={{ width: '1px', background: 'var(--border)', margin: '0 10px' }}></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ ...lbl, color: '#d97706' }}>Note Globale NSTI</label>
+                    <GradeInput value={(studentGrades.firstYear || {}).nsti || ''} onChange={(v) => handleGradeChange('firstYear', 'nsti', v)} />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Table */}
             {modules.length === 0 ? (
               <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
@@ -412,7 +500,7 @@ const GradeManagement = () => {
                     </thead>
                     <tbody>
                       {modules.map((mod, idx) => {
-                        const g = studentGrades[mod] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
+                        const g = studentGrades[mod.replace(/\./g, '_')] || { c1: '', c2: '', c3: '', efcfp: '', efcft: '' };
                         const moyCC = calcMoyenneCC(g);
                         const avg = calcAvg(g);
                         const complete = isComplete(g);
@@ -460,7 +548,7 @@ const GradeManagement = () => {
                               {complete && avg !== null ? (
                                 <span style={{ padding: '3px 8px', borderRadius: 'var(--radius-pill)', fontSize: '9px', fontWeight: '700', textTransform: 'uppercase',
                                   background: passed ? 'rgba(22,163,74,0.06)' : 'rgba(245,158,11,0.06)', color: passed ? '#16a34a' : '#d97706' }}>
-                                  {passed ? 'Validé' : 'Rattrapage'}
+                                  {passed ? 'Validé' : 'Faible'}
                                 </span>
                               ) : <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>—</span>}
                             </td>
