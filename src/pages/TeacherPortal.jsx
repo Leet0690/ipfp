@@ -90,7 +90,7 @@ const TeacherPortal = () => {
   
   const currentSession = useMemo(() => {
     if (selectedSessionId) return todaysSessions.find(s => s.id === selectedSessionId);
-    return todaysSessions[0];
+    return null;
   }, [todaysSessions, selectedSessionId]);
 
   const sessionDuration = useMemo(() => {
@@ -220,7 +220,7 @@ const TeacherPortal = () => {
   }, [students, selectedGroup, filterYear, selectedDiploma, activeTab, currentSession]);
 
   const allAttended = useMemo(() => {
-    if (!relevantStudents || relevantStudents.length === 0 || !selectedSubject) return true;
+    if (!currentSession || !relevantStudents || relevantStudents.length === 0 || !selectedSubject) return false;
     return relevantStudents.every(s => {
       const docId = `${s.id}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
       const record = studentAttendance.find(a => a.id === docId);
@@ -419,10 +419,11 @@ const TeacherPortal = () => {
             </div>
           </div>
 
-          {todaysSessions.length > 1 && (
+          {todaysSessions.length > 0 && (
             <div style={{ minWidth: '200px' }}>
               <label style={lblStyle}>Changer de séance</label>
-              <select className="input-premium" style={{ ...selectStyle, width: '100%', background: 'white' }} value={selectedSessionId || currentSession.id} onChange={(e) => setSelectedSessionId(e.target.value)}>
+              <select className="input-premium" style={{ ...selectStyle, width: '100%', background: 'white' }} value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)}>
+                <option value="">-- Sélectionner une séance --</option>
                 {todaysSessions.map(s => <option key={s.id} value={s.id}>{s.time?.replace(/\s/g, '').replace(/h/gi, ':')} - {getGroupAbbreviation(s.filiere, s.annee)} - {s.module}</option>)}
               </select>
             </div>
@@ -477,13 +478,15 @@ const TeacherPortal = () => {
 
           {activeTab === 'attendance' && (
             <>
-              <button 
+              {todaysSessions.length > 0 && (
+                <button 
                 onClick={handleValidateAttendance} 
                 className={`btn-modern ${allAttended ? 'primary' : ''}`} 
                 style={{ padding: '10px 20px', fontSize: '13px', opacity: allAttended ? 1 : 0.6, cursor: allAttended ? 'pointer' : 'not-allowed' }}
               >
                 Valider l'appel <i className="fa-solid fa-check" style={{ marginLeft: '4px', fontSize: '12px' }}></i>
-              </button>
+                </button>
+              )}
               <AnimatePresence>
                 {attendanceSuccess && (
                   <motion.span initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -554,17 +557,17 @@ const TeacherPortal = () => {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
         style={{ background: 'white', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: 'var(--shadow-xs)' }}
       >
-        {relevantStudents.length === 0 ? (
+        {activeTab === 'attendance' && !currentSession ? (
           <div style={{ padding: '64px', textAlign: 'center' }}>
-            <i className={`fa-solid ${activeTab === 'attendance' && !currentSession ? 'fa-calendar-xmark' : 'fa-users-slash'}`} style={{ fontSize: '42px', color: 'var(--border)', display: 'block', marginBottom: '16px', opacity: 0.5 }}></i>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-              {activeTab === 'attendance' && !currentSession ? 'Aucune séance' : 'Liste vide'}
-            </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-              {activeTab === 'attendance' && !currentSession 
-                ? `Aucune séance n'est planifiée pour vous ce jour (${dayOfWeek}).`
-                : 'Aucun stagiaire ne correspond aux critères actuels.'}
-            </p>
+            <i className="fa-solid fa-calendar-check" style={{ fontSize: '42px', color: 'var(--primary)', display: 'block', marginBottom: '16px', opacity: 0.3 }}></i>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>Prise d'absence</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Veuillez sélectionner l'une de vos séances d'aujourd'hui pour commencer.</p>
+          </div>
+        ) : relevantStudents.length === 0 ? (
+          <div style={{ padding: '64px', textAlign: 'center' }}>
+            <i className="fa-solid fa-users-slash" style={{ fontSize: '42px', color: 'var(--border)', display: 'block', marginBottom: '16px', opacity: 0.5 }}></i>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px' }}>Liste vide</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Aucun stagiaire ne correspond aux critères actuels.</p>
           </div>
         ) : !selectedSubject ? (
           <div style={{ padding: '64px', textAlign: 'center' }}>
