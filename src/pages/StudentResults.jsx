@@ -85,21 +85,21 @@ const StudentResults = () => {
   const hasC3 = (g) => g && g.c3 !== '' && g.c3 !== undefined && g.c3 !== null && !isNaN(parseFloat(g.c3));
 
   // General average (CC*0.4 + EFC*0.6 for complete modules)
-  let weightedSum = 0, totalCoeff = 0;
+  let sumCC = 0, sumFT = 0, sumFP = 0, cnt = 0;
   studentModules.forEach(mod => {
     const g = studentGrades[sanitize(mod.name)];
     const cc = calcMoyenneCC(g);
     if (cc === null || !g || g.efcfp === '' || g.efcft === '') return;
     if (!isValidGrade(g.c1) || !isValidGrade(g.c2) || !isValidGrade(g.c3) || !isValidGrade(g.efcfp) || !isValidGrade(g.efcft)) return;
 
-    const efcfp = parseFloat(g.efcfp), efcft = parseFloat(g.efcft);
-    if (isNaN(efcfp) || isNaN(efcft)) return;
-    const efc = (efcfp + efcft) / 2;
-    const coeff = mod.coefficient || 1;
-    weightedSum += (cc * 0.4 + efc * 0.6) * coeff;
-    totalCoeff += coeff;
+    sumCC += cc;
+    sumFT += parseFloat(g.efcft);
+    sumFP += parseFloat(g.efcfp);
+    cnt++;
   });
-  const generalAvg = totalCoeff > 0 ? (weightedSum / totalCoeff).toFixed(2) : '—';
+  
+  const generalAvgNum = cnt > 0 ? (((sumCC / cnt) * 3) + ((sumFT / cnt) * 2) + ((sumFP / cnt) * 3)) / 8 : 0;
+  const generalAvg = cnt > 0 ? generalAvgNum.toFixed(2) : '—';
   const completedModules = modules.filter(mod => {
     const g = studentGrades[sanitize(mod)];
     return g && g.c1 !== '' && g.c2 !== '' && g.efcfp !== '' && g.efcft !== '';

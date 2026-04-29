@@ -147,7 +147,8 @@ const GradeManagement = () => {
     if (g.efcfp === '' || g.efcft === '') return null;
     const efcfp = parseFloat(g.efcfp), efcft = parseFloat(g.efcft);
     if (isNaN(efcfp) || isNaN(efcft)) return null;
-    return (cc * 0.4 + ((efcfp + efcft) / 2) * 0.6);
+    // New Formula: ((CC*3) + (EFCFT*2) + (EFCFP*3)) / 8
+    return (cc * 3 + efcft * 2 + efcfp * 3) / 8;
   };
 
   const isComplete = (g) => {
@@ -156,16 +157,22 @@ const GradeManagement = () => {
   };
 
   const generalAvg = () => {
-    let weightedSum = 0, totalCoeff = 0;
+    let sumCC = 0, sumFT = 0, sumFP = 0, cnt = 0;
     studentModules.forEach(mod => {
       const g = studentGrades[mod.name.replace(/\./g, '_')];
-      const avg = calcAvg(g);
-      if (avg !== null) {
-        weightedSum += avg * (mod.coefficient || 1);
-        totalCoeff += (mod.coefficient || 1);
+      const cc = calcMoyenneCC(g);
+      if (cc !== null && g.efcft !== '' && g.efcfp !== '') {
+        sumCC += cc;
+        sumFT += parseFloat(g.efcft);
+        sumFP += parseFloat(g.efcfp);
+        cnt++;
       }
     });
-    return totalCoeff > 0 ? (weightedSum / totalCoeff).toFixed(2) : '—';
+    if (cnt === 0) return '—';
+    const mCC = sumCC / cnt;
+    const mFT = sumFT / cnt;
+    const mFP = sumFP / cnt;
+    return (((mCC * 3) + (mFT * 2) + (mFP * 3)) / 8).toFixed(2);
   };
 
   const completedModules = modules.filter(mod => isComplete(studentGrades[mod.replace(/\./g, '_')])).length;
@@ -372,20 +379,22 @@ const GradeManagement = () => {
                   </div>
 
                   {/* 4. Note d'Obtention de Diplôme */}
-                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', padding: '16px', background: 'white' }}>
+                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', padding: '16px', background: 'white', opacity: selectedStudent?.year === '1ère année' ? 0.6 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                       <i className="fa-solid fa-award" style={{ color: '#8b5cf6', fontSize: '14px' }}></i>
                       <h4 style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Note d'Obtention de Diplôme</h4>
                     </div>
                     <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 }}>
-                      Attestation d'admission avec moyenne générale et décision du jury.
+                      {selectedStudent?.year === '1ère année' 
+                        ? "Non disponible pour les stagiaires de 1ère année."
+                        : "Attestation d'admission avec moyenne générale et décision du jury."}
                     </p>
                     <div style={{ height: '36px' }}></div>
                     <button onClick={handleNoteObtentionDiplome}
-                      disabled={!selectedStudent}
+                      disabled={!selectedStudent || selectedStudent.year === '1ère année'}
                       className="btn-modern primary"
                       style={{ width: '100%', padding: '8px', fontSize: '11px', background: '#8b5cf6', borderColor: '#8b5cf6',
-                        opacity: !selectedStudent ? 0.4 : 1 }}>
+                        opacity: (!selectedStudent || selectedStudent.year === '1ère année') ? 0.4 : 1 }}>
                       <i className="fa-solid fa-download" style={{ marginRight: '6px' }}></i>
                       {selectedStudent ? 'Télécharger' : 'Sélectionner un stagiaire'}
                     </button>

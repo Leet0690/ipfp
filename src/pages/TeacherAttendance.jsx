@@ -285,7 +285,7 @@ const TeacherAttendance = () => {
                           />
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+                          <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', padding: '3px', gap: '2px' }}>
                             <button onClick={() => handleStatusChange(row, 'present')}
                               style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
                                 background: status === 'present' ? '#16a34a' : 'transparent', color: status === 'present' ? 'white' : 'var(--text-muted)' }}>
@@ -296,6 +296,14 @@ const TeacherAttendance = () => {
                                 background: status === 'absent' ? '#dc2626' : 'transparent', color: status === 'absent' ? 'white' : 'var(--text-muted)' }}>
                               Absent
                             </button>
+                            {status && (
+                              <button onClick={() => handleStatusChange(row, '')}
+                                title="Réinitialiser"
+                                style={{ padding: '6px 8px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
+                                  background: 'transparent', color: 'var(--text-faint)' }}>
+                                <i className="fa-solid fa-xmark"></i>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </motion.tr>

@@ -385,7 +385,7 @@ export const generateBulletinGlobal = (student, allGrades, modules) => {
   doc.rect(margin, y, tableW, infoH, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text('ANNEE DE FORMATION : 2024-2025', w / 2, y + 5.5, { align: 'center' });
+  doc.text('ANNEE DE FORMATION : 2025-2026', w / 2, y + 5.5, { align: 'center' });
 
   // ── Grades Table ──
   y += infoH + 2;
@@ -440,16 +440,18 @@ export const generateBulletinGlobal = (student, allGrades, modules) => {
 
     let avg = null;
     if (moyCC !== null && !isNaN(nP) && !isNaN(nT)) {
-      avg = moyCC * 0.4 + ((nP + nT) / 2) * 0.6;
+      // New Formula: ((moyCC*3) + (EFCFT*2) + (EFCFP*3)) / 8
+      avg = (moyCC * 3 + nT * 2 + nP * 3) / 8;
       totalWeighted += avg * coeff;
       totalCoeff += coeff;
       sumAvg += avg; countAvg++;
     }
 
-    // Appreciation
+    // Appreciation: Faible, Passable, A.Bien, Bien, T.bien, Excellent
     let appreciation = '';
     if (avg !== null) {
-      if (avg >= 16) appreciation = 'T.Bien';
+      if (avg >= 18) appreciation = 'Excellent';
+      else if (avg >= 16) appreciation = 'T.Bien';
       else if (avg >= 14) appreciation = 'Bien';
       else if (avg >= 12) appreciation = 'A.Bien';
       else if (avg >= 10) appreciation = 'Passable';
@@ -492,50 +494,65 @@ export const generateBulletinGlobal = (student, allGrades, modules) => {
   });
 
   // ── Moyennes pondérées row ──
-  const avgCC = countCC > 0 ? (sumCC / countCC).toFixed(2) : '';
-  const avgEFCFT = countEFCFT > 0 ? (sumEFCFT / countEFCFT).toFixed(2) : '';
-  const avgEFCFP = countEFCFP > 0 ? (sumEFCFP / countEFCFP).toFixed(2) : '';
-  const avgMoy = countAvg > 0 ? (sumAvg / countAvg).toFixed(2) : '';
+  // ── Moyenne générale (Using the new global formula) ──
+  // Formula: ((moyCC*3) + (avgEFCFT*2) + (avgEFCFP*3)) / 8
+  const avgCC_num = countCC > 0 ? (sumCC / countCC) : 0;
+  const avgEFCFT_num = countEFCFT > 0 ? (sumEFCFT / countEFCFT) : 0;
+  const avgEFCFP_num = countEFCFP > 0 ? (sumEFCFP / countEFCFP) : 0;
+  
+  const finalAvgNum = (countCC > 0 && countEFCFT > 0 && countEFCFP > 0) 
+    ? ((avgCC_num * 3) + (avgEFCFT_num * 2) + (avgEFCFP_num * 3)) / 8 
+    : 0;
+
+  const finalAvg = finalAvgNum > 0 ? finalAvgNum.toFixed(2).replace('.', ',') : '—';
+  const avgCC = countCC > 0 ? avgCC_num.toFixed(2) : '';
+  const avgEFCFT = countEFCFT > 0 ? avgEFCFT_num.toFixed(2) : '';
+  const avgEFCFP = countEFCFP > 0 ? avgEFCFP_num.toFixed(2) : '';
+  const avgMoy = finalAvg;
 
   if (y > 265) { doc.addPage(); y = 40; }
   doc.setFillColor(230, 230, 245);
-  const lblW = c[0] + c[1] + c[2];
-  doc.rect(margin, y, lblW, rH, 'FD');
-  doc.rect(margin + lblW, y, c[3], rH, 'FD');
-  doc.rect(margin + lblW + c[3], y, c[4], rH, 'FD');
-  doc.rect(margin + lblW + c[3] + c[4], y, c[5], rH, 'FD');
-  doc.rect(margin + lblW + c[3] + c[4] + c[5], y, c[6] + c[7], rH, 'FD');
+  const lblW = c[0] + c[1];
+  doc.rect(margin, y, lblW, rH, 'FD'); // Label cell
+  doc.rect(margin + lblW, y, c[2], rH, 'FD'); // Coeff cell
+  doc.rect(margin + lblW + c[2], y, c[3], rH, 'FD'); // CC cell
+  doc.rect(margin + lblW + c[2] + c[3], y, c[4], rH, 'FD'); // EFCFT cell
+  doc.rect(margin + lblW + c[2] + c[3] + c[4], y, c[5], rH, 'FD'); // EFCFP cell
+  doc.rect(margin + lblW + c[2] + c[3] + c[4] + c[5], y, c[6] + c[7], rH, 'FD'); // Final cell
+  
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.text(`Moyennes pondérées (${totalCoeff || 0})`, margin + 2, y + 6);
-  doc.text(avgCC, margin + lblW + c[3] / 2, y + 6, { align: 'center' });
-  doc.text(avgEFCFT, margin + lblW + c[3] + c[4] / 2, y + 6, { align: 'center' });
-  doc.text(avgEFCFP, margin + lblW + c[3] + c[4] + c[5] / 2, y + 6, { align: 'center' });
-  doc.text(avgMoy, margin + lblW + c[3] + c[4] + c[5] + (c[6] + c[7]) / 2, y + 6, { align: 'center' });
+  doc.text(`Moyennes pondérées`, margin + 2, y + 6);
+  doc.text(String(totalCoeff || 0), margin + lblW + c[2] / 2, y + 6, { align: 'center' });
+  doc.text(avgCC, margin + lblW + c[2] + c[3] / 2, y + 6, { align: 'center' });
+  doc.text(avgEFCFT, margin + lblW + c[2] + c[3] + c[4] / 2, y + 6, { align: 'center' });
+  doc.text(avgEFCFP, margin + lblW + c[2] + c[3] + c[4] + c[5] / 2, y + 6, { align: 'center' });
+  doc.text(avgMoy, margin + lblW + c[2] + c[3] + c[4] + c[5] + (c[6] + c[7]) / 2, y + 6, { align: 'center' });
 
-  // ── Moyenne générale ──
   y += rH;
-  const finalAvg = totalCoeff > 0 ? (totalWeighted / totalCoeff).toFixed(2) : '—';
+  const fullLabelW = c[0] + c[1] + c[2] + c[3] + c[4] + c[5];
+  const resultW = c[6] + c[7];
+  
   doc.setFillColor(200, 210, 230);
-  doc.rect(margin, y, lblW + c[3], rH, 'FD');
-  doc.rect(margin + lblW + c[3], y, c[4] + c[5] + c[6] + c[7], rH, 'FD');
+  doc.rect(margin, y, fullLabelW, rH, 'FD');
+  doc.rect(margin + fullLabelW, y, resultW, rH, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.text('Moyenne générale', margin + 2, y + 6);
   doc.setFontSize(10);
-  doc.text(finalAvg, margin + lblW + c[3] + (c[4] + c[5] + c[6] + c[7]) / 2, y + 6.5, { align: 'center' });
+  doc.text(finalAvg, margin + fullLabelW + resultW / 2, y + 6.5, { align: 'center' });
 
   // ── Décision jury ──
   y += rH;
-  const isPassed = totalCoeff > 0 && parseFloat(finalAvg) >= 10;
+  const isPassed = totalCoeff > 0 && parseFloat(finalAvg.replace(',', '.')) >= 10;
   doc.setFillColor(220, 210, 240);
-  doc.rect(margin, y, lblW + c[3], rH, 'FD');
-  doc.rect(margin + lblW + c[3], y, c[4] + c[5] + c[6] + c[7], rH, 'FD');
+  doc.rect(margin, y, fullLabelW, rH, 'FD');
+  doc.rect(margin + fullLabelW, y, resultW, rH, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.text("Décision jury d'examen", margin + 2, y + 6);
   doc.setTextColor(isPassed ? 0 : 200, isPassed ? 128 : 0, isPassed ? 0 : 0);
-  doc.text(isPassed ? 'Admis(e)' : 'Ajourné(e)', margin + lblW + c[3] + (c[4] + c[5] + c[6] + c[7]) / 2, y + 6.5, { align: 'center' });
+  doc.text(isPassed ? 'Admis(e)' : 'Ajourné(e)', margin + fullLabelW + resultW / 2, y + 6.5, { align: 'center' });
   doc.setTextColor(0);
 
   // ── Footer ──
@@ -734,24 +751,17 @@ export const generateNoteObtentionDiplome = (student, allGrades, modules) => {
   y += 20;
   const boxLbl = 55, boxVal = 35, boxH = 10, gap = 6;
 
-  // Compute final (combining 1st year + 2nd year if available, + NSTI)
-  // Weighted according to standard vocational training formula (typically avg(Y1, Y2) if applicable)
-  // Here we use the combined averages from the bottom row for the final average calculation.
+  // ── Compute averages (New Formula for 2 Years) ──
+  // Formula: ((moyenne CC 2ans * 3) + (moyenne EFCFT 2ans * 2) + (moyenne EFCFP 2ans * 3) + nsti*2) / 10
+  
   let finalAvgNum = null;
-
-  if (avgY1 !== null && avgY2 !== null) {
-    const globalAvgY = (avgY1 + avgY2) / 2;
-    // The global note usually incorporates NSTI. Let's assume standard formula: (Moyenne Y1+Y2 + NSTI) / 2 or just standard weights.
-    if (firstYear.nsti) {
-      finalAvgNum = (globalAvgY + parseFloat(firstYear.nsti)) / 2; // Approximated typical global formula if NSTI is separate
-    } else {
-      finalAvgNum = globalAvgY;
-    }
-  } else if (avgY2 !== null) {
-    finalAvgNum = avgY2;
-    if (firstYear.nsti) {
-      finalAvgNum = (finalAvgNum + parseFloat(firstYear.nsti)) / 2;
-    }
+  if (combinedCC !== '—' && combinedEFCFT !== '—' && combinedEFCFP !== '—') {
+    const cc2 = parseFloat(combinedCC);
+    const ft2 = parseFloat(combinedEFCFT);
+    const fp2 = parseFloat(combinedEFCFP);
+    const nstiVal = (firstYear.nsti && firstYear.nsti !== '') ? parseFloat(firstYear.nsti) : 0;
+    
+    finalAvgNum = (cc2 * 3 + ft2 * 2 + fp2 * 3 + nstiVal * 2) / 10;
   }
 
   const finalAvg = finalAvgNum !== null ? finalAvgNum.toFixed(2).replace('.', ',') : '—';
@@ -760,7 +770,8 @@ export const generateNoteObtentionDiplome = (student, allGrades, modules) => {
   let mention = '';
   if (finalAvgNum !== null) {
     const fa = parseFloat(finalAvgNum.toFixed(2));
-    if (fa >= 16) mention = 'T.Bien';
+    if (fa >= 18) mention = 'Excellent';
+    else if (fa >= 16) mention = 'T.Bien';
     else if (fa >= 14) mention = 'Bien';
     else if (fa >= 12) mention = 'A.Bien';
     else if (fa >= 10) mention = 'Passable';
