@@ -193,6 +193,7 @@ const AdminDashboard = () => {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [diplomaFilter, setDiplomaFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
+  const [moduleFilter, setModuleFilter] = useState('');
 
   // Modal state
   const [modalMode, setModalMode] = useState(null);
@@ -351,12 +352,21 @@ const AdminDashboard = () => {
     if (categoryFilter) {
       data = data.filter(item => {
         if (activeTab === 'students') return item.major === categoryFilter;
-        const subjects = item.subjects || [item.subject];
-        return subjects.includes(categoryFilter);
+        const groups = item.groups || [];
+        return groups.includes(categoryFilter);
       });
     }
+
+    // 4. Filter by Module (Teacher only)
+    if (activeTab === 'teachers' && moduleFilter) {
+      data = data.filter(item => {
+        const subjects = item.subjects || [item.subject];
+        return subjects.includes(moduleFilter);
+      });
+    }
+    
     return data;
-  }, [activeTab, students, teachers, categoryFilter, diplomaFilter]);
+  }, [activeTab, students, teachers, categoryFilter, diplomaFilter, yearFilter, moduleFilter]);
 
   const columns = useMemo(() => [
     {
@@ -673,21 +683,39 @@ const AdminDashboard = () => {
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', padding: '8px', marginBottom: '20px', background: 'white', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xs)' }}>
         <div style={{ flex: 1 }}></div>
         
-        <select className="input-premium" style={{ fontSize: '12px', padding: '7px 12px', maxWidth: '140px', cursor: 'pointer', appearance: 'auto' }} value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
-          <option value="">Toutes années</option>
+        <select className="input-premium" style={{ fontSize: '12px', padding: '7px 12px', maxWidth: '140px', cursor: 'pointer', appearance: 'auto' }} value={diplomaFilter} onChange={(e) => { setDiplomaFilter(e.target.value); setCategoryFilter(''); setModuleFilter(''); }}>
+          <option value="">Tous les niveaux</option>
+          {Object.keys(FILIERES).map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+
+        <select className="input-premium" style={{ fontSize: '12px', padding: '7px 12px', maxWidth: '140px', cursor: 'pointer', appearance: 'auto' }} value={yearFilter} onChange={(e) => { setYearFilter(e.target.value); setModuleFilter(''); }}>
+          <option value="">Toutes les années</option>
           <option value="1ère année">1ère année</option>
           <option value="2ème année">2ème année</option>
         </select>
 
-        <select className="input-premium" style={{ fontSize: '12px', padding: '7px 12px', maxWidth: '180px', cursor: 'pointer', appearance: 'auto' }} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-          <option value="">{activeTab === 'students' ? 'Toutes filières' : 'Tous modules'}</option>
-          {Array.from(new Set(
-            (activeTab === 'students' ? students : teachers)
-            .filter(i => (!diplomaFilter || (activeTab === 'students' ? i.diploma === diplomaFilter : (i.diplomas || (i.diploma ? [i.diploma] : [])).includes(diplomaFilter))) && 
-                         (!yearFilter || (activeTab === 'students' ? i.year === yearFilter : (i.years || []).includes(yearFilter))))
-            .flatMap(i => activeTab === 'students' ? [i.major] : (i.subjects || [i.subject]))
-          )).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+        <select className="input-premium" style={{ fontSize: '12px', padding: '7px 12px', maxWidth: '180px', cursor: 'pointer', appearance: 'auto' }} value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setModuleFilter(''); }}>
+          <option value="">Toutes les filières</option>
+          {(diplomaFilter ? (FILIERES[diplomaFilter] || []) : Array.from(new Set(Object.values(FILIERES).flat()))).map(cat => <option key={cat} value={cat}>{cat}</option>)}
         </select>
+
+        {activeTab === 'teachers' && (
+          <select className="input-premium" style={{ fontSize: '12px', padding: '7px 12px', maxWidth: '180px', cursor: 'pointer', appearance: 'auto' }} value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>
+            <option value="">Tous les modules</option>
+            {(() => {
+              let mods = [];
+              if (diplomaFilter && categoryFilter) {
+                const year1 = MODULES_DATA[diplomaFilter]?.[categoryFilter]?.['1ère année'] || [];
+                const year2 = MODULES_DATA[diplomaFilter]?.[categoryFilter]?.['2ème année'] || [];
+                mods = yearFilter === '1ère année' ? year1 : yearFilter === '2ème année' ? year2 : [...year1, ...year2];
+              } else {
+                mods = Array.from(new Set(teachers.flatMap(t => t.subjects || [t.subject])));
+              }
+              return Array.from(new Set(mods)).filter(Boolean).map(cat => <option key={cat} value={cat}>{cat}</option>);
+            })()}
+          </select>
+        )}
+
         <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '1 1 160px' }}>
           <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', fontSize: '12px' }}></i>
           <input className="input-premium" style={{ width: '100%', paddingLeft: '34px', fontSize: '13px', padding: '7px 12px 7px 34px' }} placeholder="Rechercher…" value={globalFilter ?? ''} onChange={(e) => setGlobalFilter(e.target.value)} />

@@ -238,21 +238,21 @@ const GradeManagement = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={lbl}>Niveau</label>
             <select className="input-premium" style={selectStyle} value={filterDiploma} onChange={(e) => { setFilterDiploma(e.target.value); setFilterMajor(''); setSelectedStudentId(''); setPdfModule(''); }}>
-              <option value="">Tous les niveaux</option>
+              <option value="" disabled>-- Choisir le niveau --</option>
               {Object.keys(FILIERES).map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={lbl}>Filière</label>
             <select className="input-premium" style={selectStyle} value={filterMajor} onChange={(e) => { setFilterMajor(e.target.value); setSelectedStudentId(''); setPdfModule(''); }}>
-              <option value="">Toutes les filières</option>
+              <option value="" disabled>-- Choisir la filière --</option>
               {availableMajors.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={lbl}>Année</label>
             <select className="input-premium" style={selectStyle} value={filterYear} onChange={(e) => { setFilterYear(e.target.value); setSelectedStudentId(''); setPdfModule(''); }}>
-              <option value="">Toutes</option>
+              <option value="" disabled>-- Choisir l'année --</option>
               <option value="1ère année">1ère année</option>
               <option value="2ème année">2ème année</option>
             </select>

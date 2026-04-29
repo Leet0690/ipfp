@@ -8,15 +8,15 @@ const NAV_CATEGORIES = [
     label: "Tableau de Bord",
     icon: "fa-chart-pie",
     items: [
-      { to: "/", icon: "fa-chart-pie", label: "Dashboard" },
+      { to: "/", icon: "fa-chart-pie", label: "Tableau de bord" },
     ]
   },
   {
     label: "Pôle Académique",
     icon: "fa-graduation-cap",
     items: [
-      { to: "/admin/modules", icon: "fa-cubes", label: "Gestion des Modules" },
-      { to: "/admin/grades", icon: "fa-pen-ruler", label: "Notes & Rapports" },
+      { to: "/admin/modules", icon: "fa-cubes", label: "Modules" },
+      { to: "/admin/grades", icon: "fa-pen-ruler", label: "Notes" },
       { to: "/admin/reports", icon: "fa-chart-line", label: "Rapports" },
       { to: "/admin/schedules", icon: "fa-calendar-days", label: "Emplois du Temps" },
     ]

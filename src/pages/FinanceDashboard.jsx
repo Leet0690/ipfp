@@ -38,6 +38,10 @@ const FinanceDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTeacherId, setEditingTeacherId] = useState(null);
   
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [salariesPage, setSalariesPage] = useState(1);
+  const itemsPerPage = 10;
+  
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentData, setPaymentData] = useState({
@@ -161,6 +165,12 @@ const FinanceDashboard = () => {
       return { ...t, hours, hourlyRate, total, isPaid };
     });
   }, [teachers, teacherAttendance, salaryFilter, salaries]);
+
+  const paginatedSalaries = useMemo(() => {
+    return salaries.slice((salariesPage - 1) * itemsPerPage, salariesPage * itemsPerPage);
+  }, [salaries, salariesPage, itemsPerPage]);
+  
+  const totalSalariesPages = Math.ceil(salaries.length / itemsPerPage);
 
   // Statistics
   const stats = useMemo(() => {
@@ -430,9 +440,9 @@ const FinanceDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {salaries.length === 0 ? (
+                  {paginatedSalaries.length === 0 ? (
                     <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>Aucun historique de salaire.</td></tr>
-                  ) : salaries.map(s => (
+                  ) : paginatedSalaries.map(s => (
                     <tr key={s.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={{ padding: '16px', fontWeight: '700' }}>{s.teacherName}</td>
                       <td style={{ padding: '16px' }}>{s.month} {s.year}</td>
@@ -448,6 +458,20 @@ const FinanceDashboard = () => {
                 </tbody>
               </table>
             </div>
+
+            {totalSalariesPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '16px 0' }}>
+                <button onClick={() => setSalariesPage(p => Math.max(1, p - 1))} disabled={salariesPage === 1} className="btn-modern" style={{ padding: '6px 12px', fontSize: '11px', opacity: salariesPage === 1 ? 0.5 : 1, cursor: salariesPage === 1 ? 'not-allowed' : 'pointer' }}>
+                  <i className="fa-solid fa-chevron-left"></i> Précédent
+                </button>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>
+                  Page <span style={{ color: 'var(--text-primary)' }}>{salariesPage}</span> sur {totalSalariesPages}
+                </span>
+                <button onClick={() => setSalariesPage(p => Math.min(totalSalariesPages, p + 1))} disabled={salariesPage === totalSalariesPages} className="btn-modern" style={{ padding: '6px 12px', fontSize: '11px', opacity: salariesPage === totalSalariesPages ? 0.5 : 1, cursor: salariesPage === totalSalariesPages ? 'not-allowed' : 'pointer' }}>
+                  Suivant <i className="fa-solid fa-chevron-right"></i>
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
       )}

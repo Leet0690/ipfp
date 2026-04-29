@@ -21,6 +21,9 @@ const ModuleManagement = () => {
   const [filterMajor, setFilterMajor] = useState('');
   const [filterYear, setFilterYear] = useState('');
   const [filterSemester, setFilterSemester] = useState('');
+  
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 15;
 
   // --- Helpers ---
   const diplomas = Object.keys(MODULES_DATA);
@@ -31,7 +34,8 @@ const ModuleManagement = () => {
       if (filterDiploma && m.diploma !== filterDiploma) return false;
       if (filterMajor && m.major !== filterMajor) return false;
       if (filterYear && m.year !== filterYear) return false;
-      if (filterSemester && m.semester !== filterSemester) return false;
+      const sem = m.semester || 'S1';
+      if (filterSemester && sem !== filterSemester) return false;
       return true;
     });
 
@@ -64,9 +68,13 @@ const ModuleManagement = () => {
       groups[key].ids.push(m.id);
     });
     return Object.values(groups);
-  }, [modules, filterDiploma, filterMajor, filterYear]);
+  }, [modules, filterDiploma, filterMajor, filterYear, filterSemester]);
 
-
+  const paginatedModules = useMemo(() => {
+    return groupedModules.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  }, [groupedModules, page]);
+  
+  const totalPages = Math.ceil(groupedModules.length / itemsPerPage);
 
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -142,27 +150,33 @@ const ModuleManagement = () => {
 
       {/* --- Filters --- */}
       <div className="glass-card" style={{ padding: '20px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-        <select className="input-premium" style={{ flex: 1 }} value={filterYear} onChange={e => setFilterYear(e.target.value)}>
-          <option value="">Toutes les années</option>
+        <select className="input-premium" style={{ flex: 1 }} value={filterYear} onChange={e => { setFilterYear(e.target.value); setPage(1); }}>
+          <option value="" disabled>-- Choisir l'année --</option>
           <option value="1ère année">1ère année</option>
           <option value="2ème année">2ème année</option>
         </select>
-        <select className="input-premium" style={{ flex: 1 }} value={filterDiploma} onChange={e => setFilterDiploma(e.target.value)}>
-          <option value="">Tous les niveaux</option>
+        <select className="input-premium" style={{ flex: 1 }} value={filterDiploma} onChange={e => { setFilterDiploma(e.target.value); setPage(1); }}>
+          <option value="" disabled>-- Choisir le niveau --</option>
           {diplomas.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
-        <select className="input-premium" style={{ flex: 1 }} value={filterMajor} onChange={e => setFilterMajor(e.target.value)}>
-          <option value="">Toutes les filières</option>
+        <select className="input-premium" style={{ flex: 1 }} value={filterMajor} onChange={e => { setFilterMajor(e.target.value); setPage(1); }}>
+          <option value="" disabled>-- Choisir la filière --</option>
           {majors.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
-        <select className="input-premium" style={{ flex: 1, maxWidth: '120px' }} value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
-          <option value="">Tous Semestres</option>
+        <select className="input-premium" style={{ flex: 1, maxWidth: '160px' }} value={filterSemester} onChange={e => { setFilterSemester(e.target.value); setPage(1); }}>
+          <option value="" disabled>-- Choisir le semestre --</option>
           <option value="S1">S1</option>
           <option value="S2">S2</option>
         </select>
       </div>
 
       {/* --- Modules Table --- */}
+      {(!filterYear || !filterDiploma || !filterMajor || !filterSemester) ? (
+        <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
+          <i className="fa-solid fa-filter" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
+          <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Veuillez sélectionner l'année, le niveau, la filière et le semestre pour afficher la liste des modules.</p>
+        </div>
+      ) : (
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
           <thead>
@@ -176,11 +190,11 @@ const ModuleManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {groupedModules.length === 0 ? (
+            {paginatedModules.length === 0 ? (
               <tr>
-                <td colSpan="5" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Aucun module trouvé.</td>
+                <td colSpan="6" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Aucun module trouvé.</td>
               </tr>
-            ) : groupedModules.map((m, idx) => (
+            ) : paginatedModules.map((m, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <td style={{ padding: '16px' }}>
                   <p style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '14px' }}>{m.name}</p>
@@ -215,7 +229,22 @@ const ModuleManagement = () => {
             ))}
           </tbody>
         </table>
+        
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '16px 0', borderTop: '1px solid var(--border-light)' }}>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-modern" style={{ padding: '6px 12px', fontSize: '11px', opacity: page === 1 ? 0.5 : 1, cursor: page === 1 ? 'not-allowed' : 'pointer' }}>
+              <i className="fa-solid fa-chevron-left"></i> Précédent
+            </button>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>
+              Page <span style={{ color: 'var(--text-primary)' }}>{page}</span> sur {totalPages}
+            </span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-modern" style={{ padding: '6px 12px', fontSize: '11px', opacity: page === totalPages ? 0.5 : 1, cursor: page === totalPages ? 'not-allowed' : 'pointer' }}>
+              Suivant <i className="fa-solid fa-chevron-right"></i>
+            </button>
+          </div>
+        )}
       </div>
+      )}
 
       {/* --- Modal --- */}
       <AnimatePresence>

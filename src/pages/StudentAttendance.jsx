@@ -144,21 +144,21 @@ const StudentAttendance = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={lbl}>Niveau</label>
             <select className="input-premium" style={selectStyle} value={filterDiploma} onChange={(e) => { setFilterDiploma(e.target.value); setFilterMajor(''); setFilterModule(''); }}>
-              <option value="">Tous</option>
+              <option value="" disabled>-- Choisir le niveau --</option>
               {Object.keys(FILIERES).map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={lbl}>Filière</label>
             <select className="input-premium" style={selectStyle} value={filterMajor} onChange={(e) => { setFilterMajor(e.target.value); setFilterModule(''); }}>
-              <option value="">Toutes</option>
+              <option value="" disabled>-- Choisir la filière --</option>
               {availableMajors.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={lbl}>Année</label>
             <select className="input-premium" style={selectStyle} value={filterYear} onChange={(e) => { setFilterYear(e.target.value); setFilterModule(''); }}>
-              <option value="">Toutes</option>
+              <option value="" disabled>-- Choisir l'année --</option>
               <option value="1ère année">1ère année</option>
               <option value="2ème année">2ème année</option>
             </select>
@@ -194,7 +194,12 @@ const StudentAttendance = () => {
 
       {/* Table */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-        {filteredStudents.length === 0 ? (
+        {(!filterDiploma || !filterMajor || !filterYear) ? (
+          <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
+            <i className="fa-solid fa-filter" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
+            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Veuillez sélectionner le niveau, la filière et l'année pour afficher les stagiaires.</p>
+          </div>
+        ) : filteredStudents.length === 0 ? (
           <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
             <i className="fa-solid fa-users" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
             <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Aucun stagiaire trouvé.</p>
