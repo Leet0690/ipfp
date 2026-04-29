@@ -95,7 +95,8 @@ const TeacherAttendance = () => {
 
       const duration = calcDuration(session.time);
       const safeModule = (session.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
-      const docId = `${teacher.id}_${safeModule}_${selectedDate}`;
+      const safeTime = (session.time || '').replace(/[^0-9]/g, '') || 'x';
+      const docId = `${teacher.id}_${safeModule}_${safeTime}_${selectedDate}`;
       
       slotsMap.set(slotKey, {
         key: slotKey,
@@ -141,7 +142,7 @@ const TeacherAttendance = () => {
   const handleStatusChange = async (row, status) => {
     try {
       const hours = status === 'present' ? row.duration : 0;
-      await updateTeacherAttendance(row.teacher.id, selectedDate, status, '', hours, row.module);
+      await updateTeacherAttendance(row.teacher.id, selectedDate, status, '', hours, row.module, row.time);
     } catch (error) {
       console.error(error);
       addNotification("Erreur lors de l'enregistrement.");
@@ -152,7 +153,7 @@ const TeacherAttendance = () => {
     try {
       const record = teacherAttendance.find(a => a.id === row.docId);
       const status = record?.status || 'present';
-      await updateTeacherAttendance(row.teacher.id, selectedDate, status, record?.comment || '', hours, row.module);
+      await updateTeacherAttendance(row.teacher.id, selectedDate, status, record?.comment || '', hours, row.module, row.time);
     } catch (error) {
       console.error(error);
     }

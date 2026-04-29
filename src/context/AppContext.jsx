@@ -365,10 +365,11 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const updateTeacherAttendance = async (teacherId, date, status, comment, hours = 0, moduleId = '') => {
+  const updateTeacherAttendance = async (teacherId, date, status, comment, hours = 0, moduleId = '', timeSlot = '') => {
     const safeModule = (moduleId || 'global').replace(/[^a-zA-Z0-9]/g, '_');
-    const docId = `${teacherId}_${safeModule}_${date}`;
-    const data = { teacherId, date, status, hours: status === 'present' ? hours : 0, comment: comment || '', moduleId: moduleId || '', timestamp: serverTimestamp() };
+    const safeTime = (timeSlot || '').replace(/[^0-9]/g, '') || 'x';
+    const docId = `${teacherId}_${safeModule}_${safeTime}_${date}`;
+    const data = { teacherId, date, status, hours: status === 'present' ? hours : 0, comment: comment || '', moduleId: moduleId || '', timeSlot: timeSlot || '', timestamp: serverTimestamp() };
     
     await setDoc(doc(db, 'attendance_formateurs', docId), data, { merge: true });
     

@@ -276,7 +276,8 @@ const TeacherPortal = () => {
           'present', 
           `Appel validé pour le module: ${selectedSubject}`,
           sessionDuration,
-          selectedSubject
+          selectedSubject,
+          currentSession?.time || ''
         );
       } catch (e) {
         console.error("Error updating teacher presence:", e);
@@ -286,7 +287,7 @@ const TeacherPortal = () => {
       
       // Attempt to close the window after 1.5 seconds.
       setTimeout(() => {
-        setIsFinished(true); // Show the success message in case window.close() is blocked
+        setIsFinished(true);
         try {
           window.close();
         } catch (e) {
