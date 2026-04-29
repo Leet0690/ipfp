@@ -97,12 +97,22 @@ export const AppProvider = ({ children }) => {
           }
 
           if (studentDoc && isMounted) {
-            setStudents([{ id: studentDoc.id, ...studentDoc.data() }]);
+            const studentData = studentDoc.data();
+            setStudents([{ id: studentDoc.id, ...studentData }]);
             const gradeSnap = await getDoc(doc(db, 'grades', studentDoc.id));
             if (gradeSnap.exists()) {
               setGrades({ [studentDoc.id]: gradeSnap.data() });
             }
-            const modSnap = await getDocs(query(collection(db, 'modules'), orderBy('name', 'asc')));
+            // Modules: filter by student's diploma + major (much fewer reads)
+            let modQuery;
+            if (studentData.diploma && studentData.major) {
+              modQuery = query(collection(db, 'modules'), 
+                where('diploma', '==', studentData.diploma),
+                where('major', '==', studentData.major));
+            } else {
+              modQuery = query(collection(db, 'modules'), orderBy('name', 'asc'));
+            }
+            const modSnap = await getDocs(modQuery);
             setModules(modSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           }
         } else if (isTeacherPortal) {
@@ -120,19 +130,40 @@ export const AppProvider = ({ children }) => {
           }
 
           if (teacherDoc && isMounted) {
-            setTeachers([{ id: teacherDoc.id, ...teacherDoc.data() }]);
+            const teacherData = teacherDoc.data();
+            setTeachers([{ id: teacherDoc.id, ...teacherData }]);
             
-            const [stuSnap, graSnap, schSnap, modSnap] = await Promise.all([
-              getDocs(query(collection(db, 'students'), orderBy('createdAt', 'desc'))),
-              getDocs(collection(db, 'grades')),
-              getDocs(collection(db, 'schedules')),
-              getDocs(query(collection(db, 'modules'), orderBy('name', 'asc')))
-            ]);
-            
-            setStudents(stuSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-            const gradesData = {}; graSnap.docs.forEach(d => { gradesData[d.id] = d.data(); });
-            setGrades(gradesData);
+            // Schedules: only this teacher's sessions
+            const schSnap = await getDocs(query(collection(db, 'schedules'), where('teacherId', '==', teacherDoc.id)));
             setSchedules(schSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+            // Students: only from the teacher's assigned groups
+            const groups = teacherData.groups || [];
+            let allStudents = [];
+            if (groups.length > 0) {
+              // Firestore 'in' supports max 10 values, batch if needed
+              for (let i = 0; i < groups.length; i += 10) {
+                const batch = groups.slice(i, i + 10);
+                const stuSnap = await getDocs(query(collection(db, 'students'), where('major', 'in', batch)));
+                allStudents = allStudents.concat(stuSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+              }
+            }
+            setStudents(allStudents);
+
+            // Grades: only for the loaded students
+            const gradesData = {};
+            if (allStudents.length > 0) {
+              const studentIds = allStudents.map(s => s.id);
+              for (let i = 0; i < studentIds.length; i += 10) {
+                const batch = studentIds.slice(i, i + 10);
+                const graSnap = await getDocs(query(collection(db, 'grades'), where('__name__', 'in', batch)));
+                graSnap.docs.forEach(d => { gradesData[d.id] = d.data(); });
+              }
+            }
+            setGrades(gradesData);
+
+            // Modules: load all (small collection, needed for grade display)
+            const modSnap = await getDocs(query(collection(db, 'modules'), orderBy('name', 'asc')));
             setModules(modSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           }
         } else {
