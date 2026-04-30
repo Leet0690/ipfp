@@ -3,11 +3,31 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { FILIERES } from '../data/modules';
 import { generateFicheSignature, generateFicheNotes, generateBulletinGlobal, generateNoteObtentionDiplome } from '../utils/pdfGenerator';
+import { TableSkeleton } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
+import { 
+  FileText, 
+  Download, 
+  ChevronDown, 
+  ChevronUp, 
+  Search, 
+  GraduationCap, 
+  CheckCircle2, 
+  Clock, 
+  History, 
+  CloudUpload, 
+  FileSignature, 
+  Award,
+  Info,
+  Filter,
+  X,
+  Copy
+} from 'lucide-react';
 
 /* ── Styles & Constants ── */
-const lbl = { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' };
-const thStyle = { padding: '10px 12px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-subtle)', whiteSpace: 'nowrap' };
-const tdStyle = { padding: '10px 12px', borderBottom: '1px solid var(--border-light)' };
+const lbl = { fontSize: 'var(--text-xs)', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' };
+const thStyle = { padding: '12px 16px', fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-subtle)', whiteSpace: 'nowrap' };
+const tdStyle = { padding: '12px 16px', borderBottom: '1px solid var(--border-light)' };
 const selectStyle = { cursor: 'pointer', appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2394a3b8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px', paddingRight: '36px' };
 
 /* ── Components ── */
@@ -17,24 +37,24 @@ const GradeInput = ({ value, onChange, placeholder = '—' }) => {
   return (
     <input type="number" step="0.25" className="input-premium"
       style={{ 
-        width: '60px', textAlign: 'center', fontWeight: '600', padding: '5px 4px', fontSize: '13px', margin: '0 auto',
-        border: isInvalid ? '2px solid #ef4444' : undefined,
-        backgroundColor: isInvalid ? '#fef2f2' : undefined,
-        color: isInvalid ? '#dc2626' : undefined
+        width: '64px', textAlign: 'center', fontWeight: '700', padding: '6px 4px', fontSize: 'var(--text-sm)', margin: '0 auto',
+        border: isInvalid ? '2px solid var(--danger)' : undefined,
+        backgroundColor: isInvalid ? 'var(--danger-ultra-light)' : undefined,
+        color: isInvalid ? 'var(--danger)' : undefined
       }}
       placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
   );
 };
 
-const MiniStat = ({ label, value }) => (
-  <div style={{ textAlign: 'center', padding: '6px 14px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-lg)' }}>
-    <p style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>{value}</p>
-    <p style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>{label}</p>
+const MiniStat = ({ label, value, icon: Icon }) => (
+  <div style={{ textAlign: 'center', padding: '8px 16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <p style={{ fontSize: 'var(--text-lg)', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>{value}</p>
+    <p style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '4px' }}>{label}</p>
   </div>
 );
 
 const GradeManagement = () => {
-  const { students = [], teachers = [], grades = {}, updateGrades, loading = false, modules: allModules = [] } = useApp() || {};
+  const { students = [], teachers = [], grades = {}, updateGrades, loading = false, modules: allModules = [], confirmAction } = useApp() || {};
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [filterDiploma, setFilterDiploma] = useState('');
   const [filterMajor, setFilterMajor] = useState('');
@@ -99,7 +119,7 @@ const GradeManagement = () => {
     updateGrades(selectedStudentId, module, { ...current, [field]: value });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     let hasInvalid = false;
     Object.values(studentGrades).forEach(g => {
       ['c1', 'c2', 'c3', 'efcfp', 'efcft'].forEach(field => {
@@ -111,7 +131,7 @@ const GradeManagement = () => {
     });
 
     if (hasInvalid) {
-      alert("Validation impossible : certaines notes sont invalides (doivent être entre 0 et 20). Veuillez corriger les cases en rouge.");
+      alert("Validation impossible : certaines notes sont invalides.");
       return;
     }
     
@@ -147,7 +167,6 @@ const GradeManagement = () => {
     if (g.efcfp === '' || g.efcft === '') return null;
     const efcfp = parseFloat(g.efcfp), efcft = parseFloat(g.efcft);
     if (isNaN(efcfp) || isNaN(efcft)) return null;
-    // New Formula: ((CC*3) + (EFCFT*2) + (EFCFP*3)) / 8
     return (cc * 3 + efcft * 2 + efcfp * 3) / 8;
   };
 
@@ -221,8 +240,8 @@ const GradeManagement = () => {
 
   if (loading && students.length === 0) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <div className="spinner"></div>
+      <div className="max-w-container section-padding">
+        <TableSkeleton rows={12} />
       </div>
     );
   }
@@ -230,18 +249,18 @@ const GradeManagement = () => {
   return (
     <div className="max-w-container section-padding">
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '6px' }}>
-          Gestion des notes
+        <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)', marginBottom: '4px' }}>
+          Gestion des Notes
         </h1>
-        <p style={{ color: 'var(--text-tertiary)', fontSize: '15px', marginBottom: '28px' }}>
-          Saisissez C1, C2, C3 (optionnel), EFCFP et EFCFT pour chaque module.
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-8)' }}>
+          Saisie centralisée des résultats académiques par stagiaire.
         </p>
       </motion.div>
 
       {/* Filters */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-        className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+        className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={lbl}>Niveau</label>
             <select className="input-premium" style={selectStyle} value={filterDiploma} onChange={(e) => { setFilterDiploma(e.target.value); setFilterMajor(''); setSelectedStudentId(''); setPdfModule(''); }}>
@@ -268,7 +287,7 @@ const GradeManagement = () => {
             <label style={lbl}>Stagiaire</label>
             <select className="input-premium" style={selectStyle} value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)}>
               <option value="">Sélectionner un stagiaire</option>
-              {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.lastName} {s.firstName} — {s.major}</option>)}
+              {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.lastName} {s.firstName}</option>)}
             </select>
           </div>
         </div>
@@ -276,142 +295,93 @@ const GradeManagement = () => {
 
       {/* ── Documents Section ── */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
-        className="glass-card" style={{ marginBottom: '24px', overflow: 'hidden' }}>
+        className="glass-card" style={{ marginBottom: 'var(--space-6)', overflow: 'hidden' }}>
         <button onClick={() => setShowDocPanel(!showDocPanel)}
-          style={{ width: '100%', padding: '14px 20px', background: 'transparent', border: 'none', cursor: 'pointer',
+          style={{ width: '100%', padding: '16px 24px', background: 'transparent', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: 'var(--radius-md)', background: 'var(--primary-ultra-light)', color: 'var(--primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}>
-              <i className="fa-solid fa-file-pdf"></i>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-lg)', background: 'var(--primary-ultra-light)', color: 'var(--primary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FileText size={18} />
             </div>
-            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
-              Documents à télécharger
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: '800', color: 'var(--text-primary)' }}>
+              Édition des Documents PDF
             </span>
-            <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', background: 'var(--bg-subtle)',
-              padding: '2px 8px', borderRadius: 'var(--radius-pill)' }}>4 types</span>
           </div>
-          <i className={`fa-solid fa-chevron-${showDocPanel ? 'up' : 'down'}`} style={{ color: 'var(--text-muted)', fontSize: '11px', transition: 'transform 0.2s' }}></i>
+          {showDocPanel ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
 
         <AnimatePresence>
           {showDocPanel && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
               style={{ overflow: 'hidden' }}>
-              <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--border-light)' }}>
+              <div style={{ padding: '0 24px 24px', borderTop: '1px solid var(--border-light)' }}>
                 
-                {/* Module selector for fiches */}
                 {filterDiploma && filterMajor && filterYear && pdfModules.length > 0 && (
-                  <div style={{ marginTop: '16px', marginBottom: '16px' }}>
-                    <label style={lbl}>Module (pour fiches)</label>
-                    <select className="input-premium" style={{ ...selectStyle, marginTop: '6px' }} value={pdfModule} onChange={(e) => setPdfModule(e.target.value)}>
+                  <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+                    <label style={lbl}>Module Cible</label>
+                    <select className="input-premium" style={{ ...selectStyle, marginTop: '8px' }} value={pdfModule} onChange={(e) => setPdfModule(e.target.value)}>
                       <option value="">Sélectionner un module</option>
                       {pdfModules.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginTop: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-3)', marginTop: '12px' }}>
                   
-                  {/* 1. Fiche de Signature (CC) */}
-                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', padding: '16px', background: 'white' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                      <i className="fa-solid fa-pen-fancy" style={{ color: 'var(--primary)', fontSize: '14px' }}></i>
-                      <h4 style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Fiche des Notes (CC)</h4>
+                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-xl)', padding: '20px', background: 'white' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <FileSignature size={16} style={{ color: 'var(--primary)' }} />
+                      <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>Fiche de Notes (CC)</h4>
                     </div>
-                    <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 }}>
-                      Par module / par CC — Liste des stagiaires avec colonne notes vide.
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                      <label style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)' }}>CC N°</label>
-                      <select className="input-premium" style={{ ...selectStyle, width: '70px', padding: '4px 28px 4px 8px', fontSize: '12px' }}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '700' }}>Examen</label>
+                      <select className="input-premium" style={{ ...selectStyle, width: '80px', padding: '4px 28px 4px 12px', fontSize: '12px' }}
                         value={pdfCC} onChange={(e) => setPdfCC(e.target.value)}>
                         <option value="1">CC1</option>
                         <option value="2">CC2</option>
                         <option value="3">CC3</option>
                       </select>
                     </div>
-                    <button onClick={handleFicheSignature}
-                      disabled={!pdfModule || !pdfStudents.length}
-                      className="btn-modern primary"
-                      style={{ width: '100%', padding: '8px', fontSize: '11px', opacity: (!pdfModule || !pdfStudents.length) ? 0.4 : 1 }}>
-                      <i className="fa-solid fa-download" style={{ marginRight: '6px' }}></i>Télécharger
+                    <button onClick={handleFicheSignature} disabled={!pdfModule} className="btn-modern primary" style={{ width: '100%', opacity: !pdfModule ? 0.5 : 1 }}>
+                      <Download size={14} style={{ marginRight: '8px' }} /> Télécharger
                     </button>
                   </div>
 
-                  {/* 2. Fiche des Notes (EFC) */}
-                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', padding: '16px', background: 'white' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                      <i className="fa-solid fa-clipboard-list" style={{ color: '#d97706', fontSize: '14px' }}></i>
-                      <h4 style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Fiche des Notes (EFC)</h4>
+                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-xl)', padding: '20px', background: 'white' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <FileText size={16} style={{ color: '#d97706' }} />
+                      <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>Fiche de Notes (EFC)</h4>
                     </div>
-                    <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 }}>
-                      Par module — Colonnes EFCFP et EFCFT uniquement.
-                    </p>
-                    <div style={{ height: '36px' }}></div>
-                    <button onClick={handleFicheNotes}
-                      disabled={!pdfModule || !pdfStudents.length}
-                      className="btn-modern primary"
-                      style={{ width: '100%', padding: '8px', fontSize: '11px', background: '#d97706', borderColor: '#d97706',
-                        opacity: (!pdfModule || !pdfStudents.length) ? 0.4 : 1 }}>
-                      <i className="fa-solid fa-download" style={{ marginRight: '6px' }}></i>Télécharger
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '22px' }}>Modèle pour les examens de fin de module.</p>
+                    <button onClick={handleFicheNotes} disabled={!pdfModule} className="btn-modern primary" style={{ width: '100%', background: '#d97706', borderColor: '#d97706', opacity: !pdfModule ? 0.5 : 1 }}>
+                      <Download size={14} style={{ marginRight: '8px' }} /> Télécharger
                     </button>
                   </div>
 
-                  {/* 3. Bulletin Global */}
-                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', padding: '16px', background: 'white' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                      <i className="fa-solid fa-graduation-cap" style={{ color: '#16a34a', fontSize: '14px' }}></i>
-                      <h4 style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Bulletin Global</h4>
+                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-xl)', padding: '20px', background: 'white' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <GraduationCap size={16} style={{ color: '#16a34a' }} />
+                      <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>Bulletin Global</h4>
                     </div>
-                    <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 }}>
-                      Toutes les notes d'un stagiaire dans tous ses modules.
-                    </p>
-                    <div style={{ height: '36px' }}></div>
-                    <button onClick={handleBulletinGlobal}
-                      disabled={!selectedStudent}
-                      className="btn-modern primary"
-                      style={{ width: '100%', padding: '8px', fontSize: '11px', background: '#16a34a', borderColor: '#16a34a',
-                        opacity: !selectedStudent ? 0.4 : 1 }}>
-                      <i className="fa-solid fa-download" style={{ marginRight: '6px' }}></i>
-                      {selectedStudent ? 'Télécharger' : 'Sélectionner un stagiaire'}
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '22px' }}>Relevé complet du stagiaire sélectionné.</p>
+                    <button onClick={handleBulletinGlobal} disabled={!selectedStudent} className="btn-modern primary" style={{ width: '100%', background: '#16a34a', borderColor: '#16a34a', opacity: !selectedStudent ? 0.5 : 1 }}>
+                      <Download size={14} style={{ marginRight: '8px' }} /> Bulletin
                     </button>
                   </div>
 
-                  {/* 4. Note d'Obtention de Diplôme */}
-                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', padding: '16px', background: 'white', opacity: selectedStudent?.year === '1ère année' ? 0.6 : 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                      <i className="fa-solid fa-award" style={{ color: '#8b5cf6', fontSize: '14px' }}></i>
-                      <h4 style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Note d'Obtention de Diplôme</h4>
+                  <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-xl)', padding: '20px', background: 'white' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <Award size={16} style={{ color: '#8b5cf6' }} />
+                      <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>Attestation Admis</h4>
                     </div>
-                    <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 }}>
-                      {selectedStudent?.year === '1ère année' 
-                        ? "Non disponible pour les stagiaires de 1ère année."
-                        : "Attestation d'admission avec moyenne générale et décision du jury."}
-                    </p>
-                    <div style={{ height: '36px' }}></div>
-                    <button onClick={handleNoteObtentionDiplome}
-                      disabled={!selectedStudent || selectedStudent.year === '1ère année'}
-                      className="btn-modern primary"
-                      style={{ width: '100%', padding: '8px', fontSize: '11px', background: '#8b5cf6', borderColor: '#8b5cf6',
-                        opacity: (!selectedStudent || selectedStudent.year === '1ère année') ? 0.4 : 1 }}>
-                      <i className="fa-solid fa-download" style={{ marginRight: '6px' }}></i>
-                      {selectedStudent ? 'Télécharger' : 'Sélectionner un stagiaire'}
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '22px' }}>Note d'obtention (2ème année uniquement).</p>
+                    <button onClick={handleNoteObtentionDiplome} disabled={!selectedStudent || selectedStudent.year === '1ère année'} className="btn-modern primary" style={{ width: '100%', background: '#8b5cf6', borderColor: '#8b5cf6', opacity: (!selectedStudent || selectedStudent.year === '1ère année') ? 0.5 : 1 }}>
+                      <Download size={14} style={{ marginRight: '8px' }} /> Attestation
                     </button>
                   </div>
 
                 </div>
-
-                {/* Hint */}
-                {(!filterDiploma || !filterMajor || !filterYear) && (
-                  <div style={{ marginTop: '14px', padding: '10px 14px', background: 'rgba(176,104,185,0.04)', borderRadius: 'var(--radius-md)',
-                    border: '1px solid rgba(176,104,185,0.08)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <i className="fa-solid fa-circle-info" style={{ color: 'var(--primary)', fontSize: '11px' }}></i>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      Sélectionnez <strong>Niveau</strong>, <strong>Filière</strong> et <strong>Année</strong> pour activer les fiches par module.
-                    </span>
-                  </div>
-                )}
               </div>
             </motion.div>
           )}
@@ -422,89 +392,84 @@ const GradeManagement = () => {
       <AnimatePresence mode="wait">
         {selectedStudent ? (
           <motion.div key={selectedStudentId} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-            {/* Student header */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '800', border: '1px solid var(--border-light)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '20px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '900', border: '1px solid var(--border-light)' }}>
                   {selectedStudent.lastName[0]}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>{selectedStudent.lastName} {selectedStudent.firstName}</h3>
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    <span style={{ fontWeight: '600' }}>{selectedStudent.major}</span> · {selectedStudent.year} · {selectedStudent.diploma}
+                  <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: '800' }}>{selectedStudent.lastName} {selectedStudent.firstName}</h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                    {selectedStudent.major} · {selectedStudent.year}
                   </p>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <MiniStat label="Moyenne" value={generalAvg()} />
-                <MiniStat label="Modules" value={`${completedModules}/${modules.length}`} />
-                <button onClick={handleSave} className="btn-modern primary" style={{ padding: '10px 18px', fontSize: '13px' }}>
-                  Enregistrer <i className="fa-solid fa-cloud-arrow-up" style={{ marginLeft: '4px', fontSize: '12px' }}></i>
+                <MiniStat label="Validés" value={`${completedModules}/${modules.length}`} />
+                <button onClick={handleSave} className="btn-modern primary" style={{ padding: '12px 24px' }}>
+                  <CloudUpload size={18} style={{ marginRight: '8px' }} /> Enregistrer
                 </button>
               </div>
             </div>
 
             <AnimatePresence>
               {saved && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                  style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.1)', borderRadius: 'var(--radius-lg)', padding: '10px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <i className="fa-solid fa-circle-check" style={{ color: '#16a34a' }}></i>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#16a34a' }}>Notes enregistrées.</span>
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                  style={{ background: 'var(--success-ultra-light)', border: '1px solid var(--success-light)', borderRadius: 'var(--radius-lg)', padding: '12px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <CheckCircle2 size={16} style={{ color: 'var(--success)' }} />
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: '700', color: 'var(--success)' }}>Notes synchronisées avec succès.</span>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Notes 1ère Année & NSTI Section */}
+            {/* 2nd Year Specific Saisie */}
             {selectedStudent.year === '2ème année' && (
-              <div className="glass-card" style={{ padding: '16px', marginBottom: '16px', background: 'var(--primary-ultra-light)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '12px', color: 'var(--primary)' }}>
-                  <i className="fa-solid fa-clock-rotate-left" style={{ marginRight: '6px' }}></i>
-                  Saisie des notes de la 1ère année et NSTI (Admin uniquement)
+              <div className="glass-card" style={{ padding: '20px', marginBottom: '20px', background: 'rgba(99, 102, 241, 0.03)', border: '1px dashed var(--primary-light)' }}>
+                <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: '800', marginBottom: '16px', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <History size={16} /> Historique & NSTI
                 </h4>
-                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={lbl}>Moy CC (1ère année)</label>
+                    <label style={lbl}>Moy CC (1ère)</label>
                     <GradeInput value={(studentGrades.firstYear || {}).moyCC || ''} onChange={(v) => handleGradeChange('firstYear', 'moyCC', v)} />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={lbl}>Moy EFCFT (1ère année)</label>
+                    <label style={lbl}>EFCFT (1ère)</label>
                     <GradeInput value={(studentGrades.firstYear || {}).moyEFCFT || ''} onChange={(v) => handleGradeChange('firstYear', 'moyEFCFT', v)} />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={lbl}>Moy EFCFP (1ère année)</label>
+                    <label style={lbl}>EFCFP (1ère)</label>
                     <GradeInput value={(studentGrades.firstYear || {}).moyEFCFP || ''} onChange={(v) => handleGradeChange('firstYear', 'moyEFCFP', v)} />
                   </div>
-                  <div style={{ width: '1px', background: 'var(--border)', margin: '0 10px' }}></div>
+                  <div style={{ width: '1px', background: 'var(--border-light)' }}></div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ ...lbl, color: '#d97706' }}>Note Globale NSTI</label>
+                    <label style={{ ...lbl, color: 'var(--accent)' }}>Note NSTI</label>
                     <GradeInput value={(studentGrades.firstYear || {}).nsti || ''} onChange={(v) => handleGradeChange('firstYear', 'nsti', v)} />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Table */}
+            {/* Main Grade Table */}
             {modules.length === 0 ? (
-              <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
-                <i className="fa-solid fa-book-open" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
-                <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Aucun module défini pour cette filière / année.</p>
-              </div>
+              <EmptyState title="Aucun module" message="Configurez les modules pour cette filière dans la gestion des modules." icon="book" />
             ) : (
-              <div style={{ background: 'white', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: 'var(--shadow-xs)' }}>
+              <div className="glass-card" style={{ overflow: 'hidden' }}>
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '950px' }}>
+                  <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '980px' }}>
                     <thead>
                       <tr>
                         <th style={thStyle}>#</th>
-                        <th style={thStyle}>Module</th>
-                        <th style={{ ...thStyle, textAlign: 'center', width: '70px' }}>C1</th>
-                        <th style={{ ...thStyle, textAlign: 'center', width: '70px' }}>C2</th>
-                        <th style={{ ...thStyle, textAlign: 'center', width: '70px' }}>C3</th>
-                        <th style={{ ...thStyle, textAlign: 'center', width: '70px', background: 'rgba(254,205,8,0.06)' }}>Moy CC</th>
-                        <th style={{ ...thStyle, textAlign: 'center', width: '70px' }}>EFCFP</th>
-                        <th style={{ ...thStyle, textAlign: 'center', width: '70px' }}>EFCFT</th>
-                        <th style={{ ...thStyle, textAlign: 'center', width: '80px', background: 'rgba(176,104,185,0.04)' }}>Moyenne</th>
-                        <th style={{ ...thStyle, textAlign: 'center', width: '90px' }}>Décision</th>
+                        <th style={thStyle}>Désignation Module</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>CC1</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>CC2</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>CC3</th>
+                        <th style={{ ...thStyle, textAlign: 'center', background: 'rgba(0,0,0,0.02)' }}>Moy CC</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>EFCFP</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>EFCFT</th>
+                        <th style={{ ...thStyle, textAlign: 'center', background: 'var(--primary-ultra-light)' }}>Générale</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -516,52 +481,37 @@ const GradeManagement = () => {
                         const passed = avg !== null && avg >= 10;
 
                         return (
-                          <motion.tr key={mod} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.02 }}
-                            style={{ background: idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.5)' }}>
+                          <tr key={mod} style={{ background: idx % 2 === 0 ? 'white' : 'var(--bg-subtle)' }}>
+                            <td style={tdStyle}><span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-faint)' }}>{idx + 1}</span></td>
                             <td style={tdStyle}>
-                              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-faint)' }}>{idx + 1}</span>
+                              <p style={{ fontSize: 'var(--text-sm)', fontWeight: '700', color: 'var(--text-primary)' }}>{mod}</p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                {complete ? <CheckCircle2 size={10} style={{ color: 'var(--success)' }} /> : <Clock size={10} style={{ color: 'var(--text-faint)' }} />}
+                                <span style={{ fontSize: '9px', fontWeight: '800', color: complete ? 'var(--success)' : 'var(--text-faint)', textTransform: 'uppercase' }}>{complete ? 'Complet' : 'Partiel'}</span>
+                              </div>
                             </td>
-                            <td style={tdStyle}>
-                              <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod}</p>
-                              <span style={{ fontSize: '9px', fontWeight: '600', color: complete ? '#16a34a' : 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                <i className={`fa-${complete ? 'solid fa-circle-check' : 'regular fa-clock'}`} style={{ fontSize: '7px' }}></i>
-                                {complete ? 'Complet' : 'En attente'}
-                              </span>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}><GradeInput value={g.c1} onChange={(v) => handleGradeChange(mod, 'c1', v)} /></td>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}><GradeInput value={g.c2} onChange={(v) => handleGradeChange(mod, 'c2', v)} /></td>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}><GradeInput value={g.c3 || ''} onChange={(v) => handleGradeChange(mod, 'c3', v)} placeholder="opt." /></td>
+                            <td style={{ ...tdStyle, textAlign: 'center', background: 'rgba(0,0,0,0.01)' }}>
+                              <span style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>{moyCC !== null ? moyCC.toFixed(2) : '—'}</span>
                             </td>
-                            <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              <GradeInput value={g.c1} onChange={(v) => handleGradeChange(mod, 'c1', v)} />
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              <GradeInput value={g.c2} onChange={(v) => handleGradeChange(mod, 'c2', v)} />
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              <GradeInput value={g.c3 || ''} onChange={(v) => handleGradeChange(mod, 'c3', v)} placeholder="opt." />
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'center', background: 'rgba(254,205,8,0.03)' }}>
-                              <span style={{ fontSize: '14px', fontWeight: '700', color: moyCC !== null ? 'var(--text-primary)' : 'var(--text-faint)' }}>
-                                {moyCC !== null ? moyCC.toFixed(2) : '—'}
-                              </span>
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              <GradeInput value={g.efcfp} onChange={(v) => handleGradeChange(mod, 'efcfp', v)} />
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              <GradeInput value={g.efcft} onChange={(v) => handleGradeChange(mod, 'efcft', v)} />
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'center', background: 'rgba(176,104,185,0.02)' }}>
-                              <span style={{ fontSize: '15px', fontWeight: '800', color: avg !== null ? (passed ? 'var(--primary)' : '#d97706') : 'var(--text-faint)' }}>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}><GradeInput value={g.efcfp} onChange={(v) => handleGradeChange(mod, 'efcfp', v)} /></td>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}><GradeInput value={g.efcft} onChange={(v) => handleGradeChange(mod, 'efcft', v)} /></td>
+                            <td style={{ ...tdStyle, textAlign: 'center', background: 'var(--primary-ultra-light)' }}>
+                              <span style={{ fontSize: 'var(--text-sm)', fontWeight: '900', color: avg !== null ? (passed ? 'var(--primary)' : 'var(--accent)') : 'var(--text-faint)' }}>
                                 {avg !== null ? avg.toFixed(2) : '—'}
                               </span>
                             </td>
                             <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              {complete && avg !== null ? (
-                                <span style={{ padding: '3px 8px', borderRadius: 'var(--radius-pill)', fontSize: '9px', fontWeight: '700', textTransform: 'uppercase',
-                                  background: passed ? 'rgba(22,163,74,0.06)' : 'rgba(245,158,11,0.06)', color: passed ? '#16a34a' : '#d97706' }}>
+                              {complete && avg !== null && (
+                                <span style={{ padding: '4px 10px', borderRadius: 'var(--radius-pill)', fontSize: '9px', fontWeight: '800', textTransform: 'uppercase',
+                                  background: passed ? 'var(--success-ultra-light)' : 'var(--danger-ultra-light)', color: passed ? 'var(--success)' : 'var(--danger)' }}>
                                   {passed ? 'Validé' : 'Faible'}
                                 </span>
-                              ) : <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>—</span>}
+                              )}
                             </td>
-                          </motion.tr>
+                          </tr>
                         );
                       })}
                     </tbody>
@@ -571,11 +521,11 @@ const GradeManagement = () => {
             )}
           </motion.div>
         ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '80px 0' }}>
-            <i className="fa-solid fa-graduation-cap" style={{ fontSize: '48px', color: 'var(--border)', display: 'block', marginBottom: '16px' }}></i>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-tertiary)', marginBottom: '6px' }}>Sélectionnez un stagiaire</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Utilisez les filtres pour trouver un stagiaire et saisir ses notes.</p>
-          </motion.div>
+          <EmptyState 
+            title="Aucun stagiaire sélectionné" 
+            message="Utilisez les filtres ci-dessus pour rechercher un stagiaire et gérer ses notes académiques." 
+            icon="search" 
+          />
         )}
       </AnimatePresence>
     </div>

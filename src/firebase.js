@@ -1,5 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager,
+  CACHE_SIZE_UNLIMITED 
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAG7CiN3A1ZaVDU21AFaFHTwi38CnDs-do",
@@ -13,4 +18,20 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Cache persistant IndexedDB
+let _db;
+try {
+  _db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+      cacheSizeBytes: CACHE_SIZE_UNLIMITED
+    })
+  });
+} catch (e) {
+  console.warn("Firestore cache initialization failed:", e);
+  const { getFirestore } = await import('firebase/firestore');
+  _db = getFirestore(app);
+}
+
+export const db = _db;

@@ -4,40 +4,27 @@ import { useApp } from '../context/AppContext';
 import { MODULES_DATA } from '../data/modules';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  LineChart, Line, Legend, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
+  LineChart, Line, Cell
 } from 'recharts';
-
-// --- Styles ---
-const cardHeaderStyle = { 
-  display: 'flex', 
-  justifyContent: 'space-between', 
-  alignItems: 'center', 
-  marginBottom: '24px' 
-};
-
-const selectStyle = {
-  background: 'var(--bg-subtle)',
-  border: '1px solid var(--border-light)',
-  padding: '8px 12px',
-  borderRadius: '10px',
-  fontSize: '13px',
-  fontWeight: '600',
-  color: 'var(--text-primary)',
-  cursor: 'pointer',
-  outline: 'none',
-  transition: 'all 0.2s ease'
-};
+import { 
+  ChartLine, 
+  Filter, 
+  BarChart3, 
+  Users, 
+  TrendingUp, 
+  BookOpen,
+  PieChart,
+  LayoutDashboard
+} from 'lucide-react';
 
 const Reports = () => {
-  const { students = [], grades = {}, studentAttendance = [], modules: allModules = [] } = useApp() || {};
+  const { students = [], grades = {}, modules: allModules = [] } = useApp() || {};
 
-  // --- Filter States ---
   const [selectedDiploma, setSelectedDiploma] = useState(Object.keys(MODULES_DATA)[0]);
   const [selectedMajor, setSelectedMajor] = useState('');
   const [selectedYear, setSelectedYear] = useState('1ère année');
   const [selectedModule, setSelectedModule] = useState('');
 
-  // --- Derived Options ---
   const availableMajors = useMemo(() => {
     return selectedDiploma ? Object.keys(MODULES_DATA[selectedDiploma] || {}) : [];
   }, [selectedDiploma]);
@@ -53,7 +40,6 @@ const Reports = () => {
 
   const availableModules = availableModulesList.map(m => m.name);
 
-  // Set defaults when parents change
   React.useEffect(() => {
     if (availableMajors.length > 0 && !availableMajors.includes(selectedMajor)) {
       setSelectedMajor(availableMajors[0]);
@@ -66,31 +52,22 @@ const Reports = () => {
     }
   }, [availableModules, selectedModule]);
 
-  // --- Analytics Logic ---
   const analytics = useMemo(() => {
-    const totalStudents = students.length || 0;
-    
-    // 1. Module Progression (C1, C2, C3, EFC)
-    const moduleGrades = [];
-    let avgC1 = 0, avgC2 = 0, avgC3 = 0, avgEFC = 0;
-    let countC1 = 0, countC2 = 0, countC3 = 0, countEFC = 0;
-
     const filteredStudents = students.filter(s => 
       s.diploma === selectedDiploma && s.major === selectedMajor && s.year === selectedYear
     );
 
+    let avgC1 = 0, avgC2 = 0, avgC3 = 0, avgEFC = 0;
+    let countC1 = 0, countC2 = 0, countC3 = 0, countEFC = 0;
+
     filteredStudents.forEach(s => {
-      const g = grades[s.id]?.[selectedModule];
+      const g = grades[s.id]?.[selectedModule.replace(/\./g, '_')];
       if (g) {
         if (g.c1 && !isNaN(parseFloat(g.c1))) { avgC1 += parseFloat(g.c1); countC1++; }
         if (g.c2 && !isNaN(parseFloat(g.c2))) { avgC2 += parseFloat(g.c2); countC2++; }
         if (g.c3 && !isNaN(parseFloat(g.c3))) { avgC3 += parseFloat(g.c3); countC3++; }
-        
         const efcfp = parseFloat(g.efcfp), efcft = parseFloat(g.efcft);
-        if (!isNaN(efcfp) && !isNaN(efcft)) {
-          avgEFC += (efcfp + efcft) / 2;
-          countEFC++;
-        }
+        if (!isNaN(efcfp) && !isNaN(efcft)) { avgEFC += (efcfp + efcft) / 2; countEFC++; }
       }
     });
 
@@ -101,22 +78,17 @@ const Reports = () => {
       { name: 'EFC', val: countEFC > 0 ? (avgEFC / countEFC).toFixed(2) : 0 },
     ].filter(d => d.name !== 'C3' || countC3 > 0);
 
-    // 2. Global Module Status
     const globalModuleData = availableModules.map(mod => {
       let total = 0, count = 0;
       filteredStudents.forEach(s => {
-        const g = grades[s.id]?.[mod];
+        const g = grades[s.id]?.[mod.replace(/\./g, '_')];
         if (g) {
           const efcfp = parseFloat(g.efcfp), efcft = parseFloat(g.efcft);
-          if (!isNaN(efcfp) && !isNaN(efcft)) {
-            total += (efcfp + efcft) / 2;
-            count++;
-          }
+          if (!isNaN(efcfp) && !isNaN(efcft)) { total += (efcfp + efcft) / 2; count++; }
         }
       });
       return { 
         name: mod.length > 20 ? mod.substring(0, 20) + '...' : mod, 
-        fullName: mod,
         moyenne: count > 0 ? (total / count).toFixed(2) : 0 
       };
     }).sort((a, b) => b.moyenne - a.moyenne);
@@ -125,115 +97,91 @@ const Reports = () => {
   }, [students, grades, selectedDiploma, selectedMajor, selectedYear, selectedModule, availableModules]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', paddingBottom: '60px' }}>
+    <div className="section-padding" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-8)' }}>
       <header>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <div style={{ padding: '8px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', borderRadius: '12px' }}>
-             <i className="fa-solid fa-chart-line" style={{ fontSize: '20px' }}></i>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+          <div style={{ padding: '10px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', borderRadius: 'var(--radius-lg)' }}>
+             <ChartLine size={24} />
           </div>
-          <h1 style={{ fontSize: '32px', fontWeight: '900', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Analytique & Rapports</h1>
+          <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)' }}>Analytique & Rapports</h1>
         </div>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Visualisation de la progression académique par module et niveau.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Suivi visuel des performances académiques et de la progression.</p>
       </header>
 
       {/* --- Filter Bar --- */}
-      <div className="glass-card" style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end', background: 'rgba(255,255,255,0.6)' }}>
+      <div className="glass-card" style={{ padding: 'var(--space-5)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', alignItems: 'flex-end' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Niveau</label>
-          <select style={selectStyle} value={selectedDiploma} onChange={e => setSelectedDiploma(e.target.value)}>
+          <label style={labelStyle}>Niveau</label>
+          <select className="input-premium" style={{ minWidth: '180px' }} value={selectedDiploma} onChange={e => setSelectedDiploma(e.target.value)}>
             {Object.keys(MODULES_DATA).map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Filière</label>
-          <select style={selectStyle} value={selectedMajor} onChange={e => setSelectedMajor(e.target.value)}>
+          <label style={labelStyle}>Filière</label>
+          <select className="input-premium" style={{ minWidth: '200px' }} value={selectedMajor} onChange={e => setSelectedMajor(e.target.value)}>
             {availableMajors.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Année</label>
-          <select style={selectStyle} value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
+          <label style={labelStyle}>Année</label>
+          <select className="input-premium" value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
             <option value="1ère année">1ère année</option>
             <option value="2ème année">2ème année</option>
           </select>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: '200px' }}>
-          <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Module Spécifique</label>
-          <select style={selectStyle} value={selectedModule} onChange={e => setSelectedModule(e.target.value)}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: '240px' }}>
+          <label style={labelStyle}>Module d'analyse</label>
+          <select className="input-premium" value={selectedModule} onChange={e => setSelectedModule(e.target.value)}>
             {availableModules.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
       </div>
 
       {/* --- Charts Grid --- */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-6)' }}>
         
-        {/* Module Progression Chart */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card" style={{ padding: '32px', minHeight: '400px' }}>
-          <div style={cardHeaderStyle}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card" style={{ padding: 'var(--space-8)', minHeight: '450px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-8)' }}>
             <div>
-              <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>Progression par Module</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Moyenne des évaluations (C1 → C2 → EFC)</p>
+              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: '800' }}>Progression du Module</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Moyenne séquentielle (C1 → C2 → EFC)</p>
             </div>
-            <div style={{ background: 'var(--primary-ultra-light)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '800' }}>
-              {analytics.filteredStudentsCount} Stagiaires
+            <div className="badge-status primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Users size={12} /> {analytics.filteredStudentsCount} Stagiaires
             </div>
           </div>
           
-          <div style={{ height: '280px', width: '100%', marginTop: '20px' }}>
+          <div style={{ height: '300px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={analytics.progressionData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 700, fill: 'var(--text-muted)' }} dy={10} />
-                <YAxis domain={[0, 20]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: 'var(--text-muted)' }} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: 'var(--text-faint)' }} dy={10} />
+                <YAxis domain={[0, 20]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: 'var(--text-faint)' }} />
                 <Tooltip 
-                  contentStyle={{ background: 'rgba(255,255,255,0.95)', border: 'none', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', backdropFilter: 'blur(10px)' }}
+                  contentStyle={{ background: 'white', border: 'none', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)' }}
                   itemStyle={{ fontWeight: 800, color: 'var(--primary)' }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="val" 
-                  stroke="var(--primary)" 
-                  strokeWidth={4} 
-                  dot={{ r: 6, fill: 'var(--primary)', strokeWidth: 2, stroke: '#fff' }} 
-                  activeDot={{ r: 8, strokeWidth: 0 }}
-                  animationDuration={1500}
-                />
+                <Line type="monotone" dataKey="val" stroke="var(--primary)" strokeWidth={4} dot={{ r: 5, fill: 'var(--primary)', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 8 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
 
-        {/* Global Module Comparison */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card" style={{ padding: '32px', minHeight: '400px' }}>
-          <div style={cardHeaderStyle}>
-            <div>
-              <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>État Global des Modules</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Moyenne finale par module pour ce niveau</p>
-            </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card" style={{ padding: 'var(--space-8)', minHeight: '450px' }}>
+          <div style={{ marginBottom: 'var(--space-8)' }}>
+            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: '800' }}>Comparatif Inter-Modules</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Classement par moyenne finale</p>
           </div>
 
-          <div style={{ height: '300px', width: '100%', marginTop: '10px' }}>
+          <div style={{ height: '300px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics.globalModuleData.slice(0, 8)} layout="vertical" margin={{ left: 20, right: 30 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.05)" />
+              <BarChart data={analytics.globalModuleData.slice(0, 8)} layout="vertical" margin={{ left: 10 }}>
                 <XAxis type="number" domain={[0, 20]} hide />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  width={120}
-                  tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--text-primary)' }} 
-                />
-                <Tooltip 
-                  cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-                  contentStyle={{ background: 'white', border: 'none', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
-                  formatter={(value) => [`${value} / 20`, 'Moyenne']}
-                />
-                <Bar dataKey="moyenne" radius={[0, 10, 10, 0]} barSize={20}>
+                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={100} tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--text-primary)' }} />
+                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ border: 'none', borderRadius: '12px', boxShadow: 'var(--shadow-md)' }} />
+                <Bar dataKey="moyenne" radius={[0, 10, 10, 0]} barSize={18}>
                   {analytics.globalModuleData.slice(0, 8).map((entry, index) => (
-                    <Cell key={index} fill={parseFloat(entry.moyenne) >= 10 ? 'var(--primary)' : '#ef4444'} />
+                    <Cell key={index} fill={parseFloat(entry.moyenne) >= 10 ? 'var(--primary)' : 'var(--danger)'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -242,9 +190,10 @@ const Reports = () => {
         </motion.div>
 
       </div>
-
     </div>
   );
 };
+
+const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' };
 
 export default Reports;

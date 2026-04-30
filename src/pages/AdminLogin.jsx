@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAdminAuth } from '../context/AdminAuthContext';
+import Logo from '../components/Logo';
+import { 
+  Mail, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  LogIn, 
+  AlertCircle, 
+  Loader2,
+  CheckCircle2,
+  ShieldCheck,
+  ChevronRight
+} from 'lucide-react';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
@@ -19,7 +32,7 @@ const AdminLogin = () => {
     setLoading(true);
 
     if (!email || !password) {
-      setError('Email and password are required');
+      setError('Veuillez remplir tous les champs');
       setLoading(false);
       return;
     }
@@ -34,13 +47,12 @@ const AdminLogin = () => {
       }
       navigate('/admin/dashboard');
     } else {
-      setError(result.error);
+      setError(result.error || 'Identifiants incorrects');
     }
 
     setLoading(false);
   };
 
-  // Pre-fill email if "remember me" was checked
   React.useEffect(() => {
     const savedEmail = localStorage.getItem('admin_email');
     if (savedEmail) {
@@ -50,320 +62,82 @@ const AdminLogin = () => {
   }, []);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #f8f9fc 0%, #eef2f7 100%)',
-      padding: '24px',
-      fontFamily: "'Inter', sans-serif"
-    }}>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        style={{
-          maxWidth: '420px',
-          width: '100%',
-          padding: '48px 40px',
-          background: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          border: '1px solid rgba(255, 255, 255, 0.8)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.1)'
-        }}
-      >
-        {/* Logo */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '32px',
-          gap: '12px'
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            background: 'var(--primary)',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontSize: '24px',
-            boxShadow: '0 10px 20px rgba(176, 104, 185, 0.3)'
-          }}>
-            <i className="fa-solid fa-school"></i>
-          </div>
-          <div>
-            <h1 style={{
-              fontSize: '20px',
-              fontWeight: '800',
-              color: 'var(--text-primary)',
-              margin: 0,
-              letterSpacing: '-0.02em'
-            }}>IPFP MANAGER</h1>
-            <p style={{
-              fontSize: '10px',
-              fontWeight: '600',
-              color: 'var(--text-muted)',
-              margin: '2px 0 0 0',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase'
-            }}>Admin Portal</p>
+    <div className="flex-center" style={{ minHeight: '100vh', background: 'var(--bg-main)', padding: 'var(--space-6)' }}>
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: '10%', left: '15%', width: '300px', height: '300px', background: 'var(--primary)', filter: 'blur(150px)', opacity: 0.05 }} />
+        <div style={{ position: 'absolute', bottom: '10%', right: '15%', width: '300px', height: '300px', background: 'var(--accent)', filter: 'blur(150px)', opacity: 0.05 }} />
+      </div>
+
+      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}
+        className="glass-premium" style={{ width: '100%', maxWidth: '440px', padding: '48px 40px', borderRadius: 'var(--radius-3xl)', position: 'relative', zIndex: 10 }}>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '40px' }}>
+          <Logo size={48} />
+          <div style={{ textAlign: 'center', marginTop: '16px' }}>
+            <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: '900', color: 'var(--text-primary)', letterSpacing: '-0.04em' }}>IPFP MANAGER</h1>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '4px' }}>
+              <ShieldCheck size={12} style={{ color: 'var(--primary)' }} />
+              <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Portail Administratif</span>
+            </div>
           </div>
         </div>
 
-        {/* Title */}
-        <h2 style={{
-          fontSize: '28px',
-          fontWeight: '900',
-          color: 'var(--text-primary)',
-          textAlign: 'center',
-          marginBottom: '8px',
-          letterSpacing: '-0.04em'
-        }}>
-          Admin Login
-        </h2>
+        <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', textAlign: 'center', marginBottom: '32px', letterSpacing: '-0.04em' }}>Connexion Admin</h2>
 
-        <p style={{
-          fontSize: '14px',
-          color: 'var(--text-muted)',
-          textAlign: 'center',
-          marginBottom: '32px',
-          fontWeight: '500'
-        }}>
-          Sign in to access the admin dashboard
-        </p>
+        <AnimatePresence>
+          {error && (
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+              style={{ background: 'var(--danger-ultra-light)', border: '1px solid var(--danger-light)', borderRadius: 'var(--radius-xl)', padding: '12px 16px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <AlertCircle size={18} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+              <p style={{ fontSize: '13px', color: 'var(--danger)', fontWeight: '600' }}>{error}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Error Message */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              marginBottom: '24px',
-              fontSize: '13px',
-              color: '#dc2626',
-              fontWeight: '500'
-            }}
-          >
-            ⚠️ {error}
-          </motion.div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Email Input */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '700',
-              color: 'var(--text-primary)',
-              marginBottom: '6px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em'
-            }}>Email Address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@ipfp.com"
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: 'var(--text-primary)',
-                background: 'var(--bg-input)',
-                boxSizing: 'border-box',
-                transition: 'all 0.15s'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = 'var(--primary)';
-                e.target.style.boxShadow = '0 0 0 3px rgba(176, 104, 185, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = 'var(--border)';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={fGroup}>
+            <label style={lbl}>Adresse Email</label>
+            <div style={{ position: 'relative' }}>
+              <Mail size={16} style={fIcon} />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-premium" style={{ width: '100%', paddingLeft: '40px' }} placeholder="admin@ipfp.com" autoComplete="email" required />
+            </div>
           </div>
 
-          {/* Password Input */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '700',
-              color: 'var(--text-primary)',
-              marginBottom: '6px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em'
-            }}>Password</label>
+          <div style={fGroup}>
+            <label style={lbl}>Mot de passe</label>
             <div style={{ position: 'relative' }}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px 12px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border)',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: 'var(--text-primary)',
-                  background: 'var(--bg-input)',
-                  boxSizing: 'border-box',
-                  transition: 'all 0.15s',
-                  paddingRight: '40px'
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = 'var(--primary)';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(176, 104, 185, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = 'var(--border)';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-muted)',
-                  fontSize: '14px',
-                  padding: '4px 8px'
-                }}
-              >
-                <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+              <Lock size={16} style={fIcon} />
+              <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className="input-premium" style={{ width: '100%', paddingLeft: '40px', paddingRight: '44px' }} placeholder="••••••••" autoComplete="current-password" required />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', display: 'flex' }}>
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
 
-          {/* Remember Me */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <input
-              type="checkbox"
-              id="rememberMe"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              style={{
-                width: '16px',
-                height: '16px',
-                cursor: 'pointer',
-                accentColor: 'var(--primary)'
-              }}
-            />
-            <label
-              htmlFor="rememberMe"
-              style={{
-                fontSize: '13px',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-                fontWeight: '500'
-              }}
-            >
-              Remember my email
-            </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input type="checkbox" id="rememberMe" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+            <label htmlFor="rememberMe" style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer' }}>Se souvenir de moi</label>
           </div>
 
-          {/* Login Button */}
-          <motion.button
-            type="submit"
-            disabled={loading}
-            whileHover={!loading ? { scale: 1.02 } : {}}
-            whileTap={!loading ? { scale: 0.98 } : {}}
-            style={{
-              marginTop: '8px',
-              padding: '12px 16px',
-              borderRadius: '10px',
-              border: 'none',
-              background: 'var(--primary)',
-              color: 'white',
-              fontSize: '14px',
-              fontWeight: '700',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-              transition: 'all 0.15s',
-              boxShadow: '0 10px 20px rgba(176, 104, 185, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            {loading ? (
-              <>
-                <div style={{
-                  width: '14px',
-                  height: '14px',
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
-                  borderTopColor: 'white',
-                  borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite'
-                }} />
-                Signing in...
-              </>
-            ) : (
-              <>
-                <i className="fa-solid fa-arrow-right-to-bracket" style={{ fontSize: '12px' }}></i>
-                Sign In
-              </>
-            )}
-          </motion.button>
+          <button type="submit" disabled={loading} className="btn-modern primary" style={{ width: '100%', justifyContent: 'center', padding: '14px', borderRadius: 'var(--radius-xl)', fontSize: '15px', marginTop: '8px' }}>
+            {loading ? <Loader2 size={18} className="spinner" /> : <><LogIn size={18} style={{ marginRight: '8px' }} /> Se connecter</>}
+          </button>
         </form>
 
-        {/* Demo Info */}
-        <div style={{
-          marginTop: '32px',
-          paddingTop: '24px',
-          borderTop: '1px solid var(--border-light)',
-          background: 'rgba(176, 104, 185, 0.05)',
-          borderRadius: '12px',
-          padding: '12px 14px',
-          fontSize: '12px',
-          color: 'var(--text-secondary)',
-          fontWeight: '500'
-        }}>
-          <p style={{ margin: '0 0 6px 0' }}>📝 Demo Credentials:</p>
-          <p style={{ margin: '2px 0' }}>Email: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '4px' }}>admin@ipfp.com</code></p>
-          <p style={{ margin: '2px 0' }}>Password: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '4px' }}>admin123</code></p>
+        <div style={{ marginTop: '40px', padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-2xl)', border: '1px solid var(--border-light)' }}>
+          <p style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Accès Démo</p>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <p>Email: <code style={{ color: 'var(--primary)', fontWeight: '700' }}>admin@ipfp.com</code></p>
+            <p>Pass: <code style={{ color: 'var(--primary)', fontWeight: '700' }}>admin123</code></p>
+          </div>
         </div>
-
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        `}</style>
       </motion.div>
     </div>
   );
 };
+
+const fGroup = { display: 'flex', flexDirection: 'column', gap: '8px' };
+const lbl = { fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' };
+const fIcon = { position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' };
 
 export default AdminLogin;

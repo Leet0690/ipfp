@@ -1,41 +1,63 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import Logo from '../components/Logo';
+import { 
+  LayoutDashboard, 
+  Boxes, 
+  PenTool, 
+  LineChart, 
+  CalendarDays, 
+  CalendarCheck, 
+  Users, 
+  GraduationCap, 
+  Wallet, 
+  Settings, 
+  LogOut, 
+  Menu, 
+  X, 
+  Bell, 
+  ChevronDown, 
+  ChevronUp, 
+  ChevronLeft,
+  School,
+  UserCheck
+} from 'lucide-react';
 
 const NAV_CATEGORIES = [
   {
     label: "Tableau de Bord",
-    icon: "fa-chart-pie",
+    icon: LayoutDashboard,
     items: [
-      { to: "/", icon: "fa-chart-pie", label: "Tableau de bord" },
+      { to: "/", icon: LayoutDashboard, label: "Tableau de bord" },
     ]
   },
   {
     label: "Pôle Académique",
-    icon: "fa-graduation-cap",
+    icon: GraduationCap,
     items: [
-      { to: "/admin/modules", icon: "fa-cubes", label: "Modules" },
-      { to: "/admin/grades", icon: "fa-pen-ruler", label: "Notes" },
-      { to: "/admin/reports", icon: "fa-chart-line", label: "Rapports" },
-      { to: "/admin/schedules", icon: "fa-calendar-days", label: "Emplois du Temps" },
+      { to: "/admin/modules", icon: Boxes, label: "Modules" },
+      { to: "/admin/grades", icon: PenTool, label: "Notes" },
+      { to: "/admin/reports", icon: LineChart, label: "Rapports" },
+      { to: "/admin/schedules", icon: CalendarDays, label: "Emplois du Temps" },
     ]
   },
   {
     label: "Suivi de Présence",
-    icon: "fa-user-clock",
+    icon: UserCheck,
     items: [
-      { to: "/admin/attendance-students", icon: "fa-user-clock", label: "Absences Stagiaires" },
-      { to: "/admin/attendance-teachers", icon: "fa-calendar-check", label: "Présences Formateurs" },
+      { to: "/admin/attendance-students", icon: UserCheck, label: "Absences Stagiaires" },
+      { to: "/admin/attendance-teachers", icon: CalendarCheck, label: "Présences Formateurs" },
     ]
   },
   {
     label: "Administration",
-    icon: "fa-gear",
+    icon: Settings,
     items: [
-      { to: "/admin/students", icon: "fa-users", label: "Stagiaires" },
-      { to: "/admin/teachers", icon: "fa-chalkboard-user", label: "Formateurs" },
-      { to: "/admin/finance", icon: "fa-wallet", label: "Finance" },
+      { to: "/admin/students", icon: Users, label: "Stagiaires" },
+      { to: "/admin/teachers", icon: GraduationCap, label: "Formateurs" },
+      { to: "/admin/finance", icon: Wallet, label: "Finance" },
     ]
   }
 ];
@@ -67,8 +89,8 @@ const SidebarCategory = ({ cat, isSidebarOpen, renderNavLink, location, isMobile
           width: '100%',
           display: 'flex',
           alignItems: 'center',
-          gap: '10px',
-          padding: '10px 16px',
+          gap: 'var(--space-3)',
+          padding: 'var(--space-3) var(--space-4)',
           borderRadius: 'var(--radius-lg)',
           fontSize: '11px',
           fontWeight: '800',
@@ -81,9 +103,9 @@ const SidebarCategory = ({ cat, isSidebarOpen, renderNavLink, location, isMobile
           transition: 'all 0.2s',
         }}
       >
-        <i className={`fa-solid ${cat.icon}`} style={{ fontSize: '11px', width: '16px', textAlign: 'center' }}></i>
+        <cat.icon size={16} strokeWidth={2.5} />
         <span style={{ flex: 1, textAlign: 'left' }}>{cat.label}</span>
-        <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: '9px', opacity: 0.5 }}></i>
+        {open ? <ChevronUp size={12} opacity={0.5} /> : <ChevronDown size={12} opacity={0.5} />}
       </button>
       <AnimatePresence initial={false}>
         {open && (
@@ -157,7 +179,7 @@ export default function DashboardLayout({ children }) {
           justifyContent: 'center',
           flexShrink: 0
         }}>
-          <i className={`fa-solid ${item.icon}`} style={{ fontSize: '14px' }}></i>
+          <item.icon size={isActive ? 18 : 16} strokeWidth={isActive ? 2.5 : 2} />
         </div>
         
         <AnimatePresence initial={false}>
@@ -209,17 +231,9 @@ export default function DashboardLayout({ children }) {
           zIndex: 40,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'space-between' : 'center', height: '72px', padding: isSidebarOpen ? '0 20px' : '0', borderBottom: '1px solid rgba(176, 104, 185, 0.04)' }}>
-          <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '16px', boxShadow: 'var(--shadow-glow)' }}>
-              <i className="fa-solid fa-school"></i>
-            </div>
-            {isSidebarOpen && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <span className="luminous-text" style={{ fontSize: '16px', fontWeight: '900', letterSpacing: '-0.02em', display: 'block' }}>IPFP</span>
-                <p style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)', letterSpacing: '0.06em', marginTop: '-2px', textTransform: 'uppercase' }}>Manager</p>
-              </motion.div>
-            )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'space-between' : 'center', height: '72px', padding: isSidebarOpen ? '0 var(--space-5)' : '0', borderBottom: '1px solid rgba(176, 104, 185, 0.04)' }}>
+          <Link to="/" style={{ textDecoration: 'none' }}>
+            <Logo size={isSidebarOpen ? 32 : 36} showText={isSidebarOpen} />
           </Link>
         </div>
 
@@ -251,7 +265,7 @@ export default function DashboardLayout({ children }) {
              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-subtle)'; e.currentTarget.style.color = '#ef4444'; }}
              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
            >
-             <i className="fa-solid fa-arrow-right-from-bracket"></i>
+             <LogOut size={16} />
              {isSidebarOpen && <span>Déconnexion</span>}
            </button>
         </div>
@@ -277,25 +291,30 @@ export default function DashboardLayout({ children }) {
             <button 
               className="desktop-menu-btn"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              aria-label={isSidebarOpen ? "Réduire le menu" : "Développer le menu"}
               style={{
                 width: '36px', height: '36px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
                 background: 'var(--white)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
                 transition: 'all 0.2s', boxShadow: 'var(--shadow-xs)'
               }}
             >
-              <i className={`fa-solid ${isSidebarOpen ? 'fa-angle-left' : 'fa-bars'}`}></i>
+             <ChevronLeft 
+                size={18} 
+                style={{ transform: isSidebarOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.3s' }} 
+              />
             </button>
 
             {/* Mobile toggler */}
             <button 
               className="mobile-menu-btn"
               onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Ouvrir le menu mobile"
               style={{
                 width: '36px', height: '36px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
                 background: 'var(--white)', color: 'var(--text-secondary)', display: 'none', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
               }}
             >
-              <i className="fa-solid fa-bars"></i>
+              <Menu size={20} />
             </button>
           </div>
 
@@ -304,13 +323,14 @@ export default function DashboardLayout({ children }) {
             <div style={{ position: 'relative' }}>
               <button 
                 onClick={() => setShowNotifs(!showNotifs)} 
+                aria-label={`Notifications (${unreadCount} non lues)`}
                 style={{ 
                   width: '38px', height: '38px', borderRadius: '50%', background: 'var(--white)', border: '1px solid var(--border)', 
                   display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', cursor: 'pointer',
                   position: 'relative', transition: 'all 0.2s', boxShadow: 'var(--shadow-xs)'
                 }}
               >
-                <i className="fa-regular fa-bell"></i>
+                <Bell size={20} strokeWidth={1.5} />
                 {unreadCount > 0 && (
                   <span style={{ 
                     position: 'absolute', top: '-2px', right: '-2px', background: '#ef4444', color: 'white', 
@@ -385,7 +405,7 @@ export default function DashboardLayout({ children }) {
             
             <footer style={{ textAlign: 'center', padding: '48px 0 24px', marginTop: '40px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
-                <i className="fa-solid fa-school" style={{ color: 'var(--primary)', fontSize: '14px' }}></i>
+                <School size={14} style={{ color: 'var(--primary)' }} />
                 <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                   Institut Polytechnique de la Formation Professionnelle
                 </span>
@@ -431,15 +451,15 @@ export default function DashboardLayout({ children }) {
             <div style={{ padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)' }}>
                <Link to="/" onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '32px', height: '32px', background: 'var(--primary)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '14px' }}>
-                  <i className="fa-solid fa-school"></i>
+                  <School size={16} />
                 </div>
                 <div>
                   <span className="luminous-text" style={{ fontSize: '15px', fontWeight: '900' }}>IPFP</span>
                   <p style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Manager</p>
                 </div>
               </Link>
-              <button onClick={() => setIsMobileMenuOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: '18px', color: 'var(--text-tertiary)', cursor: 'pointer' }}>
-                <i className="fa-solid fa-xmark"></i>
+              <button onClick={() => setIsMobileMenuOpen(false)} aria-label="Fermer le menu" style={{ background: 'transparent', border: 'none', fontSize: '18px', color: 'var(--text-tertiary)', cursor: 'pointer' }}>
+                <X size={24} />
               </button>
             </div>
             
@@ -451,7 +471,7 @@ export default function DashboardLayout({ children }) {
             
             <div style={{ padding: '20px 16px', borderTop: '1px solid var(--border-light)' }}>
               <button onClick={() => { logout(); setIsMobileMenuOpen(false); }} style={{ width: '100%', padding: '12px', background: 'var(--bg-subtle)', border: 'none', borderRadius: 'var(--radius-lg)', color: '#ef4444', fontWeight: '600', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}>
-                <i className="fa-solid fa-arrow-right-from-bracket"></i>
+                <LogOut size={16} />
                 Déconnexion
               </button>
             </div>

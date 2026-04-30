@@ -2,18 +2,22 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { FILIERES, getModulesForFiliere } from '../data/modules';
-
-const lbl = { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' };
-const thStyle = { padding: '10px 12px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-subtle)', whiteSpace: 'nowrap' };
-const tdStyle = { padding: '10px 12px', borderBottom: '1px solid var(--border-light)' };
-const selectStyle = { cursor: 'pointer', appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2394a3b8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px', paddingRight: '36px' };
-
-const MiniStat = ({ label, value }) => (
-  <div style={{ textAlign: 'center', padding: '10px 14px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-lg)' }}>
-    <p style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>{value}</p>
-    <p style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '4px' }}>{label}</p>
-  </div>
-);
+import { TableSkeleton } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
+import { 
+  UserCheck, 
+  FileSpreadsheet, 
+  Search, 
+  Calendar, 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  Users, 
+  Filter,
+  MousePointer2,
+  Download,
+  MoreVertical
+} from 'lucide-react';
 
 const StudentAttendance = () => {
   const { students, studentAttendance, updateStudentAttendance, addNotification, loading, schedules } = useApp();
@@ -23,7 +27,6 @@ const StudentAttendance = () => {
   const [filterModule, setFilterModule] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [success, setSuccess] = useState('');
 
   const dayOfWeek = useMemo(() => {
     const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -32,7 +35,6 @@ const StudentAttendance = () => {
 
   const filteredStudents = useMemo(() => {
     return (students || []).filter(s => {
-      // Find if this student's group has a class today
       const hasClassToday = (schedules || []).some(sc => sc.filiere === s.major && sc.annee === s.year && sc.day === dayOfWeek);
       if (!hasClassToday) return false;
 
@@ -51,20 +53,16 @@ const StudentAttendance = () => {
   
   const availableModules = useMemo(() => {
     if (filterMajor && filterYear) {
-      // Show modules actually scheduled for this group on this day
       const scheduledModules = (schedules || [])
         .filter(sc => sc.filiere === filterMajor && sc.annee === filterYear && sc.day === dayOfWeek)
         .map(sc => sc.module);
       
       if (scheduledModules.length > 0) return Array.from(new Set(scheduledModules));
-      
-      // Fallback to academic curriculum if no specific schedule found (though filtering above might hide students anyway)
       if (filterDiploma) return getModulesForFiliere(filterDiploma, filterMajor, filterYear);
     }
     return [];
   }, [filterDiploma, filterMajor, filterYear, schedules, dayOfWeek]);
 
-  // Statistics for currently filtered students and current date/module
   const stats = useMemo(() => {
     let presents = 0, absents = 0, retards = 0;
     filteredStudents.forEach(s => {
@@ -81,17 +79,15 @@ const StudentAttendance = () => {
 
   const handleStatusChange = async (studentId, status) => {
     if (!filterModule) {
-      alert("Veuillez d'abord sélectionner un module ou indiquer 'Général' s'il n'y a pas de sélection (nécessite l'adaptation du module).");
+      alert("Veuillez d'abord sélectionner un module.");
       return;
     }
     try {
-      // Find existing comment
       const docId = `${studentId}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
       const record = studentAttendance.find(a => a.id === docId);
       await updateStudentAttendance(studentId, filterModule, selectedDate, status, record?.comment || '', 'admin');
     } catch (error) {
-      console.error(error);
-      addNotification("Erreur lors de l'enregistrement de l'absence.");
+      addNotification("Erreur lors de l'enregistrement.");
     }
   };
 
@@ -99,12 +95,12 @@ const StudentAttendance = () => {
     if (!filterModule) return;
     const docId = `${studentId}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
     let record = studentAttendance.find(a => a.id === docId);
-    let status = record ? record.status : 'present'; // default 
+    let status = record ? record.status : 'present'; 
     await updateStudentAttendance(studentId, filterModule, selectedDate, status, comment, 'admin');
   };
 
   const exportCSV = () => {
-    if (!filteredStudents.length) return alert('Aucune donnée à exporter.');
+    if (!filteredStudents.length) return alert('Aucune donnée.');
     const headers = "\uFEFFStagiaire,Matricule,Module,Date,Statut,Commentaire\n";
     const rows = filteredStudents.map(s => {
       const docId = `${s.id}_${(filterModule || 'global').replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
@@ -119,107 +115,89 @@ const StudentAttendance = () => {
 
   return (
     <div className="max-w-container section-padding">
-      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '6px' }}>
-            Absences Stagiaires
+          <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <UserCheck size={28} style={{ color: 'var(--primary)' }} /> Absences Stagiaires
           </h1>
-          <p style={{ color: 'var(--text-tertiary)', fontSize: '15px', marginBottom: '28px' }}>
-            Enregistrement et suivi des présences par date et module.
-          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Feuilles d'appel et suivi quotidien par module.</p>
         </div>
-        <button onClick={exportCSV} className="btn-modern secondary" style={{ padding: '8px 16px', fontSize: '12px' }}>
-          <i className="fa-solid fa-file-csv" style={{ marginRight: '6px' }}></i> Exporter (CSV)
+        <button onClick={exportCSV} className="btn-modern secondary">
+          <Download size={16} style={{ marginRight: '8px' }} /> Exporter (CSV)
         </button>
-      </motion.div>
+      </div>
 
       {/* Filters */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lbl}>Date</label>
-            <input type="date" className="input-premium" style={{ width: '100%', padding: '7px 12px', fontSize: '13px', cursor: 'pointer' }}
-              value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+      <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
+          <div style={filterGroupStyle}>
+            <label style={labelStyle}>Date de l'appel</label>
+            <div style={{ position: 'relative' }}>
+              <Calendar size={14} style={filterIconStyle} />
+              <input type="date" className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lbl}>Niveau</label>
-            <select className="input-premium" style={selectStyle} value={filterDiploma} onChange={(e) => { setFilterDiploma(e.target.value); setFilterMajor(''); setFilterModule(''); }}>
-              <option value="" disabled>-- Choisir le niveau --</option>
+          <div style={filterGroupStyle}>
+            <label style={labelStyle}>Niveau</label>
+            <select className="input-premium" value={filterDiploma} onChange={(e) => { setFilterDiploma(e.target.value); setFilterMajor(''); setFilterModule(''); }}>
+              <option value="" disabled>-- Choisir niveau --</option>
               {Object.keys(FILIERES).map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lbl}>Filière</label>
-            <select className="input-premium" style={selectStyle} value={filterMajor} onChange={(e) => { setFilterMajor(e.target.value); setFilterModule(''); }}>
-              <option value="" disabled>-- Choisir la filière --</option>
+          <div style={filterGroupStyle}>
+            <label style={labelStyle}>Filière</label>
+            <select className="input-premium" value={filterMajor} onChange={(e) => { setFilterMajor(e.target.value); setFilterModule(''); }}>
+              <option value="" disabled>-- Choisir filière --</option>
               {availableMajors.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lbl}>Année</label>
-            <select className="input-premium" style={selectStyle} value={filterYear} onChange={(e) => { setFilterYear(e.target.value); setFilterModule(''); }}>
-              <option value="" disabled>-- Choisir l'année --</option>
+          <div style={filterGroupStyle}>
+            <label style={labelStyle}>Année</label>
+            <select className="input-premium" value={filterYear} onChange={(e) => { setFilterYear(e.target.value); setFilterModule(''); }}>
+              <option value="" disabled>-- Année --</option>
               <option value="1ère année">1ère année</option>
               <option value="2ème année">2ème année</option>
             </select>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lbl}>Module</label>
-            <select className="input-premium" style={selectStyle} value={filterModule} onChange={(e) => setFilterModule(e.target.value)}>
-              <option value="">(Sélectionnez un module)</option>
+          <div style={filterGroupStyle}>
+            <label style={labelStyle}>Module</label>
+            <select className="input-premium" value={filterModule} onChange={(e) => setFilterModule(e.target.value)}>
+              <option value="">(Module requis)</option>
               {availableModules.map(m => <option key={m} value={m}>{m}</option>)}
-              {availableModules.length === 0 && <option value="global">Global / Toute la journée</option>}
+              {availableModules.length === 0 && <option value="global">Général</option>}
             </select>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lbl}>Recherche</label>
-            <div style={{ position: 'relative' }}>
-               <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', fontSize: '12px' }}></i>
-               <input type="text" className="input-premium" style={{ width: '100%', paddingLeft: '30px' }} placeholder="Nom ou prénom..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
-          </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Stats Summary */}
       {filteredStudents.length > 0 && filterModule && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
           <MiniStat label="Effectif" value={stats.total} />
           <MiniStat label="Présents" value={stats.presents} />
           <MiniStat label="Absents" value={stats.absents} />
-          <MiniStat label="Retards" value={stats.retards} />
-          <MiniStat label="Taux Présence" value={stats.total > 0 ? `${Math.round((stats.presents / stats.total) * 100)}%` : '—'} />
+          <MiniStat label="Taux" value={stats.total > 0 ? `${Math.round((stats.presents / stats.total) * 100)}%` : '—'} />
         </motion.div>
       )}
 
-      {/* Table */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-        {(!filterDiploma || !filterMajor || !filterYear) ? (
-          <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-            <i className="fa-solid fa-filter" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
-            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Veuillez sélectionner le niveau, la filière et l'année pour afficher les stagiaires.</p>
-          </div>
-        ) : filteredStudents.length === 0 ? (
-          <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-            <i className="fa-solid fa-users" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
-            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Aucun stagiaire trouvé.</p>
-          </div>
-        ) : !filterModule ? (
-          <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-            <i className="fa-solid fa-hand-pointer" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
-            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Veuillez sélectionner un module pour afficher la liste d'appel.</p>
-          </div>
-        ) : (
-          <div style={{ background: 'white', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: 'var(--shadow-xs)' }}>
+      {/* Main Table Area */}
+      <div className="glass-card" style={{ overflow: 'hidden' }}>
+        {loading ? <TableSkeleton rows={10} /> : (
+          !filterDiploma || !filterMajor || !filterYear ? (
+            <EmptyState title="Filtres requis" message="Sélectionnez le niveau, la filière et l'année pour voir les stagiaires." icon="filter" />
+          ) : !filterModule ? (
+            <EmptyState title="Module manquant" message="Veuillez sélectionner un module pour lancer l'appel." icon="mouse-pointer" />
+          ) : filteredStudents.length === 0 ? (
+            <EmptyState title="Aucun cours aujourd'hui" message={`Aucun cours n'est programmé le ${dayOfWeek} pour ce groupe.`} icon="calendar" />
+          ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '700px' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '750px' }}>
                 <thead>
-                  <tr>
-                    <th style={{ ...thStyle, width: '40px', textAlign: 'center' }}>#</th>
+                  <tr style={{ background: 'var(--bg-subtle)' }}>
+                    <th style={{ ...thStyle, textAlign: 'center', width: '60px' }}>#</th>
                     <th style={thStyle}>Stagiaire</th>
-                    <th style={thStyle}>Filière</th>
-                    <th style={{ ...thStyle, textAlign: 'center', width: '220px' }}>Statut</th>
-                    <th style={thStyle}>Motif / Commentaire</th>
+                    <th style={{ ...thStyle, textAlign: 'center', width: '260px' }}>Pointage</th>
+                    <th style={thStyle}>Commentaire / Motif</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -230,54 +208,58 @@ const StudentAttendance = () => {
                     const comment = record?.comment || '';
 
                     return (
-                      <motion.tr key={student.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                        style={{ background: idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.5)' }}>
+                      <tr key={student.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-faint)' }}>{idx + 1}</span>
+                          <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-faint)' }}>{idx + 1}</span>
                         </td>
                         <td style={tdStyle}>
-                          <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{student.lastName} {student.firstName}</p>
-                          <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Matricule: {student.regNo}</p>
-                        </td>
-                        <td style={tdStyle}>
-                          <span style={{ fontSize: '11px', fontWeight: '500', color: 'var(--text-secondary)' }}>{student.major}</span>
+                          <p style={{ fontSize: 'var(--text-sm)', fontWeight: '700', color: 'var(--text-primary)' }}>{student.lastName} {student.firstName}</p>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Matricule: {student.regNo}</p>
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
-                            <button onClick={() => handleStatusChange(student.id, 'present')}
-                              style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
-                                background: status === 'present' ? '#16a34a' : 'transparent', color: status === 'present' ? 'white' : 'var(--text-muted)' }}>
-                              Présent
-                            </button>
-                            <button onClick={() => handleStatusChange(student.id, 'absent')}
-                              style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
-                                background: status === 'absent' ? '#dc2626' : 'transparent', color: status === 'absent' ? 'white' : 'var(--text-muted)' }}>
-                              Absent
-                            </button>
-                            <button onClick={() => handleStatusChange(student.id, 'retard')}
-                              style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
-                                background: status === 'retard' ? '#d97706' : 'transparent', color: status === 'retard' ? 'white' : 'var(--text-muted)' }}>
-                              Retard
-                            </button>
+                          <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '4px' }}>
+                            <StatusBtn active={status === 'present'} color="var(--success)" onClick={() => handleStatusChange(student.id, 'present')}>Présent</StatusBtn>
+                            <StatusBtn active={status === 'absent'} color="var(--danger)" onClick={() => handleStatusChange(student.id, 'absent')}>Absent</StatusBtn>
+                            <StatusBtn active={status === 'retard'} color="var(--warning)" onClick={() => handleStatusChange(student.id, 'retard')}>Retard</StatusBtn>
                           </div>
                         </td>
                         <td style={tdStyle}>
-                          <input type="text" className="input-premium" placeholder="Optionnel..." 
-                            style={{ width: '100%', fontSize: '12px', padding: '6px 10px', background: 'transparent' }}
-                            value={comment}
-                            onChange={(e) => handleCommentChange(student.id, e.target.value)} />
+                          <input type="text" className="input-premium" placeholder="Note d'absence..." 
+                            style={{ width: '100%', fontSize: '12px', background: 'transparent', border: '1px solid transparent' }}
+                            value={comment} onChange={(e) => handleCommentChange(student.id, e.target.value)} />
                         </td>
-                      </motion.tr>
+                      </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-          </div>
+          )
         )}
-      </motion.div>
+      </div>
     </div>
   );
 };
+
+const StatusBtn = ({ active, color, children, onClick }) => (
+  <button onClick={onClick}
+    style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-lg)', fontSize: '11px', fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s',
+      background: active ? color : 'transparent', color: active ? 'white' : 'var(--text-muted)' }}>
+    {children}
+  </button>
+);
+
+const MiniStat = ({ label, value }) => (
+  <div style={{ padding: '12px 20px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', minWidth: '100px', textAlign: 'center' }}>
+    <p style={{ fontSize: 'var(--text-xl)', fontWeight: '900', lineHeight: 1 }}>{value}</p>
+    <p style={{ fontSize: '9px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '4px' }}>{label}</p>
+  </div>
+);
+
+const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', display: 'block' };
+const filterGroupStyle = { display: 'flex', flexDirection: 'column' };
+const filterIconStyle = { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' };
+const thStyle = { padding: '16px', fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' };
+const tdStyle = { padding: '16px' };
 
 export default StudentAttendance;

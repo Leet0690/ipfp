@@ -2,19 +2,23 @@ import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { MODULES_DATA } from '../data/modules';
+import { TableSkeleton } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
+import { 
+  Users, 
+  Calendar, 
+  Search, 
+  Download, 
+  Clock, 
+  UserCheck, 
+  X, 
+  CheckCircle2, 
+  XCircle, 
+  AlertCircle,
+  FileSpreadsheet,
+  GraduationCap
+} from 'lucide-react';
 
-const thStyle = { padding: '10px 12px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-subtle)', whiteSpace: 'nowrap' };
-const tdStyle = { padding: '10px 12px', borderBottom: '1px solid var(--border-light)' };
-const lbl = { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' };
-
-const MiniStat = ({ label, value }) => (
-  <div style={{ textAlign: 'center', padding: '10px 14px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-lg)' }}>
-    <p style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>{value}</p>
-    <p style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '4px' }}>{label}</p>
-  </div>
-);
-
-// Calculate duration in hours from a time range string like "08:00-11:30" or "08h30-11h30"
 const calcDuration = (timeStr) => {
   if (!timeStr) return 0;
   const match = timeStr.match(/(\d{1,2})[h:]?(\d{2})?\s*[-–—]\s*(\d{1,2})[h:]?(\d{2})?/i);
@@ -26,17 +30,14 @@ const calcDuration = (timeStr) => {
     const m2 = parseInt(match[4] || 0, 10);
     const diffMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
     return Math.max(0, Math.round((diffMinutes / 60) * 100) / 100);
-  } catch {
-    return 0;
-  }
+  } catch { return 0; }
 };
 
-// Format hours for display
 const formatHours = (h) => {
   if (!h || h === 0) return '0h';
   const hrs = Math.floor(h);
   const mins = Math.round((h - hrs) * 60);
-  return mins > 0 ? `${hrs}h${mins}min` : `${hrs}h`;
+  return mins > 0 ? `${hrs}h${mins}m` : `${hrs}h`;
 };
 
 const getGroupAbbreviation = (filiere, annee) => {
@@ -58,7 +59,7 @@ const getGroupAbbreviation = (filiere, annee) => {
 };
 
 const TeacherAttendance = () => {
-  const { teachers, teacherAttendance, updateTeacherAttendance, addNotification, schedules } = useApp();
+  const { teachers, teacherAttendance, updateTeacherAttendance, addNotification, schedules, loading } = useApp();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -67,10 +68,9 @@ const TeacherAttendance = () => {
     return days[new Date(selectedDate).getDay()];
   }, [selectedDate]);
 
-  // Build a flat list of rows: one per unique (teacher × time) for this day
   const sessionRows = useMemo(() => {
     const todaySessions = (schedules || []).filter(s => s.day === dayOfWeek);
-    const slotsMap = new Map(); // teacherId_normalizedTime -> row object
+    const slotsMap = new Map();
     
     todaySessions.forEach(session => {
       const teacher = (teachers || []).find(t => t.id === session.teacherId);
@@ -79,18 +79,14 @@ const TeacherAttendance = () => {
       const normalizedTime = (session.time || '').replace(/[^0-9]/g, '');
       const safeTeacherName = (teacher.name || 'inconnu').toLowerCase().trim();
       const slotKey = `${safeTeacherName}_${normalizedTime}`;
-      
       const abbr = getGroupAbbreviation(session.filiere, session.annee);
 
       if (slotsMap.has(slotKey)) {
         const existingRow = slotsMap.get(slotKey);
-        if (!existingRow.groups.includes(abbr)) {
-          existingRow.groups.push(abbr);
-        }
+        if (!existingRow.groups.includes(abbr)) existingRow.groups.push(abbr);
         return;
       }
       
-      // Search filter
       if (searchTerm && !teacher.name.toLowerCase().includes(searchTerm.toLowerCase())) return;
 
       const duration = calcDuration(session.time);
@@ -100,43 +96,26 @@ const TeacherAttendance = () => {
       
       slotsMap.set(slotKey, {
         key: slotKey,
-        session,
-        teacher,
-        duration,
-        docId,
-        module: session.module,
-        time: session.time,
-        groups: [abbr],
+        session, teacher, duration, docId,
+        module: session.module, time: session.time, groups: [abbr],
       });
     });
 
     const rows = Array.from(slotsMap.values());
-
-    // Sort by teacher name, then by time
-    rows.sort((a, b) => {
-      const nameComp = (a.teacher.name || '').localeCompare(b.teacher.name || '');
-      if (nameComp !== 0) return nameComp;
-      return (a.time || '').localeCompare(b.time || '');
-    });
-
+    rows.sort((a, b) => (a.teacher.name || '').localeCompare(b.teacher.name || '') || (a.time || '').localeCompare(b.time || ''));
     return rows;
   }, [schedules, teachers, dayOfWeek, searchTerm, selectedDate]);
 
-  // Statistics
   const stats = useMemo(() => {
-    let presents = 0, absents = 0, totalHours = 0, total = sessionRows.length;
+    let presents = 0, absents = 0, totalHours = 0;
     sessionRows.forEach(row => {
       const record = teacherAttendance.find(a => a.id === row.docId);
       if (record) {
-        if (record.status === 'present') {
-          presents++;
-          totalHours += (record.hours || 0);
-        } else if (record.status === 'absent') {
-          absents++;
-        }
+        if (record.status === 'present') { presents++; totalHours += (record.hours || 0); }
+        else if (record.status === 'absent') { absents++; }
       }
     });
-    return { presents, absents, totalHours, total };
+    return { presents, absents, totalHours, total: sessionRows.length };
   }, [sessionRows, teacherAttendance]);
 
   const handleStatusChange = async (row, status) => {
@@ -144,7 +123,6 @@ const TeacherAttendance = () => {
       const hours = status === 'present' ? row.duration : 0;
       await updateTeacherAttendance(row.teacher.id, selectedDate, status, '', hours, row.module, row.time);
     } catch (error) {
-      console.error(error);
       addNotification("Erreur lors de l'enregistrement.");
     }
   };
@@ -154,96 +132,87 @@ const TeacherAttendance = () => {
       const record = teacherAttendance.find(a => a.id === row.docId);
       const status = record?.status || 'present';
       await updateTeacherAttendance(row.teacher.id, selectedDate, status, record?.comment || '', hours, row.module, row.time);
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   const exportCSV = () => {
-    if (!sessionRows.length) return alert('Aucune donnée à exporter.');
-    const headers = "\uFEFFFormateur,Module,Horaire,Filière,Année,Date,Statut,Heures\n";
+    if (!sessionRows.length) return alert('Aucune donnée.');
+    const headers = "\uFEFFFormateur,Module,Horaire,Groupes,Date,Statut,Heures\n";
     const rows = sessionRows.map(row => {
       const r = teacherAttendance.find(a => a.id === row.docId) || {};
       const hours = r.status === 'present' ? (r.hours || 0) : 0;
-      return `"${row.teacher.name}","${row.module}","${row.time}","${row.filiere}","${row.annee}","${selectedDate}","${r.status || 'non défini'}","${hours}"`;
+      return `"${row.teacher.name}","${row.module}","${row.time}","${row.groups.join(', ')}","${selectedDate}","${r.status || 'non défini'}","${hours}"`;
     }).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `Présences_Formateurs_${selectedDate}.csv`);
+    link.setAttribute('download', `Presences_Formateurs_${selectedDate}.csv`);
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
   return (
     <div className="max-w-container section-padding">
-      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '6px' }}>
-            Présences Formateurs
+          <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <UserCheck size={28} style={{ color: 'var(--primary)' }} /> Présences Formateurs
           </h1>
-          <p style={{ color: 'var(--text-tertiary)', fontSize: '15px', marginBottom: '28px' }}>
-            Suivi journalier par séance — chaque module est suivi indépendamment.
-          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Suivi des vacations et pointage des séances de cours.</p>
         </div>
-        <button onClick={exportCSV} className="btn-modern secondary" style={{ padding: '8px 16px', fontSize: '12px' }}>
-          <i className="fa-solid fa-file-csv" style={{ marginRight: '6px' }}></i> Exporter (CSV)
+        <button onClick={exportCSV} className="btn-modern secondary">
+          <FileSpreadsheet size={16} style={{ marginRight: '8px' }} /> Exporter (CSV)
         </button>
-      </motion.div>
+      </div>
 
       {/* Filters */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lbl}>Date d'appel</label>
-            <input type="date" className="input-premium" style={{ width: '100%', padding: '7px 12px', fontSize: '13px', cursor: 'pointer' }}
-              value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lbl}>Jour</label>
-            <div className="input-premium" style={{ padding: '7px 12px', fontSize: '13px', background: 'var(--bg-subtle)', fontWeight: '700', color: 'var(--primary)' }}>
-              {dayOfWeek}
+      <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)' }}>
+          <div style={fGroup}>
+            <label style={labelStyle}>Date d'appel</label>
+            <div style={{ position: 'relative' }}>
+              <Calendar size={14} style={fIcon} />
+              <input type="date" className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={lbl}>Recherche</label>
+          <div style={fGroup}>
+            <label style={labelStyle}>Jour de semaine</label>
+            <div className="input-premium" style={{ background: 'var(--bg-subtle)', fontWeight: '800', color: 'var(--primary)', textAlign: 'center' }}>{dayOfWeek}</div>
+          </div>
+          <div style={fGroup}>
+            <label style={labelStyle}>Recherche Formateur</label>
             <div style={{ position: 'relative' }}>
-               <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', fontSize: '12px' }}></i>
-               <input type="text" className="input-premium" style={{ width: '100%', paddingLeft: '30px' }} placeholder="Nom du formateur..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Search size={14} style={fIcon} />
+              <input type="text" className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} placeholder="Nom..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Stats Summary */}
       {sessionRows.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
           <MiniStat label="Séances" value={stats.total} />
           <MiniStat label="Présents" value={stats.presents} />
-          <MiniStat label="Absents" value={stats.absents} />
           <MiniStat label="Total Heures" value={formatHours(stats.totalHours)} />
-          <MiniStat label="Taux Présence" value={stats.total > 0 ? `${Math.round((stats.presents / stats.total) * 100)}%` : '—'} />
+          <MiniStat label="Taux" value={stats.total > 0 ? `${Math.round((stats.presents / stats.total) * 100)}%` : '—'} />
         </motion.div>
       )}
 
-      {/* Table */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-        {sessionRows.length === 0 ? (
-          <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-            <i className="fa-solid fa-chalkboard-user" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
-            <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Aucune séance planifiée pour {dayOfWeek}.</p>
-          </div>
-        ) : (
-          <div style={{ background: 'white', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: 'var(--shadow-xs)' }}>
+      {/* Main Area */}
+      <div className="glass-card" style={{ overflow: 'hidden' }}>
+        {loading ? <TableSkeleton rows={8} /> : (
+          sessionRows.length === 0 ? (
+            <EmptyState title="Aucune séance" message={`Aucun cours n'est programmé dans l'emploi du temps pour ce ${dayOfWeek}.`} icon="calendar" />
+          ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '700px' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '850px' }}>
                 <thead>
-                  <tr>
-                    <th style={{ ...thStyle, width: '40px', textAlign: 'center' }}>#</th>
+                  <tr style={{ background: 'var(--bg-subtle)' }}>
+                    <th style={{ ...thStyle, width: '50px', textAlign: 'center' }}>#</th>
                     <th style={thStyle}>Formateur</th>
-                    <th style={thStyle}>Module</th>
-                    <th style={thStyle}>Horaire</th>
-                    <th style={thStyle}>Groupe</th>
-                    <th style={{ ...thStyle, textAlign: 'center', width: '90px' }}>Durée</th>
-                    <th style={{ ...thStyle, textAlign: 'center', width: '150px' }}>Statut</th>
+                    <th style={thStyle}>Module & Horaire</th>
+                    <th style={thStyle}>Groupes</th>
+                    <th style={{ ...thStyle, textAlign: 'center', width: '100px' }}>Heures</th>
+                    <th style={{ ...thStyle, textAlign: 'center', width: '220px' }}>Statut</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -252,71 +221,68 @@ const TeacherAttendance = () => {
                     const status = record?.status || '';
 
                     return (
-                      <motion.tr key={row.key} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                        style={{ background: idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.5)' }}>
+                      <tr key={row.key} style={{ borderBottom: '1px solid var(--border-light)' }}>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-faint)' }}>{idx + 1}</span>
+                          <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-faint)' }}>{idx + 1}</span>
                         </td>
+                        <td style={tdStyle}><span style={{ fontWeight: '700' }}>{row.teacher.name}</span></td>
                         <td style={tdStyle}>
-                          <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{row.teacher.name}</p>
-                        </td>
-                        <td style={tdStyle}>
-                          <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{row.module}</p>
-                        </td>
-                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
-                          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '3px 8px', borderRadius: 'var(--radius-sm)' }}>
-                            <i className="fa-regular fa-clock" style={{ marginRight: '4px', fontSize: '10px' }}></i>
-                            {row.time?.replace(/\s/g, '').replace(/h/gi, ':')}
-                          </span>
-                        </td>
-                        <td style={tdStyle}>
-                          <span style={{ fontSize: '11px', fontWeight: '500', color: 'var(--text-secondary)' }}>
-                            {row.groups.join(', ')}
-                          </span>
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <input 
-                            type="number" 
-                            min="0" max="12" step="0.5" 
-                            className="input-premium"
-                            style={{ width: '60px', textAlign: 'center', fontSize: '12px', fontWeight: '800', padding: '4px', margin: '0 auto', display: 'block' }}
-                            value={record?.hours !== undefined ? record.hours : row.duration}
-                            onChange={(e) => handleHoursChange(row, parseFloat(e.target.value) || 0)}
-                          />
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', padding: '3px', gap: '2px' }}>
-                            <button onClick={() => handleStatusChange(row, 'present')}
-                              style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
-                                background: status === 'present' ? '#16a34a' : 'transparent', color: status === 'present' ? 'white' : 'var(--text-muted)' }}>
-                              Présent
-                            </button>
-                            <button onClick={() => handleStatusChange(row, 'absent')}
-                              style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
-                                background: status === 'absent' ? '#dc2626' : 'transparent', color: status === 'absent' ? 'white' : 'var(--text-muted)' }}>
-                              Absent
-                            </button>
-                            {status && (
-                              <button onClick={() => handleStatusChange(row, '')}
-                                title="Réinitialiser"
-                                style={{ padding: '6px 8px', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
-                                  background: 'transparent', color: 'var(--text-faint)' }}>
-                                <i className="fa-solid fa-xmark"></i>
-                              </button>
-                            )}
+                          <p style={{ fontSize: 'var(--text-sm)', fontWeight: '700' }}>{row.module}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', marginTop: '2px' }}>
+                            <Clock size={10} />
+                            <span style={{ fontSize: '11px', fontWeight: '800' }}>{row.time}</span>
                           </div>
                         </td>
-                      </motion.tr>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            {row.groups.map(g => <span key={g} className="badge-status primary" style={{ fontSize: '9px', padding: '2px 6px' }}>{g}</span>)}
+                          </div>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          <input type="number" step="0.5" className="input-premium" 
+                            style={{ width: '64px', textAlign: 'center', padding: '4px', fontSize: '12px', fontWeight: '900' }}
+                            value={record?.hours !== undefined ? record.hours : row.duration}
+                            onChange={(e) => handleHoursChange(row, parseFloat(e.target.value) || 0)} />
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '4px', gap: '2px' }}>
+                            <StatusBtn active={status === 'present'} color="var(--success)" onClick={() => handleStatusChange(row, 'present')}>Présent</StatusBtn>
+                            <StatusBtn active={status === 'absent'} color="var(--danger)" onClick={() => handleStatusChange(row, 'absent')}>Absent</StatusBtn>
+                            {status && <button onClick={() => handleStatusChange(row, '')} className="action-btn" style={{ padding: '0 8px' }}><X size={14} /></button>}
+                          </div>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-          </div>
+          )
         )}
-      </motion.div>
+      </div>
     </div>
   );
 };
+
+const StatusBtn = ({ active, color, children, onClick }) => (
+  <button onClick={onClick}
+    style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-lg)', fontSize: '11px', fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s',
+      background: active ? color : 'transparent', color: active ? 'white' : 'var(--text-muted)' }}>
+    {children}
+  </button>
+);
+
+const MiniStat = ({ label, value }) => (
+  <div style={{ padding: '12px 20px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', minWidth: '100px', textAlign: 'center' }}>
+    <p style={{ fontSize: 'var(--text-xl)', fontWeight: '900', lineHeight: 1 }}>{value}</p>
+    <p style={{ fontSize: '9px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '4px' }}>{label}</p>
+  </div>
+);
+
+const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', display: 'block' };
+const fGroup = { display: 'flex', flexDirection: 'column' };
+const fIcon = { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' };
+const thStyle = { padding: '16px', fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' };
+const tdStyle = { padding: '16px' };
 
 export default TeacherAttendance;

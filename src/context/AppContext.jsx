@@ -15,10 +15,36 @@ import {
   limit
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import ConfirmModal from '../components/ConfirmModal';
 
 const AppContext = createContext();
 
 export const useApp = () => useContext(AppContext);
+
+// ──────────────────────────────────────────────────────────
+// Cache sessionStorage (TTL 5 min)
+// ──────────────────────────────────────────────────────────
+const CACHE_KEY = 'ipfp_v1_cache';
+const CACHE_TTL = 5 * 60 * 1000;
+const readCache = () => {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.ts > CACHE_TTL) return null;
+    return parsed.data;
+  } catch { return null; }
+};
+const writeCache = (data) => {
+  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch (e) { }
+};
+const invalidateCache = () => sessionStorage.removeItem(CACHE_KEY);
+
+const getRecentDateBound = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 60);
+  return d.toISOString().split('T')[0];
+};
 
 export const AppProvider = ({ children }) => {
   const [students, setStudents] = useState([]);
@@ -32,6 +58,33 @@ export const AppProvider = ({ children }) => {
   const [salaries, setSalaries] = useState([]);
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Modal de confirmation global
+  const [confirmState, setConfirmState] = useState({ 
+    isOpen: false, title: '', message: '', type: 'danger', resolve: null 
+  });
+
+  const confirmAction = (options) => {
+    return new Promise((resolve) => {
+      setConfirmState({
+        isOpen: true,
+        title: options.title || 'Confirmation',
+        message: options.message || 'Êtes-vous sûr de vouloir continuer ?',
+        type: options.type || 'danger',
+        resolve
+      });
+    });
+  };
+
+  const handleConfirm = () => {
+    if (confirmState.resolve) confirmState.resolve(true);
+    setConfirmState(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleCancel = () => {
+    if (confirmState.resolve) confirmState.resolve(false);
+    setConfirmState(prev => ({ ...prev, isOpen: false }));
+  };
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('eco_auth') === 'true';
@@ -56,15 +109,33 @@ export const AppProvider = ({ children }) => {
         const isStudentPortal = path.startsWith('/results/');
 
         if (isAuthenticated || isDirectorAuth) {
-          // 1. Espace Admin: Chargement unique complet
+          // 1. Tentative de restauration depuis le cache local (0 lecture Firestore)
+          const cached = readCache();
+          if (cached && isMounted && cached.students && cached.students.length > 0) {
+            setStudents(cached.students);
+            setTeachers(cached.teachers);
+            setGrades(cached.grades);
+            setSchedules(cached.schedules);
+            setModules(cached.modules);
+            setStudentAttendance(cached.studentAttendance);
+            setTeacherAttendance(cached.teacherAttendance);
+            setNotifications(cached.notifications);
+            setPayments(cached.payments);
+            setSalaries(cached.salaries);
+            setLoading(false);
+            return;
+          }
+
+          // 2. Sinon : Chargement complet depuis Firestore
+          const dateBound = getRecentDateBound();
           const [stuSnap, teaSnap, graSnap, schSnap, modSnap, attStuSnap, attTeaSnap, notSnap, paySnap, salSnap] = await Promise.all([
             getDocs(query(collection(db, 'students'), orderBy('createdAt', 'desc'))),
             getDocs(query(collection(db, 'teachers'), orderBy('createdAt', 'desc'))),
             getDocs(collection(db, 'grades')),
             getDocs(collection(db, 'schedules')),
             getDocs(query(collection(db, 'modules'), orderBy('name', 'asc'))),
-            getDocs(collection(db, 'attendance_stagiaires')),
-            getDocs(collection(db, 'attendance_formateurs')),
+            getDocs(query(collection(db, 'attendance_stagiaires'), where('date', '>=', dateBound))),
+            getDocs(query(collection(db, 'attendance_formateurs'), where('date', '>=', dateBound))),
             getDocs(query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(100))),
             getDocs(query(collection(db, 'payments'), orderBy('createdAt', 'desc'), limit(100))),
             getDocs(query(collection(db, 'salaries'), orderBy('createdAt', 'desc'), limit(100)))
@@ -72,17 +143,35 @@ export const AppProvider = ({ children }) => {
           
           if (!isMounted) return;
           
-          setStudents(stuSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-          setTeachers(teaSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          const studentsData = stuSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const teachersData = teaSnap.docs.map(d => ({ id: d.id, ...d.data() }));
           const gradesData = {}; graSnap.docs.forEach(d => { gradesData[d.id] = d.data(); });
+          const schedulesData = schSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const modulesData = modSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const attStuData = attStuSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const attTeaData = attTeaSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const notData = notSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const payData = paySnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const salData = salSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+          setStudents(studentsData);
+          setTeachers(teachersData);
           setGrades(gradesData);
-          setSchedules(schSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-          setModules(modSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-          setStudentAttendance(attStuSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-          setTeacherAttendance(attTeaSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-          setNotifications(notSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-          setPayments(paySnap.docs.map(d => ({ id: d.id, ...d.data() })));
-          setSalaries(salSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          setSchedules(schedulesData);
+          setModules(modulesData);
+          setStudentAttendance(attStuData);
+          setTeacherAttendance(attTeaData);
+          setNotifications(notData);
+          setPayments(payData);
+          setSalaries(salData);
+
+          // Sauvegarde dans le cache pour le prochain refresh
+          writeCache({
+            students: studentsData, teachers: teachersData, grades: gradesData, 
+            schedules: schedulesData, modules: modulesData, 
+            studentAttendance: attStuData, teacherAttendance: attTeaData,
+            notifications: notData, payments: payData, salaries: salData
+          });
 
         } else if (isStudentPortal) {
           // 2. Portail Stagiaire: Chargement EXCLUSIF des données de ce stagiaire
@@ -184,6 +273,21 @@ export const AppProvider = ({ children }) => {
     loadData();
 
     return () => { isMounted = false; };
+  }, [isAuthenticated, isDirectorAuth]);
+
+  // Sync cache on mutations
+  useEffect(() => {
+    if (loading || !(isAuthenticated || isDirectorAuth)) return;
+    writeCache({
+      students, teachers, grades, schedules, modules,
+      studentAttendance, teacherAttendance,
+      notifications, payments, salaries
+    });
+  }, [students, teachers, grades, schedules, modules, studentAttendance, teacherAttendance, notifications, payments, salaries, loading, isAuthenticated, isDirectorAuth]);
+
+  // Clear cache on logout
+  useEffect(() => {
+    if (!isAuthenticated && !isDirectorAuth) invalidateCache();
   }, [isAuthenticated, isDirectorAuth]);
 
   useEffect(() => {
@@ -447,9 +551,18 @@ export const AppProvider = ({ children }) => {
       studentAttendance, teacherAttendance, updateStudentAttendance, updateTeacherAttendance, loadAttendanceForSession,
       schedules, addSchedule, deleteSchedule, clearAllSchedules, migrateTeacherTokens,
       payments, salaries, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary,
-      modules, addModule, updateModule, deleteModule
+      modules, addModule, updateModule, deleteModule,
+      confirmAction
     }}>
       {children}
+      <ConfirmModal 
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </AppContext.Provider>
   );
 };

@@ -2,9 +2,25 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { MODULES_DATA } from '../data/modules';
+import { TableSkeleton } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
+import { 
+  Plus, 
+  Filter, 
+  BookOpen, 
+  Edit3, 
+  Trash2, 
+  ChevronLeft, 
+  ChevronRight, 
+  Layers, 
+  Search,
+  Book,
+  MoreVertical,
+  X
+} from 'lucide-react';
 
 const ModuleManagement = () => {
-  const { modules, addModule, updateModule, deleteModule, addNotification } = useApp();
+  const { modules, addModule, updateModule, deleteModule, loading, confirmAction } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
@@ -50,7 +66,6 @@ const ModuleManagement = () => {
         };
       }
       
-      // Professional formatting: TS + DI + 1 = TSDI1
       const dipPrefix = m.diploma === 'Technicien Spécialisé' ? 'TS' : (m.diploma === 'Technicien' ? 'T' : 'Q');
       let majorCode = '';
       if (m.major.toLowerCase().includes('développement')) majorCode = 'DI';
@@ -85,7 +100,6 @@ const ModuleManagement = () => {
     try {
       const trimmedName = formData.name.trim();
       if (isEditing) {
-        // Update all modules in the group
         for (const id of selectedIds) {
           await updateModule(id, { ...formData, name: trimmedName, coefficient: parseFloat(formData.coefficient) });
         }
@@ -127,29 +141,35 @@ const ModuleManagement = () => {
   };
 
   const handleDelete = async (group) => {
-    if (window.confirm(`Supprimer le module "${group.name}" pour toutes les classes associées ?`)) {
+    if (await confirmAction({
+      title: "Supprimer le module ?",
+      message: `Voulez-vous supprimer le module "${group.name}" pour toutes les classes associées ? Cette action est irréversible.`,
+      type: "danger"
+    })) {
       for (const id of group.ids) {
         await deleteModule(id);
       }
     }
   };
 
+  const isFiltersSelected = filterYear && filterDiploma && filterMajor && filterSemester;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: '900', color: 'var(--text-primary)' }}>Gestion des Modules</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Configurez les matières et leurs coefficients pour chaque filière.</p>
+          <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)' }}>Gestion des Modules</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Configurez les matières et leurs coefficients pour chaque filière.</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
           <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="btn-modern primary">
-            <i className="fa-solid fa-plus" style={{ marginRight: '8px' }}></i> Ajouter Module
+            <Plus size={16} style={{ marginRight: 'var(--space-2)' }} /> Ajouter Module
           </button>
         </div>
       </header>
 
       {/* --- Filters --- */}
-      <div className="glass-card" style={{ padding: '20px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+      <div className="glass-card" style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
         <select className="input-premium" style={{ flex: 1 }} value={filterYear} onChange={e => { setFilterYear(e.target.value); setPage(1); }}>
           <option value="" disabled>-- Choisir l'année --</option>
           <option value="1ère année">1ère année</option>
@@ -170,101 +190,116 @@ const ModuleManagement = () => {
         </select>
       </div>
 
-      {/* --- Modules Table --- */}
-      {(!filterYear || !filterDiploma || !filterMajor || !filterSemester) ? (
-        <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-          <i className="fa-solid fa-filter" style={{ fontSize: '36px', color: 'var(--border)', display: 'block', marginBottom: '12px' }}></i>
-          <p style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '14px' }}>Veuillez sélectionner l'année, le niveau, la filière et le semestre pour afficher la liste des modules.</p>
+      {/* --- Content Area --- */}
+      {loading ? (
+        <div className="glass-card" style={{ padding: 'var(--space-4)' }}>
+          <TableSkeleton rows={10} />
         </div>
+      ) : !isFiltersSelected ? (
+        <EmptyState 
+          title="Filtres requis" 
+          message="Veuillez sélectionner l'année, le niveau, la filière et le semestre pour afficher les modules." 
+          icon="filter" 
+        />
       ) : (
-      <div className="glass-card" style={{ overflow: 'hidden' }}>
-        <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-light)' }}>
-              <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)' }}>Nom du Module</th>
-              <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)' }}>Niveau</th>
-              <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', textAlign: 'center' }}>Sem.</th>
-              <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)' }}>Classes</th>
-              <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', textAlign: 'center' }}>Coeff.</th>
-              <th style={{ padding: '16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedModules.length === 0 ? (
-              <tr>
-                <td colSpan="6" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Aucun module trouvé.</td>
+        <div className="glass-card" style={{ overflow: 'hidden' }}>
+          <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-light)' }}>
+                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Module</th>
+                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Niveau</th>
+                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Sem.</th>
+                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Classes</th>
+                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Coeff.</th>
+                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
               </tr>
-            ) : paginatedModules.map((m, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <td style={{ padding: '16px' }}>
-                  <p style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '14px' }}>{m.name}</p>
-                </td>
-                <td style={{ padding: '16px' }}>
-                  <p style={{ fontSize: '12px', fontWeight: '600' }}>{m.diploma}</p>
-                </td>
-                <td style={{ padding: '16px', textAlign: 'center' }}>
-                  <span style={{ fontWeight: '700', color: 'var(--primary)', fontSize: '12px' }}>{m.semester || 'S1'}</span>
-                </td>
-                <td style={{ padding: '16px' }}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {m.allClasses.map((c, i) => (
-                      <span key={i} style={{ padding: '2px 8px', background: 'var(--bg-subtle)', borderRadius: '6px', fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)' }}>
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td style={{ padding: '16px', textAlign: 'center' }}>
-                  <span style={{ padding: '4px 10px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', borderRadius: '8px', fontWeight: '800', fontSize: '12px' }}>
-                    {m.coefficient}
-                  </span>
-                </td>
-                <td style={{ padding: '16px', textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button onClick={() => handleEdit(m)} className="btn-modern" style={{ padding: '6px', minWidth: '32px' }}><i className="fa-solid fa-pen-to-square"></i></button>
-                    <button onClick={() => handleDelete(m)} className="btn-modern" style={{ padding: '6px', minWidth: '32px', color: '#ef4444' }}><i className="fa-solid fa-trash"></i></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '16px 0', borderTop: '1px solid var(--border-light)' }}>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-modern" style={{ padding: '6px 12px', fontSize: '11px', opacity: page === 1 ? 0.5 : 1, cursor: page === 1 ? 'not-allowed' : 'pointer' }}>
-              <i className="fa-solid fa-chevron-left"></i> Précédent
-            </button>
-            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>
-              Page <span style={{ color: 'var(--text-primary)' }}>{page}</span> sur {totalPages}
-            </span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-modern" style={{ padding: '6px 12px', fontSize: '11px', opacity: page === totalPages ? 0.5 : 1, cursor: page === totalPages ? 'not-allowed' : 'pointer' }}>
-              Suivant <i className="fa-solid fa-chevron-right"></i>
-            </button>
-          </div>
-        )}
-      </div>
+            </thead>
+            <tbody>
+              {paginatedModules.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ padding: '0' }}>
+                    <EmptyState 
+                      title="Aucun module" 
+                      message="Aucun module n'est encore configuré pour cette sélection." 
+                      icon="book" 
+                    />
+                  </td>
+                </tr>
+              ) : paginatedModules.map((m, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  <td style={{ padding: '16px' }}>
+                    <p style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>{m.name}</p>
+                  </td>
+                  <td style={{ padding: '16px' }}>
+                    <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>{m.diploma}</p>
+                  </td>
+                  <td style={{ padding: '16px', textAlign: 'center' }}>
+                    <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '12px', background: 'var(--primary-ultra-light)', padding: '4px 8px', borderRadius: '6px' }}>{m.semester || 'S1'}</span>
+                  </td>
+                  <td style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {m.allClasses.map((c, i) => (
+                        <span key={i} style={{ padding: '2px 8px', background: 'var(--bg-subtle)', borderRadius: '6px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td style={{ padding: '16px', textAlign: 'center' }}>
+                    <span style={{ padding: '4px 10px', background: 'rgba(0,0,0,0.03)', color: 'var(--text-primary)', borderRadius: '8px', fontWeight: '800', fontSize: '12px' }}>
+                      {m.coefficient}
+                    </span>
+                  </td>
+                  <td style={{ padding: '16px', textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+                      <button onClick={() => handleEdit(m)} className="action-btn" title="Modifier"><Edit3 size={16} /></button>
+                      <button onClick={() => handleDelete(m)} className="action-btn delete" title="Supprimer"><Trash2 size={16} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '16px 0', borderTop: '1px solid var(--border-light)' }}>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-modern" style={{ opacity: page === 1 ? 0.5 : 1 }}>
+                <ChevronLeft size={16} />
+              </button>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>
+                Page <span style={{ color: 'var(--text-primary)' }}>{page}</span> / {totalPages}
+              </span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-modern" style={{ opacity: page === totalPages ? 0.5 : 1 }}>
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* --- Modal --- */}
       <AnimatePresence>
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }} />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="glass-premium" style={{ position: 'relative', width: '100%', maxWidth: '500px', padding: '32px', borderRadius: '24px', boxShadow: 'var(--shadow-xl)' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '900', marginBottom: '24px' }}>{isEditing ? 'Modifier Module' : 'Nouveau Module'}</h2>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(4px)' }} />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-premium" style={{ position: 'relative', width: '100%', maxWidth: '500px', padding: '32px', borderRadius: 'var(--radius-3xl)', boxShadow: 'var(--shadow-xl)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>{isEditing ? 'Modifier Module' : 'Nouveau Module'}</h2>
+                <button onClick={() => setIsModalOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+              </div>
+              
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Nom du Module</label>
-                  <input className="input-premium" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
+                  <label style={labelStyle}>Nom du Module</label>
+                  <input className="input-premium" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required placeholder="Ex: Algorithmique" />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Coefficient</label>
+                    <label style={labelStyle}>Coefficient</label>
                     <input className="input-premium" type="number" step="0.25" min="0.25" value={formData.coefficient} onChange={e => setFormData({...formData, coefficient: e.target.value})} required />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Semestre</label>
+                    <label style={labelStyle}>Semestre</label>
                     <select className="input-premium" value={formData.semester} onChange={e => setFormData({...formData, semester: e.target.value})}>
                       <option value="S1">S1</option>
                       <option value="S2">S2</option>
@@ -273,21 +308,21 @@ const ModuleManagement = () => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Année</label>
+                    <label style={labelStyle}>Année</label>
                     <select className="input-premium" value={formData.year} onChange={e => setFormData({...formData, year: e.target.value})}>
                       <option value="1ère année">1ère année</option>
                       <option value="2ème année">2ème année</option>
                     </select>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Niveau</label>
+                    <label style={labelStyle}>Niveau</label>
                     <select className="input-premium" value={formData.diploma} onChange={e => setFormData({...formData, diploma: e.target.value, major: Object.keys(MODULES_DATA[e.target.value] || {})[0] || ''})}>
                       {diplomas.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Filière</label>
+                  <label style={labelStyle}>Filière</label>
                   <select className="input-premium" value={formData.major} onChange={e => setFormData({...formData, major: e.target.value})}>
                     {Object.keys(MODULES_DATA[formData.diploma] || {}).map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
@@ -304,5 +339,7 @@ const ModuleManagement = () => {
     </div>
   );
 };
+
+const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' };
 
 export default ModuleManagement;
