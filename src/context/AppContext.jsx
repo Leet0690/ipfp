@@ -449,7 +449,7 @@ export const AppProvider = ({ children }) => {
       payments, salaries, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary,
       modules, addModule, updateModule, deleteModule
     }}>
-      {!loading && children}
+      {children}
     </AppContext.Provider>
   );
 };

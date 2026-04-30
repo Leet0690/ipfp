@@ -242,7 +242,7 @@ const StudentResults = () => {
       </div>
 
       {/* General Average */}
-      {totalCoeff > 0 && (
+      {cnt > 0 && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           className="glass-card" style={{ padding: '24px', textAlign: 'center', marginBottom: '32px' }}>
           <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Moyenne Générale</p>
