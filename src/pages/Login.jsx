@@ -12,16 +12,20 @@ const Login = () => {
   const { login } = useApp();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
+    setError('');
     setLoading(true);
+    await new Promise(r => setTimeout(r, 400));
     const ok = login(password);
-    if (ok) navigate('/');
-    else {
+    if (ok) {
+      navigate('/');
+    } else {
       setError('Clé de sécurité non valide');
       setPassword('');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -57,8 +61,8 @@ const Login = () => {
               <div style={{ position: 'relative' }}>
                 <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="input-premium" style={{ width: '100%', paddingLeft: '42px', paddingTop: '12px', paddingBottom: '12px' }}
-                  placeholder="••••••••" required autoComplete="current-password" />
+                  className="input-premium" style={{ width: '100%', paddingLeft: '42px', paddingTop: '12px', paddingBottom: '12px', opacity: loading ? 0.6 : 1 }}
+                  placeholder="••••••••" required autoComplete="current-password" disabled={loading} />
               </div>
             </div>
 
