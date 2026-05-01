@@ -81,6 +81,8 @@ const ScheduleManagement = () => {
     }
   };
 
+  const totalSessions = filteredSchedules.length;
+
   return (
     <div className="max-w-container section-padding">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-8)', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
@@ -93,6 +95,21 @@ const ScheduleManagement = () => {
         <button onClick={() => setShowAddModal(true)} className="btn-modern primary">
           <Plus size={18} style={{ marginRight: '8px' }} /> Ajouter une séance
         </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: 'var(--space-6)' }}>
+        <div className="glass-card" style={{ padding: '18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Groupe</div>
+          <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)' }}>{groupLabel}</div>
+        </div>
+        <div className="glass-card" style={{ padding: '18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Séances</div>
+          <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)' }}>{totalSessions}</div>
+        </div>
+        <div className="glass-card" style={{ padding: '18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Jours actifs</div>
+          <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)' }}>{days.filter(day => filteredSchedules.some(s => s.day === day)).length}</div>
+        </div>
       </div>
 
       <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)', display: 'flex', gap: 'var(--space-4)', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -115,17 +132,22 @@ const ScheduleManagement = () => {
 
       <div style={{ width: '100%', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto', paddingBottom: 'var(--space-6)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${days.length}, minmax(160px, 1fr))`, gap: 'var(--space-1)', minWidth: 'fit-content' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${days.length}, minmax(180px, 1fr))`, gap: '12px', minWidth: 'fit-content' }}>
             {days.map(day => (
-              <div key={day} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-2xl)', padding: '6px', border: '1px solid var(--border-light)' }}>
-                <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '12px', color: 'var(--text-primary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)', padding: '6px', background: 'white', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xs)' }}>
-                  {day}
+              <div key={day} style={{ display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(248,249,251,0.95))', borderRadius: 'var(--radius-2xl)', padding: '10px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', padding: '8px 10px', background: 'white', borderRadius: 'var(--radius-lg)' }}>
+                  <span style={{ fontWeight: '900', fontSize: '12px', color: 'var(--text-primary)', textTransform: 'uppercase' }}>
+                    {day}
+                  </span>
+                  <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)' }}>
+                    {(filteredSchedules.filter(s => s.day === day).length)}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
                   {(() => {
                     const daySessions = filteredSchedules.filter(s => s.day === day).sort((a,b) => a.time.localeCompare(b.time));
                     if (daySessions.length === 0) return (
-                      <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: '11px', fontWeight: '700', padding: '32px 0' }}>
+                      <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: '11px', fontWeight: '700', padding: '36px 0', border: '1px dashed var(--border-light)', borderRadius: 'var(--radius-xl)', background: 'rgba(255,255,255,0.6)' }}>
                         LIBRE
                       </div>
                     );
@@ -133,7 +155,7 @@ const ScheduleManagement = () => {
                       const teacher = teachers.find(t => t.id === session.teacherId);
                       return (
                         <motion.div key={session.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                          style={{ position: 'relative', background: 'white', padding: '8px', minHeight: '90px', display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', borderLeft: `4px solid ${session.type === 'TP' ? 'var(--primary)' : 'var(--accent)'}` }}>
+                          style={{ position: 'relative', background: 'white', padding: '12px', minHeight: '108px', display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', borderTop: `3px solid ${session.type === 'TP' ? 'var(--primary)' : 'var(--accent)'}` }}>
                           <button onClick={() => handleDelete(session.id)} 
                             style={{ position: 'absolute', top: '6px', right: '6px', background: 'transparent', color: 'var(--text-faint)', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: 'var(--radius-md)' }} 
                             onMouseEnter={e => e.currentTarget.style.color = 'var(--danger)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-faint)'}>
@@ -150,6 +172,16 @@ const ScheduleManagement = () => {
                             marginBottom: '8px',
                             wordBreak: 'break-word'
                           }}>{session.module}</div>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '9px', fontWeight: '800', padding: '4px 8px', borderRadius: '999px', background: session.type === 'TP' ? 'var(--primary-ultra-light)' : 'rgba(254,205,8,0.14)', color: session.type === 'TP' ? 'var(--primary)' : '#a06208' }}>
+                              {session.type || 'Cours'}
+                            </span>
+                            {session.room && (
+                              <span style={{ fontSize: '9px', fontWeight: '800', padding: '4px 8px', borderRadius: '999px', background: 'var(--bg-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <MapPin size={10} /> {session.room}
+                              </span>
+                            )}
+                          </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)' }}>
                             <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: 'var(--bg-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <User size={10} />

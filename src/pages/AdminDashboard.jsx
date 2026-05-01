@@ -123,6 +123,14 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
           <CalendarPlus size={14} style={{ marginRight: '6px' }} /> Gérer le planning
         </Link>
       </div>
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '18px' }}>
+        <div style={{ padding: '10px 14px', borderRadius: '16px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', fontSize: '12px', fontWeight: '800' }}>
+          {groupLabel}
+        </div>
+        <div style={{ padding: '10px 14px', borderRadius: '16px', background: 'rgba(254,205,8,0.12)', color: '#a06208', fontSize: '12px', fontWeight: '800' }}>
+          {scheduleData.reduce((acc, day) => acc + day.sessions.length, 0)} séance(s)
+        </div>
+      </div>
       
       <div style={{ width: '100%', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'auto', scrollbarColor: 'var(--primary-light) var(--bg-subtle)' }}>
@@ -134,12 +142,9 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
               borderRadius: '20px', padding: '6px', border: '1px solid rgba(255,255,255,0.8)',
               boxShadow: '0 4px 16px -4px rgba(0,0,0,0.03)' 
             }}>
-              <div style={{ 
-                margin: '2px 2px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '6px', background: 'var(--white)', borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)', fontWeight: '800', fontSize: '13px', color: 'var(--text-primary)'
-              }}>
-                {dayPlan.day}
+              <div style={{ margin: '2px 2px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'var(--white)', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                <span style={{ fontWeight: '900', fontSize: '13px', color: 'var(--text-primary)' }}>{dayPlan.day}</span>
+                <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)' }}>{dayPlan.sessions.length}</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 4px 10px', flex: 1 }}>
                 {(() => {
@@ -152,7 +157,6 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
                       boxShadow: '0 2px 10px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.04)', 
                       position: 'relative', overflow: 'hidden', cursor: 'pointer'
                     }}>
-                      {/* Color stripe */}
                       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: session.type === 'TP' ? 'var(--primary)' : 'var(--accent)' }}></div>
                       
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
