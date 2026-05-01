@@ -256,7 +256,12 @@ const AdminDashboard = () => {
   const [editFormData, setEditFormData] = useState({});
   const [editModuleSearch, setEditModuleSearch] = useState('');
 
-  const allDiplomas = useMemo(() => Object.keys(MODULES_DATA), []);
+  const allDiplomas = useMemo(() => Array.from(new Set(allModules.map(m => m.diploma))), [allModules]);
+  const availableYears = useMemo(() => Array.from(new Set(allModules.map(m => m.year))), [allModules]);
+  const availableMajors = useMemo(() => {
+    if (!diplomaFilter) return Array.from(new Set(allModules.map(m => m.major)));
+    return Array.from(new Set(allModules.filter(m => m.diploma === diplomaFilter).map(m => m.major)));
+  }, [allModules, diplomaFilter]);
 
   // Edit helper functions
   const toggleDiplomaEdit = (dip) => {
@@ -574,16 +579,27 @@ const AdminDashboard = () => {
       {!isDashboard && (
         <>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', padding: 'var(--space-2)', marginBottom: 'var(--space-6)', background: 'white', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xs)' }}>
-            <div style={{ flex: 1 }}></div>
-            <select className="input-premium" style={{ fontSize: '12px', padding: '7px 12px', maxWidth: '140px' }} value={diplomaFilter} onChange={(e) => setDiplomaFilter(e.target.value)}>
-              <option value="">Tous les niveaux</option>
-              {Object.keys(FILIERES).map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-            <div style={{ position: 'relative', minWidth: '160px', maxWidth: '220px', flex: '1 1 160px' }}>
-              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
-              <input className="input-premium" style={{ width: '100%', paddingLeft: '34px', fontSize: '13px' }} placeholder="Rechercher…" value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} />
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Search size={14} style={{ color: 'var(--text-faint)', marginLeft: '8px' }} />
+              <input className="input-premium" style={{ border: 'none', boxShadow: 'none', padding: '7px 0', fontSize: '13px', width: '200px' }} placeholder="Rechercher…" value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} />
             </div>
-            <button onClick={exportCSV} className="btn-modern"><Download size={14} style={{ marginRight: '6px' }} /> Export</button>
+            
+            <select className="input-premium" style={{ fontSize: '11px', padding: '6px 10px', minWidth: '120px' }} value={diplomaFilter} onChange={(e) => { setDiplomaFilter(e.target.value); setCategoryFilter(''); }}>
+              <option value="">Tous Niveaux</option>
+              {allDiplomas.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            
+            <select className="input-premium" style={{ fontSize: '11px', padding: '6px 10px', minWidth: '100px' }} value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+              <option value="">Toutes Années</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            
+            <select className="input-premium" style={{ fontSize: '11px', padding: '6px 10px', minWidth: '120px' }} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="">Toutes Filières</option>
+              {availableMajors.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+
+            <button onClick={exportCSV} className="btn-modern" style={{ padding: '7px 14px' }}><Download size={14} style={{ marginRight: '6px' }} /> Export</button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', marginBottom: 'var(--space-6)' }}>

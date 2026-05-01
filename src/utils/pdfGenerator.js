@@ -500,11 +500,11 @@ export const generateBulletinGlobal = (student, allGrades, modules) => {
   const avgEFCFT_num = countEFCFT > 0 ? (sumEFCFT / countEFCFT) : 0;
   const avgEFCFP_num = countEFCFP > 0 ? (sumEFCFP / countEFCFP) : 0;
   
-  const finalAvgNum = (countCC > 0 && countEFCFT > 0 && countEFCFP > 0) 
+  const finalAvgNum = (countAvg === modules.length && modules.length > 0) 
     ? ((avgCC_num * 3) + (avgEFCFT_num * 2) + (avgEFCFP_num * 3)) / 8 
     : 0;
 
-  const finalAvg = finalAvgNum > 0 ? finalAvgNum.toFixed(2).replace('.', ',') : '—';
+  const finalAvg = (finalAvgNum > 0 && countAvg === modules.length) ? finalAvgNum.toFixed(2).replace('.', ',') : '—';
   const avgCC = countCC > 0 ? avgCC_num.toFixed(2) : '';
   const avgEFCFT = countEFCFT > 0 ? avgEFCFT_num.toFixed(2) : '';
   const avgEFCFP = countEFCFP > 0 ? avgEFCFP_num.toFixed(2) : '';

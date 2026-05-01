@@ -163,7 +163,7 @@ const StudentResults = () => {
       </div>
 
       {/* ── Summary Card ── */}
-      {cnt > 0 && (
+      {cnt === modules.length && modules.length > 0 && (
         <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-premium" style={{ padding: '40px', textAlign: 'center', border: '1px solid var(--primary-light)' }}>
           <p style={{ fontSize: '11px', fontWeight: '900', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '12px' }}>Résultat Global de l'Année</p>
           <h2 style={{ fontSize: '48px', fontWeight: '900', color: 'var(--text-primary)', letterSpacing: '-0.04em', lineHeight: 1 }}>
