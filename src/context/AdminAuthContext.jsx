@@ -28,10 +28,8 @@ export const AdminAuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      // For now, use a simple hardcoded check
-      // In production, you'd verify against Firestore admin_users collection
-      const ADMIN_EMAIL = 'admin@ipfp.com';
-      const ADMIN_PASSWORD = 'admin123'; // TODO: Use bcrypt in production
+      const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
+      const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 
       if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
         const admin = {

@@ -27,6 +27,12 @@ export const useApp = () => useContext(AppContext);
 // ──────────────────────────────────────────────────────────
 const CACHE_KEY = 'ipfp_v1_cache';
 const CACHE_TTL = 30 * 60 * 1000;
+const makeToken = (length = 32) => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const values = new Uint32Array(length);
+  crypto.getRandomValues(values);
+  return Array.from(values, (v) => chars[v % chars.length]).join('');
+};
 const readCache = () => {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
@@ -295,7 +301,7 @@ export const AppProvider = ({ children }) => {
   }, [isDirectorAuth]);
 
   const login = (password) => {
-    if (password === 'admin123') { 
+    if (password === import.meta.env.VITE_ADMIN_PASSWORD) { 
       setIsAuthenticated(true); 
       showToast('Connexion réussie', 'success');
       return true; 
@@ -305,7 +311,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const loginDirector = (password) => {
-    if (password === 'directrice2026') { 
+    if (password === import.meta.env.VITE_DIRECTOR_PASSWORD) { 
       setIsDirectorAuth(true); 
       showToast('Connexion direction réussie', 'success');
       return true; 
@@ -326,7 +332,7 @@ export const AppProvider = ({ children }) => {
 
   // --- STAGIAIRES ---
   const addStudent = async (studentData) => {
-    const token = Math.random().toString(36).substring(2, 11);
+    const token = makeToken(32);
     const newStudent = { ...studentData, token, createdAt: serverTimestamp() };
     const docRef = await addDoc(collection(db, 'students'), newStudent);
     setStudents(prev => [{ id: docRef.id, ...newStudent }, ...prev]);
@@ -348,8 +354,8 @@ export const AppProvider = ({ children }) => {
 
   // --- FORMATEURS ---
   const addTeacher = async (teacherData) => {
-    const tokenGrades = Math.random().toString(36).substring(2, 11);
-    const tokenAttendance = Math.random().toString(36).substring(2, 12);
+    const tokenGrades = makeToken(32);
+    const tokenAttendance = makeToken(32);
     const newTeacher = { ...teacherData, tokenGrades, tokenAttendance, createdAt: serverTimestamp() };
     const docRef = await addDoc(collection(db, 'teachers'), newTeacher);
     setTeachers(prev => [{ id: docRef.id, ...newTeacher }, ...prev]);
@@ -374,8 +380,8 @@ export const AppProvider = ({ children }) => {
     const updatedTeachers = [];
     teachers.forEach(t => {
       if (!t.tokenGrades || !t.tokenAttendance) {
-        const tokenGrades = Math.random().toString(36).substring(2, 11);
-        const tokenAttendance = Math.random().toString(36).substring(2, 12);
+        const tokenGrades = makeToken(32);
+        const tokenAttendance = makeToken(32);
         batch.push(updateDoc(doc(db, 'teachers', t.id), { tokenGrades, tokenAttendance }));
         updatedTeachers.push({ ...t, tokenGrades, tokenAttendance });
       } else {

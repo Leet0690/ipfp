@@ -125,10 +125,9 @@ const AdminLogin = () => {
         </form>
 
         <div style={{ marginTop: '40px', padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-2xl)', border: '1px solid var(--border-light)' }}>
-          <p style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Accès Démo</p>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <p>Email: <code style={{ color: 'var(--primary)', fontWeight: '700' }}>admin@ipfp.com</code></p>
-            <p>Pass: <code style={{ color: 'var(--primary)', fontWeight: '700' }}>admin123</code></p>
+          <p style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Accès sécurisé</p>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+            Les identifiants admin sont maintenant lus depuis les variables d'environnement.
           </div>
         </div>
       </motion.div>
