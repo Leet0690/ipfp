@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { FILIERES } from '../data/modules';
 import { generateFicheSignature, generateFicheNotes, generateBulletinGlobal, generateNoteObtentionDiplome } from '../utils/pdfGenerator';
 import { TableSkeleton } from '../components/Skeleton';
@@ -55,6 +56,7 @@ const MiniStat = ({ label, value, icon: Icon }) => (
 
 const GradeManagement = () => {
   const { students = [], teachers = [], grades = {}, updateGrades, loading = false, modules: allModules = [], confirmAction } = useApp() || {};
+  const { showToast } = useToast();
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [filterDiploma, setFilterDiploma] = useState('');
   const [filterMajor, setFilterMajor] = useState('');
@@ -131,10 +133,11 @@ const GradeManagement = () => {
     });
 
     if (hasInvalid) {
-      alert("Validation impossible : certaines notes sont invalides.");
+      showToast("Validation impossible : certaines notes sont invalides.", 'error');
       return;
     }
     
+    showToast('Notes enregistrées avec succès', 'success');
     setSaved(true); 
     setTimeout(() => setSaved(false), 2500); 
   };
@@ -175,6 +178,16 @@ const GradeManagement = () => {
     return true;
   };
 
+  const getMention = (avg) => {
+    if (avg === null) return '';
+    if (avg < 10) return { label: 'Faible', color: '#dc2626', bg: '#fef2f2' };
+    if (avg < 12) return { label: 'Passable', color: '#d97706', bg: '#fffbeb' };
+    if (avg < 14) return { label: 'A.Bien', color: '#059669', bg: '#ecfdf5' };
+    if (avg < 16) return { label: 'Bien', color: '#2563eb', bg: '#eff6ff' };
+    if (avg < 18) return { label: 'T.Bien', color: '#7c3aed', bg: '#f5f3ff' };
+    return { label: 'Excellent', color: '#db2777', bg: '#fdf2f8' };
+  };
+
   const generalAvg = () => {
     let sumCC = 0, sumFT = 0, sumFP = 0, cnt = 0;
     studentModules.forEach(mod => {
@@ -213,6 +226,7 @@ const GradeManagement = () => {
       formateur: findFormateur(pdfModule),
       allGrades: grades,
     });
+    showToast('Fiche de signature générée', 'success');
   };
 
   const handleFicheNotes = () => {
@@ -226,16 +240,19 @@ const GradeManagement = () => {
       formateur: findFormateur(pdfModule),
       allGrades: grades,
     });
+    showToast('Fiche de notes générée', 'success');
   };
 
   const handleBulletinGlobal = () => {
     if (!selectedStudent) return;
     generateBulletinGlobal(selectedStudent, grades, modules);
+    showToast('Bulletin généré', 'success');
   };
 
   const handleNoteObtentionDiplome = () => {
     if (!selectedStudent) return;
     generateNoteObtentionDiplome(selectedStudent, grades, modules);
+    showToast('Attestation générée', 'success');
   };
 
   if (loading && students.length === 0) {
@@ -499,15 +516,22 @@ const GradeManagement = () => {
                             <td style={{ ...tdStyle, textAlign: 'center' }}><GradeInput value={g.efcfp} onChange={(v) => handleGradeChange(mod, 'efcfp', v)} /></td>
                             <td style={{ ...tdStyle, textAlign: 'center' }}><GradeInput value={g.efcft} onChange={(v) => handleGradeChange(mod, 'efcft', v)} /></td>
                             <td style={{ ...tdStyle, textAlign: 'center', background: 'var(--primary-ultra-light)' }}>
-                              <span style={{ fontSize: 'var(--text-sm)', fontWeight: '900', color: avg !== null ? (passed ? 'var(--primary)' : 'var(--accent)') : 'var(--text-faint)' }}>
+                              <span style={{ fontSize: 'var(--text-sm)', fontWeight: '900', color: avg !== null ? (avg >= 10 ? 'var(--primary)' : 'var(--accent)') : 'var(--text-faint)' }}>
                                 {avg !== null ? avg.toFixed(2) : '—'}
                               </span>
                             </td>
                             <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              {complete && avg !== null && (
-                                <span style={{ padding: '4px 10px', borderRadius: 'var(--radius-pill)', fontSize: '9px', fontWeight: '800', textTransform: 'uppercase',
-                                  background: passed ? 'var(--success-ultra-light)' : 'var(--danger-ultra-light)', color: passed ? 'var(--success)' : 'var(--danger)' }}>
-                                  {passed ? 'Validé' : 'Faible'}
+                              {avg !== null && (
+                                <span style={{ 
+                                  padding: '4px 10px', 
+                                  borderRadius: 'var(--radius-pill)', 
+                                  fontSize: '9px', 
+                                  fontWeight: '800', 
+                                  textTransform: 'uppercase',
+                                  background: getMention(avg).bg, 
+                                  color: getMention(avg).color 
+                                }}>
+                                  {getMention(avg).label}
                                 </span>
                               )}
                             </td>

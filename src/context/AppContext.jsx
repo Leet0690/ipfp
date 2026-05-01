@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import ConfirmModal from '../components/ConfirmModal';
+import { useToast } from './ToastContext';
 
 const AppContext = createContext();
 
@@ -47,10 +48,10 @@ const getRecentDateBound = () => {
 };
 
 export const AppProvider = ({ children }) => {
+  const { showToast } = useToast();
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [grades, setGrades] = useState({});
-  const [notifications, setNotifications] = useState([]);
   const [studentAttendance, setStudentAttendance] = useState([]);
   const [teacherAttendance, setTeacherAttendance] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -119,7 +120,6 @@ export const AppProvider = ({ children }) => {
             setModules(cached.modules);
             setStudentAttendance(cached.studentAttendance);
             setTeacherAttendance(cached.teacherAttendance);
-            setNotifications(cached.notifications);
             setPayments(cached.payments);
             setSalaries(cached.salaries);
             setLoading(false);
@@ -128,7 +128,7 @@ export const AppProvider = ({ children }) => {
 
           // 2. Sinon : Chargement complet depuis Firestore
           const dateBound = getRecentDateBound();
-          const [stuSnap, teaSnap, graSnap, schSnap, modSnap, attStuSnap, attTeaSnap, notSnap, paySnap, salSnap] = await Promise.all([
+          const [stuSnap, teaSnap, graSnap, schSnap, modSnap, attStuSnap, attTeaSnap, paySnap, salSnap] = await Promise.all([
             getDocs(query(collection(db, 'students'), orderBy('createdAt', 'desc'))),
             getDocs(query(collection(db, 'teachers'), orderBy('createdAt', 'desc'))),
             getDocs(collection(db, 'grades')),
@@ -136,7 +136,6 @@ export const AppProvider = ({ children }) => {
             getDocs(query(collection(db, 'modules'), orderBy('name', 'asc'))),
             getDocs(query(collection(db, 'attendance_stagiaires'), where('date', '>=', dateBound))),
             getDocs(query(collection(db, 'attendance_formateurs'), where('date', '>=', dateBound))),
-            getDocs(query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(100))),
             getDocs(query(collection(db, 'payments'), orderBy('createdAt', 'desc'), limit(100))),
             getDocs(query(collection(db, 'salaries'), orderBy('createdAt', 'desc'), limit(100)))
           ]);
@@ -150,7 +149,6 @@ export const AppProvider = ({ children }) => {
           const modulesData = modSnap.docs.map(d => ({ id: d.id, ...d.data() }));
           const attStuData = attStuSnap.docs.map(d => ({ id: d.id, ...d.data() }));
           const attTeaData = attTeaSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          const notData = notSnap.docs.map(d => ({ id: d.id, ...d.data() }));
           const payData = paySnap.docs.map(d => ({ id: d.id, ...d.data() }));
           const salData = salSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -161,7 +159,6 @@ export const AppProvider = ({ children }) => {
           setModules(modulesData);
           setStudentAttendance(attStuData);
           setTeacherAttendance(attTeaData);
-          setNotifications(notData);
           setPayments(payData);
           setSalaries(salData);
 
@@ -170,7 +167,7 @@ export const AppProvider = ({ children }) => {
             students: studentsData, teachers: teachersData, grades: gradesData, 
             schedules: schedulesData, modules: modulesData, 
             studentAttendance: attStuData, teacherAttendance: attTeaData,
-            notifications: notData, payments: payData, salaries: salData
+            payments: payData, salaries: salData
           });
 
         } else if (isStudentPortal) {
@@ -257,7 +254,6 @@ export const AppProvider = ({ children }) => {
           }
         } else {
           // Déconnecté (Page de login)
-          setNotifications([]);
           setTeacherAttendance([]);
           setPayments([]);
           setSalaries([]);
@@ -281,9 +277,9 @@ export const AppProvider = ({ children }) => {
     writeCache({
       students, teachers, grades, schedules, modules,
       studentAttendance, teacherAttendance,
-      notifications, payments, salaries
+      payments, salaries
     });
-  }, [students, teachers, grades, schedules, modules, studentAttendance, teacherAttendance, notifications, payments, salaries, loading, isAuthenticated, isDirectorAuth]);
+  }, [students, teachers, grades, schedules, modules, studentAttendance, teacherAttendance, payments, salaries, loading, isAuthenticated, isDirectorAuth]);
 
   // Clear cache on logout
   useEffect(() => {
@@ -299,34 +295,33 @@ export const AppProvider = ({ children }) => {
   }, [isDirectorAuth]);
 
   const login = (password) => {
-    if (password === 'admin123') { setIsAuthenticated(true); return true; }
+    if (password === 'admin123') { 
+      setIsAuthenticated(true); 
+      showToast('Connexion réussie', 'success');
+      return true; 
+    }
+    showToast('Mot de passe incorrect', 'error');
     return false;
   };
 
   const loginDirector = (password) => {
-    if (password === 'directrice2026') { setIsDirectorAuth(true); return true; }
+    if (password === 'directrice2026') { 
+      setIsDirectorAuth(true); 
+      showToast('Connexion direction réussie', 'success');
+      return true; 
+    }
+    showToast('Mot de passe incorrect', 'error');
     return false;
   };
 
-  const logoutDirector = () => setIsDirectorAuth(false);
-  const logout = () => setIsAuthenticated(false);
-
-  const addNotification = async (message) => {
-    const newNotif = { message, timestamp: new Date().toISOString(), read: false };
-    const docRef = await addDoc(collection(db, 'notifications'), newNotif);
-    setNotifications(prev => [{ id: docRef.id, ...newNotif }, ...prev]);
+  const logoutDirector = () => {
+    setIsDirectorAuth(false);
+    showToast('Déconnexion direction effectuée');
   };
-
-  const markNotificationAsRead = async (id) => {
-    await updateDoc(doc(db, 'notifications', id), { read: true });
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  };
-
-  const clearNotifications = async () => {
-    const q = query(collection(db, 'notifications'));
-    const snapshot = await getDocs(q);
-    await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
-    setNotifications([]);
+  
+  const logout = () => {
+    setIsAuthenticated(false);
+    showToast('Déconnexion effectuée');
   };
 
   // --- STAGIAIRES ---
@@ -335,20 +330,20 @@ export const AppProvider = ({ children }) => {
     const newStudent = { ...studentData, token, createdAt: serverTimestamp() };
     const docRef = await addDoc(collection(db, 'students'), newStudent);
     setStudents(prev => [{ id: docRef.id, ...newStudent }, ...prev]);
-    addNotification(`Nouveau stagiaire ajouté : ${studentData.lastName}.`);
+    showToast(`Nouveau stagiaire ajouté : ${studentData.lastName}.`, 'success');
     return token;
   };
 
   const updateStudent = async (id, data) => {
     await updateDoc(doc(db, 'students', id), data);
     setStudents(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-    addNotification(`Profil stagiaire mis à jour.`);
+    showToast(`Profil stagiaire mis à jour.`, 'success');
   };
 
   const deleteStudent = async (id) => {
     await deleteDoc(doc(db, 'students', id));
     setStudents(prev => prev.filter(s => s.id !== id));
-    addNotification(`Stagiaire supprimé.`);
+    showToast(`Stagiaire supprimé.`, 'warning');
   };
 
   // --- FORMATEURS ---
@@ -358,20 +353,20 @@ export const AppProvider = ({ children }) => {
     const newTeacher = { ...teacherData, tokenGrades, tokenAttendance, createdAt: serverTimestamp() };
     const docRef = await addDoc(collection(db, 'teachers'), newTeacher);
     setTeachers(prev => [{ id: docRef.id, ...newTeacher }, ...prev]);
-    addNotification(`Nouveau formateur ajouté : ${teacherData.name}.`);
+    showToast(`Nouveau formateur ajouté : ${teacherData.name}.`, 'success');
     return { tokenGrades, tokenAttendance };
   };
 
   const updateTeacher = async (id, data) => {
     await updateDoc(doc(db, 'teachers', id), data);
     setTeachers(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
-    addNotification(`Profil formateur mis à jour.`);
+    showToast(`Profil formateur mis à jour.`, 'success');
   };
 
   const deleteTeacher = async (id) => {
     await deleteDoc(doc(db, 'teachers', id));
     setTeachers(prev => prev.filter(t => t.id !== id));
-    addNotification(`Formateur supprimé.`);
+    showToast(`Formateur supprimé.`, 'warning');
   };
 
   const migrateTeacherTokens = async () => {
@@ -390,7 +385,7 @@ export const AppProvider = ({ children }) => {
     if (batch.length > 0) {
       await Promise.all(batch);
       setTeachers(updatedTeachers);
-      addNotification(`${batch.length} formateurs mis à jour avec de nouveaux jetons.`);
+      showToast(`${batch.length} formateurs mis à jour avec de nouveaux jetons.`, 'success');
     }
   };
 
@@ -399,20 +394,20 @@ export const AppProvider = ({ children }) => {
     const newSchedule = { ...scheduleData, createdAt: serverTimestamp() };
     const docRef = await addDoc(collection(db, 'schedules'), newSchedule);
     setSchedules(prev => [{ id: docRef.id, ...newSchedule }, ...prev]);
-    addNotification(`Séance de ${scheduleData.module} ajoutée.`);
+    showToast(`Séance de ${scheduleData.module} ajoutée.`, 'success');
   };
 
   const deleteSchedule = async (id) => {
     await deleteDoc(doc(db, 'schedules', id));
     setSchedules(prev => prev.filter(s => s.id !== id));
-    addNotification(`Séance supprimée.`);
+    showToast(`Séance supprimée.`, 'warning');
   };
 
   const clearAllSchedules = async () => {
     const snapshot = await getDocs(query(collection(db, 'schedules')));
     await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
     setSchedules([]);
-    addNotification(`Emploi du temps vidé.`);
+    showToast(`Emploi du temps vidé.`, 'warning');
   };
 
   // --- NOTES ---
@@ -428,6 +423,7 @@ export const AppProvider = ({ children }) => {
         [safeSubject]: gradeData
       }
     }));
+    showToast('Notes enregistrées', 'success');
   };
 
   // --- PRESENCES ---
@@ -466,6 +462,7 @@ export const AppProvider = ({ children }) => {
       });
     } catch (e) {
       console.error("Error loading session attendance:", e);
+      showToast('Erreur de chargement des présences', 'error');
     }
   };
 
@@ -487,6 +484,7 @@ export const AppProvider = ({ children }) => {
       }
       return [...prev, updatedRecord];
     });
+    showToast('Présence formateur enregistrée', 'success');
   };
 
   // --- FINANCES ---
@@ -494,32 +492,38 @@ export const AppProvider = ({ children }) => {
     const newPayment = { ...paymentData, createdAt: serverTimestamp() };
     const docRef = await addDoc(collection(db, 'payments'), newPayment);
     setPayments(prev => [{ id: docRef.id, ...newPayment }, ...prev]);
+    showToast('Paiement enregistré', 'success');
   };
 
   const updatePayment = async (id, data) => {
     await updateDoc(doc(db, 'payments', id), data);
     setPayments(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+    showToast('Paiement mis à jour', 'success');
   };
 
   const deletePayment = async (id) => {
     await deleteDoc(doc(db, 'payments', id));
     setPayments(prev => prev.filter(p => p.id !== id));
+    showToast('Paiement supprimé', 'warning');
   };
 
   const addSalary = async (salaryData) => {
     const newSalary = { ...salaryData, createdAt: serverTimestamp() };
     const docRef = await addDoc(collection(db, 'salaries'), newSalary);
     setSalaries(prev => [{ id: docRef.id, ...newSalary }, ...prev]);
+    showToast('Salaire enregistré', 'success');
   };
 
   const updateSalary = async (id, data) => {
     await updateDoc(doc(db, 'salaries', id), data);
     setSalaries(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    showToast('Salaire mis à jour', 'success');
   };
 
   const deleteSalary = async (id) => {
     await deleteDoc(doc(db, 'salaries', id));
     setSalaries(prev => prev.filter(s => s.id !== id));
+    showToast('Salaire supprimé', 'warning');
   };
 
   // --- MODULES ---
@@ -527,27 +531,26 @@ export const AppProvider = ({ children }) => {
     const newModule = { ...moduleData, createdAt: serverTimestamp() };
     const docRef = await addDoc(collection(db, 'modules'), newModule);
     setModules(prev => [{ id: docRef.id, ...newModule }, ...prev]);
-    addNotification(`Nouveau module ajouté : ${moduleData.name}.`);
+    showToast(`Nouveau module ajouté : ${moduleData.name}.`, 'success');
   };
 
   const updateModule = async (id, data) => {
     await updateDoc(doc(db, 'modules', id), data);
     setModules(prev => prev.map(m => m.id === id ? { ...m, ...data } : m));
-    addNotification(`Module mis à jour.`);
+    showToast(`Module mis à jour.`, 'success');
   };
 
   const deleteModule = async (id) => {
     await deleteDoc(doc(db, 'modules', id));
     setModules(prev => prev.filter(m => m.id !== id));
-    addNotification(`Module supprimé.`);
+    showToast(`Module supprimé.`, 'warning');
   };
 
   return (
     <AppContext.Provider value={{
-      students, teachers, grades, notifications, isAuthenticated, isDirectorAuth, loading,
+      students, teachers, grades, isAuthenticated, isDirectorAuth, loading,
       login, logout, loginDirector, logoutDirector,
       addStudent, addTeacher, updateStudent, updateTeacher, deleteStudent, deleteTeacher, updateGrades,
-      addNotification, markNotificationAsRead, clearNotifications,
       studentAttendance, teacherAttendance, updateStudentAttendance, updateTeacherAttendance, loadAttendanceForSession,
       schedules, addSchedule, deleteSchedule, clearAllSchedules, migrateTeacherTokens,
       payments, salaries, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary,

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { MODULES_DATA } from '../data/modules';
 import { TableSkeleton } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
@@ -21,6 +22,7 @@ import {
 
 const ModuleManagement = () => {
   const { modules, addModule, updateModule, deleteModule, loading, confirmAction } = useApp();
+  const { showToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
@@ -103,13 +105,15 @@ const ModuleManagement = () => {
         for (const id of selectedIds) {
           await updateModule(id, { ...formData, name: trimmedName, coefficient: parseFloat(formData.coefficient) });
         }
+        showToast('Module mis à jour', 'success');
       } else {
         await addModule({ ...formData, name: trimmedName, coefficient: parseFloat(formData.coefficient) });
+        showToast('Module ajouté', 'success');
       }
       setIsModalOpen(false);
       resetForm();
     } catch (e) {
-      alert("Erreur de sauvegarde.");
+      showToast("Erreur de sauvegarde.", 'error');
     }
   };
 
@@ -149,6 +153,7 @@ const ModuleManagement = () => {
       for (const id of group.ids) {
         await deleteModule(id);
       }
+      showToast('Module supprimé', 'success');
     }
   };
 
@@ -251,9 +256,9 @@ const ModuleManagement = () => {
                     </span>
                   </td>
                   <td style={{ padding: '16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
-                      <button onClick={() => handleEdit(m)} className="action-btn" title="Modifier"><Edit3 size={16} /></button>
-                      <button onClick={() => handleDelete(m)} className="action-btn delete" title="Supprimer"><Trash2 size={16} /></button>
+                    <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
+                      <ActionBtn icon={Edit3} title="Modifier" onClick={() => handleEdit(m)} />
+                      <ActionBtn icon={Trash2} title="Supprimer" color="#dc2626" onClick={() => handleDelete(m)} />
                     </div>
                   </td>
                 </tr>
@@ -341,5 +346,12 @@ const ModuleManagement = () => {
 };
 
 const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' };
+
+const ActionBtn = ({ icon: Icon, title, onClick, color = 'var(--text-muted)' }) => (
+  <button onClick={onClick} title={title} className="action-btn"
+    style={{ padding: '8px', borderRadius: 'var(--radius-md)', border: 'none', background: 'transparent', color, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <Icon size={16} />
+  </button>
+);
 
 export default ModuleManagement;

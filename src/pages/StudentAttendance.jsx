@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { FILIERES, getModulesForFiliere } from '../data/modules';
 import { TableSkeleton } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
@@ -20,7 +21,8 @@ import {
 } from 'lucide-react';
 
 const StudentAttendance = () => {
-  const { students, studentAttendance, updateStudentAttendance, addNotification, loading, schedules } = useApp();
+  const { students, studentAttendance, updateStudentAttendance, loading, schedules } = useApp();
+  const { showToast } = useToast();
   const [filterDiploma, setFilterDiploma] = useState('');
   const [filterMajor, setFilterMajor] = useState('');
   const [filterYear, setFilterYear] = useState('');
@@ -79,7 +81,7 @@ const StudentAttendance = () => {
 
   const handleStatusChange = async (studentId, status) => {
     if (!filterModule) {
-      alert("Veuillez d'abord sélectionner un module.");
+      showToast("Veuillez d'abord sélectionner un module.", 'warning');
       return;
     }
     try {
@@ -87,7 +89,7 @@ const StudentAttendance = () => {
       const record = studentAttendance.find(a => a.id === docId);
       await updateStudentAttendance(studentId, filterModule, selectedDate, status, record?.comment || '', 'admin');
     } catch (error) {
-      addNotification("Erreur lors de l'enregistrement.");
+      showToast("Erreur lors de l'enregistrement.", 'error');
     }
   };
 
@@ -100,7 +102,7 @@ const StudentAttendance = () => {
   };
 
   const exportCSV = () => {
-    if (!filteredStudents.length) return alert('Aucune donnée.');
+    if (!filteredStudents.length) return showToast('Aucune donnée.', 'info');
     const headers = "\uFEFFStagiaire,Matricule,Module,Date,Statut,Commentaire\n";
     const rows = filteredStudents.map(s => {
       const docId = `${s.id}_${(filterModule || 'global').replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;

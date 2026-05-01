@@ -5,6 +5,7 @@ import {
   flexRender, getCoreRowModel, useReactTable, getFilteredRowModel, getPaginationRowModel,
 } from '@tanstack/react-table';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { generateBulletinGlobal } from '../utils/pdfGenerator';
 import { FILIERES, MODULES_DATA, getModulesForStudent } from '../data/modules';
 import { TableSkeleton } from '../components/Skeleton';
@@ -124,8 +125,8 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
       </div>
       
       <div style={{ width: '100%', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', paddingBottom: '8px' }} className="no-scrollbar">
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${scheduleData.length}, minmax(140px, 1fr))`, gap: '8px', minWidth: '100%', padding: '4px' }}>
+        <div style={{ overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'auto', scrollbarColor: 'var(--primary-light) var(--bg-subtle)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(160px, 1fr))', gap: '6px', padding: '4px', minWidth: 'fit-content' }}>
           {scheduleData.map((dayPlan, i) => (
             <div key={i} style={{ 
               display: 'flex', flexDirection: 'column', 
@@ -134,8 +135,8 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
               boxShadow: '0 4px 16px -4px rgba(0,0,0,0.03)' 
             }}>
               <div style={{ 
-                margin: '4px 4px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '10px', background: 'var(--white)', borderRadius: '12px',
+                margin: '2px 2px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '6px', background: 'var(--white)', borderRadius: '12px',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.02)', fontWeight: '800', fontSize: '13px', color: 'var(--text-primary)'
               }}>
                 {dayPlan.day}
@@ -147,7 +148,7 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
                   
                   const renderSession = (session, j) => (
                     <motion.div key={j} whileHover={{ scale: 1.02, y: -2 }} style={{ 
-                      background: 'var(--white)', padding: '12px', borderRadius: '14px', 
+                      background: 'var(--white)', padding: '8px', minHeight: '90px', display: 'flex', flexDirection: 'column', borderRadius: '14px', 
                       boxShadow: '0 2px 10px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.04)', 
                       position: 'relative', overflow: 'hidden', cursor: 'pointer'
                     }}>
@@ -165,7 +166,14 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
                         )}
                       </div>
 
-                      <h4 style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: '1.4', marginBottom: '10px' }}>
+                      <h4 style={{ 
+                        fontSize: '12px', 
+                        fontWeight: '800', 
+                        color: 'var(--text-primary)', 
+                        lineHeight: '1.3', 
+                        marginBottom: '10px',
+                        wordBreak: 'break-word'
+                      }}>
                         {session.title}
                       </h4>
 
@@ -174,7 +182,15 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
                           <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
                              <User size={12} />
                           </div>
-                          <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                          <span style={{ 
+                            fontSize: '11px', 
+                            fontWeight: '600', 
+                            color: 'var(--text-secondary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            flex: 1
+                          }}>
                              {teachers.find(t => t.id === session.teacherId)?.name || 'Formateur'}
                           </span>
                         </div>
@@ -215,7 +231,8 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
 };
 
 const AdminDashboard = () => {
-  const { students, teachers, grades, schedules, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance, migrateTeacherTokens, loading, confirmAction } = useApp();
+  const { students, teachers, grades, schedules, modules: allModules, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance, migrateTeacherTokens, loading, confirmAction } = useApp();
+  const { showToast } = useToast();
   const location = useLocation();
   const isDashboard = location.pathname === '/';
   const [localActiveTab, setLocalActiveTab] = useState('students');
@@ -309,8 +326,9 @@ const AdminDashboard = () => {
     })) {
       if (activeTab === 'students') deleteStudent(item.id);
       else deleteTeacher(item.id);
+      showToast('Supprimé avec succès', 'success');
     }
-  }, [activeTab, deleteStudent, deleteTeacher, confirmAction]);
+  }, [activeTab, deleteStudent, deleteTeacher, confirmAction, showToast]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -332,21 +350,22 @@ const AdminDashboard = () => {
       }
       
       setSaveSuccess(true);
+      showToast('Enregistré avec succès', 'success');
       setTimeout(() => {
         setSaveSuccess(false);
         closeModal();
       }, 1500);
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de l'enregistrement.");
+      showToast("Erreur lors de l'enregistrement.", 'error');
     } finally {
       setIsSaving(false);
     }
-  }, [activeTab, selectedItem, editFormData, updateStudent, updateTeacher, closeModal]);
+  }, [activeTab, selectedItem, editFormData, updateStudent, updateTeacher, closeModal, showToast]);
 
   const exportCSV = () => {
     let data = tableData;
-    if (data.length === 0) return alert('Aucune donnée.');
+    if (data.length === 0) return showToast('Aucune donnée.', 'info');
     const headers = activeTab === 'students' ? "\uFEFFNom,Prénom,Matricule,Niveau,Filière,Année,Statut\n" : "\uFEFFNom,Module,Statut\n";
     const rows = data.map(item => {
       if (activeTab === 'students') return `"${item.lastName}","${item.firstName}","${item.regNo}","${item.diploma || ''}","${item.major}","${item.year || ''}","ACTIF"`;
@@ -356,6 +375,7 @@ const AdminDashboard = () => {
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
     link.setAttribute('download', `IPFP_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showToast('Exportation réussie', 'success');
   };
 
   const tableData = useMemo(() => {
@@ -521,7 +541,7 @@ const AdminDashboard = () => {
                   type: "warning"
                 })) {
                   // Logic handled in AppContext usually, but here for demo
-                  alert("Liens régénérés !");
+                  showToast("Liens régénérés !", 'success');
                 }
               }}>
                 <RotateCw size={14} style={{ marginRight: '6px' }} /> Régénérer
@@ -607,6 +627,142 @@ const AdminDashboard = () => {
                 <X size={20} />
               </button>
 
+              {modalMode === 'edit' && (
+                <form onSubmit={handleUpdate}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>Modifier {activeTab === 'students' ? 'le stagiaire' : 'le formateur'}</h2>
+                    {saveSuccess && <motion.span initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} style={{ color: 'var(--success)', fontSize: '13px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CheckCircle2 size={16} /> Enregistré
+                    </motion.span>}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {activeTab === 'students' ? (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={fGroup}>
+                            <label style={lbl}>Nom</label>
+                            <input required className="input-premium" value={editFormData.lastName || ''} onChange={e => setEditFormData({...editFormData, lastName: e.target.value})} />
+                          </div>
+                          <div style={fGroup}>
+                            <label style={lbl}>Prénom</label>
+                            <input required className="input-premium" value={editFormData.firstName || ''} onChange={e => setEditFormData({...editFormData, firstName: e.target.value})} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={fGroup}>
+                            <label style={lbl}>Niveau</label>
+                            <select className="input-premium" value={editFormData.diploma || ''} onChange={e => setEditFormData({...editFormData, diploma: e.target.value, major: ''})}>
+                              {Object.keys(FILIERES).map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                          </div>
+                          <div style={fGroup}>
+                            <label style={lbl}>Année</label>
+                            <select className="input-premium" value={editFormData.year || ''} onChange={e => setEditFormData({...editFormData, year: e.target.value})}>
+                              <option value="1ère année">1ère année</option>
+                              <option value="2ème année">2ème année</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div style={fGroup}>
+                          <label style={lbl}>Filière</label>
+                          <select className="input-premium" value={editFormData.major || ''} onChange={e => setEditFormData({...editFormData, major: e.target.value})}>
+                            {(FILIERES[editFormData.diploma] || []).map(f => <option key={f} value={f}>{f}</option>)}
+                          </select>
+                        </div>
+                        <div style={fGroup}>
+                          <label style={lbl}>Matricule</label>
+                          <input className="input-premium" value={editFormData.regNo || ''} onChange={e => setEditFormData({...editFormData, regNo: e.target.value})} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={fGroup}>
+                          <label style={lbl}>Nom Complet</label>
+                          <input required className="input-premium" value={editFormData.name || ''} onChange={e => setEditFormData({...editFormData, name: e.target.value})} />
+                        </div>
+                        
+                        <div style={fGroup}>
+                          <label style={lbl}>Diplômes assignés</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {allDiplomas.map(dip => (
+                              <SelectionTag key={dip} active={(editFormData.diplomas || []).includes(dip)} onClick={() => toggleDiplomaEdit(dip)} label={dip} />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={fGroup}>
+                          <label style={lbl}>Niveaux</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {['1ère année', '2ème année'].map(y => (
+                              <SelectionTag key={y} active={(editFormData.years || []).includes(y)} onClick={() => toggleYearEdit(y)} label={y} />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={fGroup}>
+                          <label style={lbl}>Filières</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '120px', overflowY: 'auto', padding: '4px' }}>
+                            {Array.from(new Set(allModules.filter(m => (editFormData.diplomas || []).includes(m.diploma)).map(m => m.major))).map(f => (
+                              <SelectionTag key={f} active={(editFormData.groups || []).includes(f)} onClick={() => toggleGroupEdit(f)} label={f} />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={fGroup}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={lbl}>Modules ({ (editFormData.subjects || []).length })</label>
+                            <input className="input-premium" style={{ height: '28px', fontSize: '11px', width: '150px' }} placeholder="Filtrer..." value={editModuleSearch} onChange={e => setEditModuleSearch(e.target.value)} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '200px', overflowY: 'auto', background: 'var(--bg-subtle)', padding: '8px', borderRadius: 'var(--radius-xl)' }}>
+                            {(editFormData.years || []).map(year => (
+                              <div key={year}>
+                                <p style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)', marginBottom: '4px' }}>{year}</p>
+                                {(editFormData.groups || []).map(filiere => {
+                                  const modules = Array.from(new Set(allModules.filter(m => 
+                                    (editFormData.diplomas || []).includes(m.diploma) && 
+                                    m.major === filiere && 
+                                    m.year === year
+                                  ).map(m => m.name)));
+                                  const filtered = editModuleSearch ? modules.filter(m => m.toLowerCase().includes(editModuleSearch.toLowerCase())) : modules;
+                                  if (filtered.length === 0) return null;
+                                  return (
+                                    <div key={filiere} style={{ marginBottom: '8px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <p style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)' }}>{filiere}</p>
+                                        <button type="button" onClick={() => toggleFiliereAllEdit(year, filiere, filtered)} style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontSize: '9px', fontWeight: '800', cursor: 'pointer' }}>
+                                          Inverse
+                                        </button>
+                                      </div>
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                                        {filtered.map(m => (
+                                          <button type="button" key={m} onClick={() => toggleSubjectEdit(m)} style={{ 
+                                            padding: '4px 8px', borderRadius: '6px', fontSize: '10px', border: 'none', cursor: 'pointer',
+                                            background: (editFormData.subjects || []).includes(m) ? 'var(--primary)' : 'white',
+                                            color: (editFormData.subjects || []).includes(m) ? 'white' : 'var(--text-secondary)'
+                                          }}>{m}</button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
+                    <button type="button" onClick={closeModal} className="btn-modern" style={{ flex: 1 }}>Annuler</button>
+                    <button type="submit" disabled={isSaving} className="btn-modern primary" style={{ flex: 2 }}>
+                      {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {modalMode === 'details' && (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
@@ -630,7 +786,7 @@ const AdminDashboard = () => {
                     </p>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', background: 'white' }} value={`https://portail-ipfp.web.app/${activeTab === 'students' ? 'results' : 'portal'}/${selectedItem.token || selectedItem.tokenGrades}`} />
-                      <button className="btn-modern primary" onClick={() => { navigator.clipboard.writeText(`https://portail-ipfp.web.app/${activeTab === 'students' ? 'results' : 'portal'}/${selectedItem.token || selectedItem.tokenGrades}`); alert('Copié !'); }}>
+                      <button className="btn-modern primary" onClick={() => { navigator.clipboard.writeText(`https://portail-ipfp.web.app/${activeTab === 'students' ? 'results' : 'portal'}/${selectedItem.token || selectedItem.tokenGrades}`); showToast('Copié !', 'success'); }}>
                         <Copy size={14} />
                       </button>
                     </div>
@@ -672,5 +828,18 @@ const InfoBox = ({ label, value, icon: Icon, valueColor = 'var(--text-secondary)
     <p style={{ fontSize: 'var(--text-sm)', fontWeight: '700', color: valueColor, overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</p>
   </div>
 );
+
+const SelectionTag = ({ active, label, onClick }) => (
+  <button type="button" onClick={onClick} style={{
+    padding: '8px 14px', borderRadius: 'var(--radius-pill)', fontSize: '10px', fontWeight: '800', transition: 'all 0.2s', cursor: 'pointer',
+    background: active ? 'var(--primary)' : 'var(--bg-subtle)',
+    color: active ? 'white' : 'var(--text-muted)',
+    border: `1px solid ${active ? 'var(--primary)' : 'var(--border-light)'}`,
+    boxShadow: active ? 'var(--shadow-sm)' : 'none'
+  }}>{label}</button>
+);
+
+const fGroup = { display: 'flex', flexDirection: 'column', gap: '4px' };
+const lbl = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' };
 
 export default AdminDashboard;

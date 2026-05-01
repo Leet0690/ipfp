@@ -394,7 +394,11 @@ export default function DashboardLayout({ children }) {
 
         {/* Content Scroll Area */}
         <main ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '24px' }}>
-          <div className="max-w-container" style={{ padding: 0 }}>
+          <div className="max-w-container" style={{ 
+            padding: 0, 
+            maxWidth: isSidebarOpen ? '1200px' : '100%', 
+            transition: 'max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1)' 
+          }}>
             <motion.div
                initial={{ opacity: 0, y: 20 }}
                animate={{ opacity: 1, y: 0 }}

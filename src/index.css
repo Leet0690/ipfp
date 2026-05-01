@@ -192,7 +192,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .max-w-container { 
   width: 100%; 
-  max-width: 1080px; 
+  max-width: 1400px; 
   margin: 0 auto; 
   padding-left: 24px;
   padding-right: 24px;
@@ -500,4 +500,99 @@ h1, h2, h3, h4, h5, h6 {
 .input-premium:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(176, 104, 185, 0.08), 0 0 12px rgba(176, 104, 185, 0.04), var(--shadow-inner);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TOAST NOTIFICATIONS
+   ═══════════════════════════════════════════════════════════════ */
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  min-width: 300px;
+  max-width: 450px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: var(--shadow-lg), 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+  position: relative;
+}
+
+.toast-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.toast-item.success::before { background: var(--success); }
+.toast-item.error::before { background: var(--danger); }
+.toast-item.warning::before { background: var(--warning); }
+.toast-item.info::before { background: var(--info); }
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.toast-message {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.toast-icon.success { color: var(--success); }
+.toast-icon.error { color: var(--danger); }
+.toast-icon.warning { color: var(--warning); }
+.toast-icon.info { color: var(--info); }
+
+.toast-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+
+.toast-close:hover {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+@media (max-width: 480px) {
+  .toast-container {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+  }
+  .toast-item {
+    min-width: 0;
+    width: 100%;
+  }
 }

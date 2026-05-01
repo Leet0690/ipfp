@@ -98,12 +98,10 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <AppProvider>
-    <AdminAuthProvider>
-      <ScrollToTop />
-      <AppContent />
-    </AdminAuthProvider>
-  </AppProvider>
+  <AdminAuthProvider>
+    <ScrollToTop />
+    <AppContent />
+  </AdminAuthProvider>
 );
 
 export default App;

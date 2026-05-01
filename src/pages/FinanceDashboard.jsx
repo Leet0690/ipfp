@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { jsPDF } from 'jspdf';
 import { logoBase64 } from '../utils/logoBase64';
 import { TableSkeleton } from '../components/Skeleton';
@@ -35,6 +36,7 @@ const FinanceDashboard = () => {
     addPayment, deletePayment, addSalary, deleteSalary, updateTeacher,
     teacherAttendance, isDirectorAuth, loginDirector, logoutDirector, logout, confirmAction
   } = useApp();
+  const { showToast } = useToast();
 
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState('payments');
@@ -70,7 +72,9 @@ const FinanceDashboard = () => {
   const handleLogin = (e) => {
     e.preventDefault();
     if (!loginDirector(password)) {
-      alert('Mot de passe incorrect');
+      showToast('Mot de passe incorrect', 'error');
+    } else {
+      showToast('Accès autorisé', 'success');
     }
   };
 
@@ -79,6 +83,7 @@ const FinanceDashboard = () => {
     const rate = parseFloat(newVal);
     if (!isNaN(rate)) {
       await updateTeacher(teacherId, { hourlyRate: rate });
+      showToast('Tarif mis à jour', 'success');
       setEditingTeacherId(null);
     }
   };
@@ -105,6 +110,7 @@ const FinanceDashboard = () => {
     doc.text(`TOTAL PAYÉ: ${payment.amount} DH`, w - 25, 125, { align: 'right' });
     doc.setFontSize(10); doc.setFont('helvetica', 'italic'); doc.text('Signature et Cachet IPFP', w - 60, 160);
     doc.save(`Recu_${student.lastName}_${payment.month}.pdf`);
+    showToast('Reçu généré', 'success');
   };
 
   const filteredPayments = useMemo(() => {
@@ -249,6 +255,7 @@ const FinanceDashboard = () => {
                             <button onClick={async () => {
                               if (await confirmAction({ title: "Supprimer paiement ?", message: "Voulez-vous supprimer ce reçu de paiement ?", type: "danger" })) {
                                 deletePayment(p.id);
+                                showToast('Paiement supprimé', 'success');
                               }
                             }} className="action-btn delete"><Trash2 size={16} /></button>
                           </div>
@@ -316,6 +323,7 @@ const FinanceDashboard = () => {
                           onClick={async () => {
                             if (await confirmAction({ title: "Confirmer paiement ?", message: `Voulez-vous valider le salaire de ${s.total} DH pour ${s.name} ?`, type: "warning" })) {
                               await addSalary({ teacherId: s.id, teacherName: s.name, amount: s.total, hours: s.hours, month: months[salaryFilter.month], year: salaryFilter.year, date: new Date().toISOString().split('T')[0] });
+                              showToast('Paiement validé', 'success');
                             }
                           }}>Valider Paiement</button>
                       )}
@@ -323,7 +331,10 @@ const FinanceDashboard = () => {
                         <button className="action-btn delete" onClick={async () => {
                           if (await confirmAction({ title: "Annuler paiement ?", message: "Voulez-vous supprimer ce versement ?", type: "danger" })) {
                             const sal = salaries.find(sal => sal.teacherId === s.id && sal.month === months[salaryFilter.month] && sal.year === salaryFilter.year);
-                            if (sal) await deleteSalary(sal.id);
+                            if (sal) {
+                              await deleteSalary(sal.id);
+                              showToast('Paiement annulé', 'info');
+                            }
                           }
                         }}><RotateCcw size={16} /></button>
                       )}
@@ -359,7 +370,12 @@ const FinanceDashboard = () => {
                       <td style={tdStyle}><span style={{ fontWeight: '800' }}>{s.amount.toLocaleString()} DH</span></td>
                       <td style={tdStyle}>{s.date}</td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <button onClick={() => deleteSalary(s.id)} className="action-btn delete"><Trash2 size={16} /></button>
+                        <button onClick={async () => {
+                          if (await confirmAction({ title: "Supprimer ?", message: "Voulez-vous supprimer cet historique ?", type: "danger" })) {
+                            deleteSalary(s.id);
+                            showToast('Historique supprimé', 'info');
+                          }
+                        }} className="action-btn delete"><Trash2 size={16} /></button>
                       </td>
                     </tr>
                   ))}
@@ -373,7 +389,9 @@ const FinanceDashboard = () => {
       {activeTab === 'stats' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 'var(--space-4)' }}>
           <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
-            <h3 style={{ fontSize: 'var(--text-md)', fontWeight: '800', marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: '8px' }}><PieChart size={18} /> Structure Budgétaire</h3>
+            <h3 style={{ fontSize: 'var(--text-md)', fontWeight: '800', marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <PieChart size={18} /> Structure Budgétaire
+            </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', fontWeight: '700' }}>
@@ -438,10 +456,11 @@ const FinanceDashboard = () => {
                 </div>
                 <button className="btn-modern primary" style={{ width: '100%', padding: '14px', justifyContent: 'center' }}
                   onClick={async () => {
-                    if (!paymentData.studentId || !paymentData.amount) return alert('Champs requis');
+                    if (!paymentData.studentId || !paymentData.amount) return showToast('Champs requis', 'warning');
                     await addPayment(paymentData);
                     setShowPaymentModal(false);
                     setPaymentData({ ...paymentData, studentId: '', amount: '' });
+                    showToast('Encaissement validé', 'success');
                   }}><CreditCard size={18} style={{ marginRight: '8px' }} /> Valider l'encaissement</button>
               </div>
             </motion.div>

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { FILIERES, MODULES_DATA } from '../data/modules';
 import EmptyState from '../components/EmptyState';
 import { 
@@ -38,6 +39,7 @@ const getGroupAbbreviation = (filiere, annee) => {
 
 const ScheduleManagement = () => {
   const { teachers, schedules, addSchedule, deleteSchedule, modules: allModules, confirmAction } = useApp();
+  const { showToast } = useToast();
   
   const allFilieres = useMemo(() => Array.from(new Set(Object.values(FILIERES).flat())), []);
   const allAnnees = ['1ère année', '2ème année'];
@@ -65,8 +67,9 @@ const ScheduleManagement = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.module || !formData.teacherId) return alert('Veuillez remplir tous les champs');
+    if (!formData.module || !formData.teacherId) return showToast('Veuillez remplir tous les champs', 'warning');
     addSchedule({ ...formData, filiere, annee });
+    showToast('Séance ajoutée au planning', 'success');
     setShowAddModal(false);
     setFormData({ ...formData, module: '', room: '' });
   };
@@ -74,6 +77,7 @@ const ScheduleManagement = () => {
   const handleDelete = async (id) => {
     if (await confirmAction({ title: "Supprimer séance ?", message: "Voulez-vous retirer cette séance de l'emploi du temps ?", type: "danger" })) {
       deleteSchedule(id);
+      showToast('Séance supprimée', 'success');
     }
   };
 
@@ -110,11 +114,11 @@ const ScheduleManagement = () => {
       </div>
 
       <div style={{ width: '100%', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', paddingBottom: 'var(--space-6)' }} className="no-scrollbar">
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${days.length}, minmax(160px, 1fr))`, gap: 'var(--space-2)', minWidth: '100%' }}>
+        <div style={{ overflowX: 'auto', paddingBottom: 'var(--space-6)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${days.length}, minmax(160px, 1fr))`, gap: 'var(--space-1)', minWidth: 'fit-content' }}>
             {days.map(day => (
-              <div key={day} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-2xl)', padding: 'var(--space-3)', border: '1px solid var(--border-light)' }}>
-                <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '12px', color: 'var(--text-primary)', textTransform: 'uppercase', marginBottom: 'var(--space-4)', padding: '8px', background: 'white', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xs)' }}>
+              <div key={day} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-2xl)', padding: '6px', border: '1px solid var(--border-light)' }}>
+                <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '12px', color: 'var(--text-primary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)', padding: '6px', background: 'white', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xs)' }}>
                   {day}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
@@ -129,7 +133,7 @@ const ScheduleManagement = () => {
                       const teacher = teachers.find(t => t.id === session.teacherId);
                       return (
                         <motion.div key={session.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                          style={{ position: 'relative', background: 'white', padding: '12px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', borderLeft: `4px solid ${session.type === 'TP' ? 'var(--primary)' : 'var(--accent)'}` }}>
+                          style={{ position: 'relative', background: 'white', padding: '8px', minHeight: '90px', display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', borderLeft: `4px solid ${session.type === 'TP' ? 'var(--primary)' : 'var(--accent)'}` }}>
                           <button onClick={() => handleDelete(session.id)} 
                             style={{ position: 'absolute', top: '6px', right: '6px', background: 'transparent', color: 'var(--text-faint)', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: 'var(--radius-md)' }} 
                             onMouseEnter={e => e.currentTarget.style.color = 'var(--danger)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-faint)'}>
@@ -138,12 +142,21 @@ const ScheduleManagement = () => {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px' }}>
                             <Clock size={10} /> {session.time}
                           </div>
-                          <div style={{ fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-primary)', lineHeight: '1.4', marginBottom: '8px' }}>{session.module}</div>
+                          <div style={{ 
+                            fontSize: 'var(--text-xs)', 
+                            fontWeight: '800', 
+                            color: 'var(--text-primary)', 
+                            lineHeight: '1.3', 
+                            marginBottom: '8px',
+                            wordBreak: 'break-word'
+                          }}>{session.module}</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)' }}>
                             <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: 'var(--bg-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <User size={10} />
                             </div>
-                            {teacher ? teacher.name : 'N/A'}
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                              {teacher ? teacher.name : 'N/A'}
+                            </span>
                           </div>
                         </motion.div>
                       );
@@ -196,7 +209,18 @@ const ScheduleManagement = () => {
                     setFormData({...formData, teacherId: e.target.value, module: teacher?.subjects?.[0] || ''});
                   }}>
                     <option value="">Sélectionner un formateur...</option>
-                    {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {(() => {
+                      const filteredTeachers = teachers.filter(t => 
+                        (t.groups || []).includes(filiere) && 
+                        (t.years || []).includes(annee)
+                      );
+                      
+                      if (filteredTeachers.length === 0) return <option disabled>Aucun formateur assigné à cette filière/année</option>;
+                      
+                      return filteredTeachers.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ));
+                    })()}
                   </select>
                 </div>
 
@@ -206,11 +230,16 @@ const ScheduleManagement = () => {
                     <option value="">Sélectionner un module...</option>
                     {(() => {
                       const teacher = teachers.find(t => t.id === formData.teacherId);
-                      const teacherModules = teacher ? (teacher.subjects || [teacher.subject]) : [];
-                      return [
-                        ...teacherModules.filter(m => currentModules.includes(m)).map(m => ({ label: m, val: m })),
-                        ...teacherModules.filter(m => !currentModules.includes(m)).map(m => ({ label: `${m} (Hors prog.)`, val: m }))
-                      ].map(opt => <option key={opt.val} value={opt.val}>{opt.label}</option>);
+                      if (!teacher) return <option disabled>Veuillez sélectionner un formateur d'abord</option>;
+                      
+                      const teacherModules = teacher.subjects || (teacher.subject ? [teacher.subject] : []);
+                      const filtered = currentModules.filter(m => teacherModules.includes(m));
+                      
+                      if (filtered.length === 0) return <option disabled>Aucun module de cette filière n'est assigné à ce formateur</option>;
+                      
+                      return filtered.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ));
                     })()}
                   </select>
                 </div>

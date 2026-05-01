@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { getModulesForStudent, MODULES_DATA } from '../data/modules';
 import { TableSkeleton } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
@@ -63,7 +64,8 @@ const getGroupAbbreviation = (filiere, annee) => {
 const TeacherPortal = () => {
   const { teacherId } = useParams();
   const navigate = useNavigate();
-  const { teachers, students, updateGrades, grades, addNotification, loading, studentAttendance, updateStudentAttendance, schedules, updateTeacherAttendance, loadAttendanceForSession, confirmAction } = useApp();
+  const { teachers, students, updateGrades, grades, loading, studentAttendance, updateStudentAttendance, schedules, updateTeacherAttendance, loadAttendanceForSession, confirmAction } = useApp();
+  const { showToast } = useToast();
   
   const teacher = useMemo(() => {
     return teachers.find(t => t.tokenGrades === teacherId || t.tokenAttendance === teacherId || t.id === teacherId);
@@ -242,11 +244,11 @@ const TeacherPortal = () => {
       if (await confirmAction({ title: "Valider l'appel ?", message: "Cette action confirmera les présences et votre vacation.", type: "warning" })) {
         setAttendanceSuccess(true);
         await updateTeacherAttendance(teacher.id, selectedDate, 'present', `Appel validé: ${selectedSubject}`, sessionDuration, selectedSubject, currentSession?.time || '');
-        addNotification("Appel enregistré et vacation validée.");
+        showToast("Appel enregistré et vacation validée.", 'success');
         setTimeout(() => { setIsFinished(true); try { window.close(); } catch (e) {} }, 1500);
       }
     } else {
-      addNotification("Veuillez marquer tous les stagiaires.");
+      showToast("Veuillez marquer tous les stagiaires.", 'warning');
     }
   };
 
@@ -267,9 +269,9 @@ const TeacherPortal = () => {
         }
       });
     });
-    if (hasInvalid) return alert("Certaines notes sont invalides.");
+    if (hasInvalid) return showToast("Certaines notes sont invalides.", 'error');
     setSuccess(true);
-    addNotification(`Notes synchronisées pour ${selectedSubject}.`);
+    showToast(`Notes synchronisées pour ${selectedSubject}.`, 'success');
     setTimeout(() => setSuccess(false), 2500);
   };
 

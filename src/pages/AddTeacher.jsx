@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { FILIERES, MODULES_DATA } from '../data/modules';
 import { 
   ArrowLeft, 
@@ -20,13 +21,14 @@ import {
 } from 'lucide-react';
 
 const AddTeacher = () => {
-  const { addTeacher } = useApp();
+  const { addTeacher, modules: allModules } = useApp();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ name: '', diplomas: [], subjects: [], groups: [], years: [] });
   const [isSuccess, setIsSuccess] = useState(false);
   const [moduleSearch, setModuleSearch] = useState('');
 
-  const allDiplomas = Object.keys(MODULES_DATA);
+  const allDiplomas = useMemo(() => Array.from(new Set(allModules.map(m => m.diploma))), [allModules]);
 
   const toggleDiploma = (dip) => {
     setFormData(prev => {
@@ -74,11 +76,12 @@ const AddTeacher = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (formData.diplomas.length === 0) return alert('Sélectionnez au moins un diplôme.');
-    if (formData.subjects.length === 0) return alert('Sélectionnez au moins un module.');
-    if (formData.groups.length === 0) return alert('Sélectionnez au moins une filière.');
-    if (formData.years.length === 0) return alert('Sélectionnez au moins un niveau.');
+    if (formData.diplomas.length === 0) return showToast('Sélectionnez au moins un diplôme.', 'warning');
+    if (formData.subjects.length === 0) return showToast('Sélectionnez au moins un module.', 'warning');
+    if (formData.groups.length === 0) return showToast('Sélectionnez au moins une filière.', 'warning');
+    if (formData.years.length === 0) return showToast('Sélectionnez au moins un niveau.', 'warning');
     addTeacher(formData);
+    showToast('Profil formateur créé avec succès !', 'success');
     setIsSuccess(true);
     setTimeout(() => { setIsSuccess(false); navigate('/admin/teachers'); }, 1200);
   };
@@ -147,15 +150,15 @@ const AddTeacher = () => {
               </div>
             </div>
 
-            <div style={fGroup}>
-              <label style={lbl}>3. Filières assignées</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {Array.from(new Set(formData.diplomas.flatMap(d => Object.keys(MODULES_DATA[d] || {})))).map(f => (
-                  <SelectionTag key={f} active={formData.groups.includes(f)} onClick={() => toggleGroup(f)} label={f} />
-                ))}
-                {formData.diplomas.length === 0 && <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>Sélectionnez un diplôme d'abord</p>}
+              <div style={fGroup}>
+                <label style={lbl}>3. Filières assignées</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {Array.from(new Set(allModules.filter(m => formData.diplomas.includes(m.diploma)).map(m => m.major))).map(f => (
+                    <SelectionTag key={f} active={formData.groups.includes(f)} onClick={() => toggleGroup(f)} label={f} />
+                  ))}
+                  {formData.diplomas.length === 0 && <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>Sélectionnez un diplôme d'abord</p>}
+                </div>
               </div>
-            </div>
 
             {/* Modules Grid */}
             <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '32px' }}>
@@ -197,7 +200,11 @@ const AddTeacher = () => {
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '450px', overflowY: 'auto', paddingRight: '8px' }}>
                         {formData.groups.map(filiere => {
-                          const modules = Array.from(new Set(formData.diplomas.flatMap(d => MODULES_DATA[d]?.[filiere]?.[year] || [])));
+                          const modules = Array.from(new Set(allModules.filter(m => 
+                            formData.diplomas.includes(m.diploma) && 
+                            m.major === filiere && 
+                            m.year === year
+                          ).map(m => m.name)));
                           const filtered = moduleSearch ? modules.filter(m => m.toLowerCase().includes(moduleSearch.toLowerCase())) : modules;
                           if (filtered.length === 0) return null;
                           const allSelected = filtered.every(m => formData.subjects.includes(m));

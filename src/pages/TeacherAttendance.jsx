@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { MODULES_DATA } from '../data/modules';
 import { TableSkeleton } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
@@ -59,7 +60,8 @@ const getGroupAbbreviation = (filiere, annee) => {
 };
 
 const TeacherAttendance = () => {
-  const { teachers, teacherAttendance, updateTeacherAttendance, addNotification, schedules, loading } = useApp();
+  const { teachers, teacherAttendance, updateTeacherAttendance, schedules, loading } = useApp();
+  const { showToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -123,7 +125,7 @@ const TeacherAttendance = () => {
       const hours = status === 'present' ? row.duration : 0;
       await updateTeacherAttendance(row.teacher.id, selectedDate, status, '', hours, row.module, row.time);
     } catch (error) {
-      addNotification("Erreur lors de l'enregistrement.");
+      showToast("Erreur lors de l'enregistrement.", 'error');
     }
   };
 
@@ -136,7 +138,7 @@ const TeacherAttendance = () => {
   };
 
   const exportCSV = () => {
-    if (!sessionRows.length) return alert('Aucune donnée.');
+    if (!sessionRows.length) return showToast('Aucune donnée.', 'info');
     const headers = "\uFEFFFormateur,Module,Horaire,Groupes,Date,Statut,Heures\n";
     const rows = sessionRows.map(row => {
       const r = teacherAttendance.find(a => a.id === row.docId) || {};

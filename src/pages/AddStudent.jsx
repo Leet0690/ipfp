@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 const AddStudent = () => {
-  const { addStudent } = useApp();
+  const { addStudent, modules: allModules } = useApp();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', major: '', regNo: '',
@@ -24,7 +24,11 @@ const AddStudent = () => {
   });
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const availableFilieres = formData.diploma ? (FILIERES[formData.diploma] || []) : [];
+  const allDiplomas = useMemo(() => Array.from(new Set(allModules.map(m => m.diploma))), [allModules]);
+  const availableFilieres = useMemo(() => {
+    if (!formData.diploma) return [];
+    return Array.from(new Set(allModules.filter(m => m.diploma === formData.diploma).map(m => m.major)));
+  }, [allModules, formData.diploma]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -86,7 +90,7 @@ const AddStudent = () => {
                 <label style={lbl}>Niveau de formation</label>
                 <select required className="input-premium" value={formData.diploma} onChange={(e) => setFormData({...formData, diploma: e.target.value, major: ''})}>
                   <option value="">Sélectionner...</option>
-                  {Object.keys(FILIERES).map(d => <option key={d} value={d}>{d}</option>)}
+                  {allDiplomas.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <div style={fGroup}>
