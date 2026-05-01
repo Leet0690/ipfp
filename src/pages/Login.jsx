@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Logo from '../components/Logo';
-import { Lock, ArrowRight, CircleAlert } from 'lucide-react';
+import { Lock, ArrowRight, CircleAlert, Loader2 } from 'lucide-react';
 
 const Login = () => {
   const [password, setPassword] = useState('');
@@ -71,7 +71,7 @@ const Login = () => {
 
             <button type="submit" className="btn-modern primary" disabled={loading}
               style={{ width: '100%', justifyContent: 'center', padding: '12px', borderRadius: 'var(--radius-lg)', fontSize: 'var(--text-sm)', fontWeight: '700', letterSpacing: '0.02em' }}>
-              {loading ? 'Connexion...' : <>Se connecter <ArrowRight size={16} style={{ marginLeft: '6px' }} /></>}
+              {loading ? <><Loader2 size={16} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />Connexion...</> : <>Se connecter <ArrowRight size={16} style={{ marginLeft: '6px' }} /></>}
             </button>
           </form>
         </div>
