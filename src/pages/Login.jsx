@@ -8,17 +8,20 @@ import { Lock, ArrowRight, CircleAlert } from 'lucide-react';
 const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useApp();
   const navigate = useNavigate();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (login(password)) {
-      navigate('/');
-    } else {
+    setLoading(true);
+    const ok = login(password);
+    if (ok) navigate('/');
+    else {
       setError('Clé de sécurité non valide');
       setPassword('');
     }
+    setLoading(false);
   };
 
   return (
@@ -66,9 +69,9 @@ const Login = () => {
               </motion.div>
             )}
 
-            <button type="submit" className="btn-modern primary"
+            <button type="submit" className="btn-modern primary" disabled={loading}
               style={{ width: '100%', justifyContent: 'center', padding: '12px', borderRadius: 'var(--radius-lg)', fontSize: 'var(--text-sm)', fontWeight: '700', letterSpacing: '0.02em' }}>
-              Se connecter <ArrowRight size={16} style={{ marginLeft: '6px' }} />
+              {loading ? 'Connexion...' : <>Se connecter <ArrowRight size={16} style={{ marginLeft: '6px' }} /></>}
             </button>
           </form>
         </div>

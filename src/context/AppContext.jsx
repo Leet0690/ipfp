@@ -23,10 +23,10 @@ const AppContext = createContext();
 export const useApp = () => useContext(AppContext);
 
 // ──────────────────────────────────────────────────────────
-// Cache sessionStorage (TTL 5 min)
+// Cache sessionStorage (TTL 30 min)
 // ──────────────────────────────────────────────────────────
 const CACHE_KEY = 'ipfp_v1_cache';
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 30 * 60 * 1000;
 const readCache = () => {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
@@ -131,8 +131,8 @@ export const AppProvider = ({ children }) => {
           const [stuSnap, teaSnap, graSnap, schSnap, modSnap, attStuSnap, attTeaSnap, paySnap, salSnap] = await Promise.all([
             getDocs(query(collection(db, 'students'), orderBy('createdAt', 'desc'))),
             getDocs(query(collection(db, 'teachers'), orderBy('createdAt', 'desc'))),
-            getDocs(collection(db, 'grades')),
-            getDocs(collection(db, 'schedules')),
+            getDocs(query(collection(db, 'grades'), limit(500))),
+            getDocs(query(collection(db, 'schedules'), orderBy('createdAt', 'desc'), limit(500))),
             getDocs(query(collection(db, 'modules'), orderBy('name', 'asc'))),
             getDocs(query(collection(db, 'attendance_stagiaires'), where('date', '>=', dateBound))),
             getDocs(query(collection(db, 'attendance_formateurs'), where('date', '>=', dateBound))),
