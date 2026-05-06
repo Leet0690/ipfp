@@ -22,8 +22,21 @@ import {
   ChevronUp, 
   ChevronLeft,
   School,
-  UserCheck
+  UserCheck,
+  WifiOff
 } from 'lucide-react';
+
+const useOnlineStatus = () => {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const on  = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online',  on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  return isOnline;
+};
 
 const NAV_CATEGORIES = [
   {
@@ -131,6 +144,7 @@ export default function DashboardLayout({ children }) {
   const [showNotifs, setShowNotifs] = useState(false);
   const location = useLocation();
   const scrollRef = useRef(null);
+  const isOnline = useOnlineStatus();
 
   // Scroll to top on route change
   useEffect(() => {
@@ -319,6 +333,31 @@ export default function DashboardLayout({ children }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Offline badge */}
+            <AnimatePresence>
+              {!isOnline && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.85, x: 10 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.85, x: 10 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-pill)',
+                    background: 'rgba(239,68,68,0.08)',
+                    border: '1px solid rgba(239,68,68,0.2)',
+                  }}
+                >
+                  <WifiOff size={13} style={{ color: '#ef4444', flexShrink: 0 }} />
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#ef4444', whiteSpace: 'nowrap', letterSpacing: '0.03em' }}>
+                    Hors ligne
+                  </span>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', flexShrink: 0, animation: 'pulse 1.8s ease-in-out infinite' }} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Notifications */}
             <div style={{ position: 'relative' }}>
               <button 
