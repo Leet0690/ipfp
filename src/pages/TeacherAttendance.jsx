@@ -60,7 +60,7 @@ const getGroupAbbreviation = (filiere, annee) => {
 };
 
 const TeacherAttendance = () => {
-  const { teachers, teacherAttendance, updateTeacherAttendance, schedules, loading } = useApp();
+  const { teachers, teacherAttendance, updateTeacherAttendance, loadTeacherAttendanceForDate, schedules, loading } = useApp();
   const { showToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -119,6 +119,10 @@ const TeacherAttendance = () => {
     });
     return { presents, absents, totalHours, total: sessionRows.length };
   }, [sessionRows, teacherAttendance]);
+
+  React.useEffect(() => {
+    loadTeacherAttendanceForDate(selectedDate);
+  }, [selectedDate, loadTeacherAttendanceForDate]);
 
   const handleStatusChange = async (row, status) => {
     try {

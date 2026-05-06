@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 const StudentAttendance = () => {
-  const { students, studentAttendance, updateStudentAttendance, loading, schedules } = useApp();
+  const { students, studentAttendance, updateStudentAttendance, loadAttendanceForSession, loading, schedules } = useApp();
   const { showToast } = useToast();
   const [filterDiploma, setFilterDiploma] = useState('');
   const [filterMajor, setFilterMajor] = useState('');
@@ -78,6 +78,12 @@ const StudentAttendance = () => {
     });
     return { presents, absents, retards, total: filteredStudents.length };
   }, [filteredStudents, studentAttendance, filterModule, selectedDate]);
+
+  React.useEffect(() => {
+    if (filterModule && selectedDate) {
+      loadAttendanceForSession(filterModule, selectedDate);
+    }
+  }, [filterModule, selectedDate, loadAttendanceForSession]);
 
   const handleStatusChange = async (studentId, status) => {
     if (!filterModule) {

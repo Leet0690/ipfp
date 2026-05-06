@@ -501,13 +501,13 @@ const AdminDashboard = () => {
   });
 
   const studentAttendanceRate = useMemo(() => {
-    if (!studentAttendance || studentAttendance.length === 0) return 0;
+    if (!studentAttendance || studentAttendance.length === 0) return null;
     const presents = studentAttendance.filter(a => a.status === 'present').length;
     return Math.round((presents / studentAttendance.length) * 100);
   }, [studentAttendance]);
 
   const teacherAttendanceRate = useMemo(() => {
-    if (!teacherAttendance || teacherAttendance.length === 0) return 0;
+    if (!teacherAttendance || teacherAttendance.length === 0) return null;
     const presents = teacherAttendance.filter(a => a.status === 'present').length;
     return Math.round((presents / teacherAttendance.length) * 100);
   }, [teacherAttendance]);
@@ -566,8 +566,8 @@ const AdminDashboard = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
             <StatCard delay={0.05} icon={GraduationCap} iconColor="var(--primary)" iconBg="var(--primary-ultra-light)" value={(students || []).length} label="Total Stagiaires" />
             <StatCard delay={0.1} icon={UserPlus} iconColor="#a06208" iconBg="rgba(254, 205, 8, 0.12)" value={(teachers || []).length} label="Total Formateurs" />
-            <StatCard delay={0.15} icon={UserPlus} iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={`${studentAttendanceRate}%`} label="Présence Stagiaires" />
-            <StatCard delay={0.2} icon={User} iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={`${teacherAttendanceRate}%`} label="Présence Formateurs" />
+            <StatCard delay={0.15} icon={UserPlus} iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={studentAttendanceRate === null ? '—' : `${studentAttendanceRate}%`} label="Présence Stagiaires" />
+            <StatCard delay={0.2} icon={User} iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={teacherAttendanceRate === null ? '—' : `${teacherAttendanceRate}%`} label="Présence Formateurs" />
             <StatCard delay={0.25} icon={FileText} iconColor="var(--accent)" iconBg="rgba(254, 205, 8, 0.1)" value={`${gradesProgress}%`} label="Saisie des Notes" />
           </div>
           <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} />

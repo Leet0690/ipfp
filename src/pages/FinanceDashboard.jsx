@@ -34,7 +34,8 @@ const FinanceDashboard = () => {
   const { 
     students, teachers, payments, salaries, loading,
     addPayment, deletePayment, addSalary, deleteSalary, updateTeacher,
-    teacherAttendance, isDirectorAuth, loginDirector, logoutDirector, logout, confirmAction
+    teacherAttendance, loadFinancialData, loadTeacherAttendanceForMonth,
+    isDirectorAuth, loginDirector, logoutDirector, logout, confirmAction
   } = useApp();
   const { showToast } = useToast();
 
@@ -68,6 +69,18 @@ const FinanceDashboard = () => {
     "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
     "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
   ];
+
+  React.useEffect(() => {
+    if (isDirectorAuth) {
+      loadFinancialData();
+    }
+  }, [isDirectorAuth, loadFinancialData]);
+
+  React.useEffect(() => {
+    if (isDirectorAuth) {
+      loadTeacherAttendanceForMonth(salaryFilter.month, salaryFilter.year);
+    }
+  }, [isDirectorAuth, salaryFilter.month, salaryFilter.year, loadTeacherAttendanceForMonth]);
 
   const handleLogin = (e) => {
     e.preventDefault();
