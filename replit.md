@@ -16,6 +16,7 @@ An academic management portal for Institut Polytechnique de la Formation Profess
 - **UI**: Lucide React icons, Framer Motion animations, Recharts for charts
 - **PDF export**: jsPDF
 - **Tables**: TanStack React Table
+- **PWA**: vite-plugin-pwa (Workbox `generateSW`); icons in `public/pwa-192.png` & `public/pwa-512.png`
 
 ## Where things live
 
@@ -33,6 +34,8 @@ An academic management portal for Institut Polytechnique de la Formation Profess
 - Schedule sessions use `time: "HH:mm-HH:mm"` string format (parsed at render time via `parseTimeRange`)
 - Token-based public access: revocable Firestore-stored tokens for student results and teacher portals
 - Admin portal is password-protected via `AdminAuthContext`; no Firebase Auth used for admins
+- All pages are lazy-loaded via `React.lazy()` + `Suspense`; vendor libs split into named chunks in `vite.config.js`
+- Service worker precaches all static assets; Firestore API calls use `NetworkFirst` (5s timeout) for offline resilience
 
 ## Product
 
