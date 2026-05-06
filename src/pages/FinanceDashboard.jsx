@@ -53,14 +53,12 @@ const FinanceDashboard = () => {
   const [salariesPage, setSalariesPage] = useState(1);
   const itemsPerPage = 10;
   
-  // Expense Filter State
   const [expenseFilter, setExpenseFilter] = useState({
     month: '',
     year: new Date().getFullYear(),
     category: ''
   });
 
-  // Expense Modal State
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenseData, setExpenseData] = useState({
     label: '',
@@ -71,7 +69,6 @@ const FinanceDashboard = () => {
     year: new Date().getFullYear()
   });
 
-  // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentData, setPaymentData] = useState({
     studentId: '',
@@ -82,7 +79,6 @@ const FinanceDashboard = () => {
   });
   const [paymentModalFilter, setPaymentModalFilter] = useState({ diploma: '', major: '', year: '' });
 
-  // Salary Calculation State
   const [salaryFilter, setSalaryFilter] = useState({
     teacherId: '',
     month: new Date().getMonth(),
@@ -271,7 +267,6 @@ const FinanceDashboard = () => {
         </div>
       </div>
 
-      {/* Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
         <StatCard title="Revenus Totaux" value={stats.revenue} icon={TrendingUp} color="var(--success)" />
         <StatCard title="Charges Salariales" value={stats.expenses} icon={TrendingDown} color="var(--danger)" />
@@ -401,7 +396,7 @@ const FinanceDashboard = () => {
                             style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', fontSize: '10px', fontWeight: '700', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-pill)', background: 'var(--bg-subtle)', color: 'var(--text-secondary)', cursor: 'pointer', transition: 'all 0.15s' }}
                             onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.background = 'var(--primary-ultra-light)'; }}
                             onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-subtle)'; }}>
-                            <Edit3 size={10} /> Modifier
+                            <Edit3 size={10} />
                           </button>
                         </div>
                       )}
@@ -483,7 +478,6 @@ const FinanceDashboard = () => {
 
       {activeTab === 'expenses' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          {/* Filter bar */}
           <div className="glass-card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <CalendarDays size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <select className="input-premium" style={{ minWidth: '130px' }}
@@ -578,12 +572,13 @@ const FinanceDashboard = () => {
       )}
 
       {activeTab === 'stats' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 'var(--space-4)' }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-6)' }}>
           <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
-            <h3 style={{ fontSize: 'var(--text-md)', fontWeight: '800', marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <PieChart size={18} /> Structure Budgétaire
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--space-6)' }}>
+              <PieChart size={24} style={{ color: 'var(--accent)' }} />
+              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: '900' }}>Structure Budgétaire</h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', fontWeight: '700' }}>
                   <span>Revenus (Encaissements)</span>
@@ -624,7 +619,6 @@ const FinanceDashboard = () => {
         </motion.div>
       )}
 
-      {/* Expense Modal */}
       <AnimatePresence>
         {showExpenseModal && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -691,7 +685,6 @@ const FinanceDashboard = () => {
         )}
       </AnimatePresence>
 
-      {/* Payment Modal */}
       <AnimatePresence>
         {showPaymentModal && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -702,7 +695,6 @@ const FinanceDashboard = () => {
                 <button onClick={() => setShowPaymentModal(false)} className="action-btn"><X size={20} /></button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                {/* Filters row */}
                 <div style={{ background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <p style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Filtrer la liste des stagiaires</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
@@ -748,7 +740,6 @@ const FinanceDashboard = () => {
                     {modalStudents.map(s => <option key={s.id} value={s.id}>{s.lastName} {s.firstName}</option>)}
                   </select>
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>
                     <label style={lbl}>Montant (DH)</label>
@@ -761,7 +752,6 @@ const FinanceDashboard = () => {
                     </select>
                   </div>
                 </div>
-
                 <button className="btn-modern primary" style={{ width: '100%', padding: '14px', justifyContent: 'center' }}
                   onClick={async () => {
                     if (!paymentData.studentId || !paymentData.amount) return showToast('Champs requis', 'warning');
