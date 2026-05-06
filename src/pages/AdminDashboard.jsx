@@ -512,6 +512,8 @@ const AdminDashboard = () => {
     initialState: { pagination: { pageSize: 10 } },
   });
 
+  const currentMonthName = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][new Date().getMonth()];
+
   const studentAttendanceRate = useMemo(() => {
     if (!studentAttendance || studentAttendance.length === 0) return null;
     const presents = studentAttendance.filter(a => a.status === 'present').length;
@@ -523,6 +525,29 @@ const AdminDashboard = () => {
     const presents = teacherAttendance.filter(a => a.status === 'present').length;
     return Math.round((presents / teacherAttendance.length) * 100);
   }, [teacherAttendance]);
+
+  const [alertThreshold, setAlertThreshold] = useState(10);
+
+  const flaggedStudents = useMemo(() => {
+    if (!studentAttendance || studentAttendance.length === 0 || !students || students.length === 0) return [];
+    const byStudent = {};
+    studentAttendance.forEach(a => {
+      if (!byStudent[a.studentId]) byStudent[a.studentId] = { total: 0, absences: 0 };
+      byStudent[a.studentId].total++;
+      if (a.status === 'absent') byStudent[a.studentId].absences++;
+    });
+    return students
+      .filter(s => {
+        const rec = byStudent[s.id];
+        if (!rec || rec.total === 0) return false;
+        return (rec.absences / rec.total) * 100 >= alertThreshold;
+      })
+      .map(s => {
+        const rec = byStudent[s.id];
+        return { ...s, absenceRate: Math.round((rec.absences / rec.total) * 100), absences: rec.absences, total: rec.total };
+      })
+      .sort((a, b) => b.absenceRate - a.absenceRate);
+  }, [studentAttendance, students, alertThreshold]);
 
   const gradesProgress = useMemo(() => {
     if (!students || students.length === 0) return 0;
@@ -578,10 +603,85 @@ const AdminDashboard = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
             <StatCard delay={0.05} icon={GraduationCap} iconColor="var(--primary)" iconBg="var(--primary-ultra-light)" value={(students || []).length} label="Total Stagiaires" />
             <StatCard delay={0.1} icon={UserPlus} iconColor="#a06208" iconBg="rgba(254, 205, 8, 0.12)" value={(teachers || []).length} label="Total Formateurs" />
-            <StatCard delay={0.15} icon={UserPlus} iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={studentAttendanceRate === null ? '—' : `${studentAttendanceRate}%`} label="Présence Stagiaires" />
-            <StatCard delay={0.2} icon={User} iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={teacherAttendanceRate === null ? '—' : `${teacherAttendanceRate}%`} label="Présence Formateurs" />
+            <StatCard delay={0.15} icon={UserPlus} iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={studentAttendanceRate === null ? '—' : `${studentAttendanceRate}%`} label={`Présence Stagiaires — ${currentMonthName}`} />
+            <StatCard delay={0.2} icon={User} iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={teacherAttendanceRate === null ? '—' : `${teacherAttendanceRate}%`} label={`Présence Formateurs — ${currentMonthName}`} />
             <StatCard delay={0.25} icon={FileText} iconColor="var(--accent)" iconBg="rgba(254, 205, 8, 0.1)" value={`${gradesProgress}%`} label="Saisie des Notes" />
           </div>
+          {/* Absence Alert Widget */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass-card" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-lg)', background: 'rgba(220,38,38,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <AlertTriangle size={18} style={{ color: '#dc2626' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>Alertes Absentéisme</h3>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', fontWeight: '600' }}>
+                    Stagiaires dont le taux d'absence dépasse le seuil
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Seuil d'alerte :</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input
+                    type="range" min="5" max="50" step="5"
+                    value={alertThreshold}
+                    onChange={e => setAlertThreshold(Number(e.target.value))}
+                    style={{ width: '90px', accentColor: '#dc2626', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '13px', fontWeight: '900', color: '#dc2626', minWidth: '36px' }}>{alertThreshold}%</span>
+                </div>
+              </div>
+            </div>
+
+            {flaggedStudents.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 'var(--radius-xl)' }}>
+                <CheckCircle2 size={16} style={{ color: '#15803d', flexShrink: 0 }} />
+                <span style={{ fontSize: '12px', fontWeight: '700', color: '#15803d' }}>
+                  {studentAttendance.length === 0 ? 'Aucune donnée de présence disponible.' : `Aucun stagiaire ne dépasse le seuil de ${alertThreshold}%.`}
+                </span>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '900', color: '#dc2626', background: 'rgba(220,38,38,0.10)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 'var(--radius-pill)', padding: '3px 10px' }}>
+                    {flaggedStudents.length} stagiaire{flaggedStudents.length > 1 ? 's' : ''} en alerte
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                  {flaggedStudents.map(s => {
+                    const rate = s.absenceRate;
+                    const severity = rate >= 30 ? '#b91c1c' : rate >= 20 ? '#dc2626' : '#ef4444';
+                    const bg = rate >= 30 ? 'rgba(185,28,28,0.07)' : 'rgba(220,38,38,0.05)';
+                    return (
+                      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: bg, border: `1px solid ${severity}22`, borderRadius: 'var(--radius-lg)' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${severity}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <span style={{ fontSize: '11px', fontWeight: '900', color: severity }}>{(s.lastName || '?')[0]}</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.lastName} {s.firstName}
+                          </p>
+                          <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', marginTop: '2px' }}>
+                            {s.major} · {s.year}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: '15px', fontWeight: '900', color: severity, lineHeight: 1 }}>{rate}%</div>
+                          <div style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-faint)', marginTop: '2px' }}>{s.absences} abs. / {s.total} séances</div>
+                        </div>
+                        <div style={{ width: '60px', height: '6px', background: 'var(--border-light)', borderRadius: '3px', flexShrink: 0, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.min(rate, 100)}%`, background: severity, borderRadius: '3px', transition: 'width 0.4s' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </motion.div>
+
           <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} />
         </div>
       )}
