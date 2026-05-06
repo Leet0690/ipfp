@@ -29,7 +29,9 @@ import {
   History,
   CalendarDays,
   Receipt,
-  Tag
+  Tag,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const EXPENSE_CATEGORIES = ['Loyer', 'Matériel', 'Fournitures', 'Services', 'Entretien', 'Communication', 'Transport', 'Autre'];
@@ -45,6 +47,7 @@ const FinanceDashboard = () => {
   const { showToast } = useToast();
 
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('payments');
   const [searchTerm, setSearchTerm] = useState('');
   const [teacherSearchTerm, setTeacherSearchTerm] = useState('');
@@ -107,11 +110,7 @@ const FinanceDashboard = () => {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (!loginDirector(password)) {
-      showToast('Mot de passe incorrect', 'error');
-    } else {
-      showToast('Accès autorisé', 'success');
-    }
+    loginDirector(password);
   };
 
   const handleSaveRate = async (teacherId) => {
@@ -252,7 +251,13 @@ const FinanceDashboard = () => {
           <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', marginBottom: 'var(--space-2)' }}>Espace Direction</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-8)' }}>Accès restreint à la gestion financière de l'IPFP.</p>
           <form onSubmit={handleLogin}>
-            <input type="password" className="input-premium" placeholder="Mot de passe confidentiel" style={{ width: '100%', marginBottom: 'var(--space-4)', textAlign: 'center', padding: '14px' }} value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
+            <div style={{ position: 'relative', marginBottom: 'var(--space-4)' }}>
+              <input type={showPassword ? 'text' : 'password'} className="input-premium" placeholder="Mot de passe confidentiel" style={{ width: '100%', textAlign: 'center', padding: '14px', paddingRight: '48px' }} value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
+              <button type="button" onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', display: 'flex' }}>
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             <button type="submit" className="btn-modern primary" style={{ width: '100%', justifyContent: 'center', padding: '14px' }}>
               Déverrouiller <ArrowRight size={18} style={{ marginLeft: '8px' }} />
             </button>

@@ -30,12 +30,14 @@ export const AdminAuthProvider = ({ children }) => {
     try {
       const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
       const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
+      const DIRECTOR_PASSWORD = import.meta.env.VITE_DIRECTOR_PASSWORD;
+      const cleanPassword = password.trim();
 
-      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+      if (email === ADMIN_EMAIL && (cleanPassword === ADMIN_PASSWORD || cleanPassword === DIRECTOR_PASSWORD)) {
         const admin = {
-          id: 'admin_001',
+          id: cleanPassword === DIRECTOR_PASSWORD ? 'director_001' : 'admin_001',
           email,
-          role: 'super_admin',
+          role: cleanPassword === DIRECTOR_PASSWORD ? 'director' : 'super_admin',
           createdAt: new Date().toISOString(),
           lastLogin: new Date().toISOString()
         };

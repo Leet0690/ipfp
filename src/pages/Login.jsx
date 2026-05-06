@@ -3,10 +3,11 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Logo from '../components/Logo';
-import { Lock, ArrowRight, CircleAlert, Loader2 } from 'lucide-react';
+import { Lock, ArrowRight, CircleAlert, Loader2, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useApp();
@@ -60,9 +61,13 @@ const Login = () => {
               </label>
               <div style={{ position: 'relative' }}>
                 <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="input-premium" style={{ width: '100%', paddingLeft: '42px', paddingTop: '12px', paddingBottom: '12px', opacity: loading ? 0.6 : 1 }}
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                  className="input-premium" style={{ width: '100%', paddingLeft: '42px', paddingRight: '44px', paddingTop: '12px', paddingBottom: '12px', opacity: loading ? 0.6 : 1 }}
                   placeholder="••••••••" required autoComplete="current-password" disabled={loading} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', display: 'flex' }}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
 

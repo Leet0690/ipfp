@@ -310,20 +310,29 @@ export const AppProvider = ({ children }) => {
   }, [isDirectorAuth]);
 
   const login = (password) => {
-    if (password === import.meta.env.VITE_ADMIN_PASSWORD) { 
-      setIsAuthenticated(true); 
+    const adminPass = import.meta.env.VITE_ADMIN_PASSWORD;
+    const directorPass = import.meta.env.VITE_DIRECTOR_PASSWORD;
+    const cleanPassword = password.trim();
+
+    if (cleanPassword === adminPass || cleanPassword === directorPass) {
+      setIsAuthenticated(true);
+      if (cleanPassword === directorPass) {
+        setIsDirectorAuth(true);
+      }
       showToast('Connexion réussie', 'success');
-      return true; 
+      return true;
     }
     showToast('Mot de passe incorrect', 'error');
     return false;
   };
 
   const loginDirector = (password) => {
-    if (password === import.meta.env.VITE_DIRECTOR_PASSWORD) { 
-      setIsDirectorAuth(true); 
-      showToast('Connexion direction réussie', 'success');
-      return true; 
+    const cleanPassword = password.trim();
+
+    if (cleanPassword === import.meta.env.VITE_DIRECTOR_PASSWORD) {
+      setIsDirectorAuth(true);
+      showToast('Accès Direction autorisé', 'success');
+      return true;
     }
     showToast('Mot de passe incorrect', 'error');
     return false;
