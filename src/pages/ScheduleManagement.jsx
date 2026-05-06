@@ -69,7 +69,6 @@ const ScheduleManagement = () => {
     e.preventDefault();
     if (!formData.module || !formData.teacherId) return showToast('Veuillez remplir tous les champs', 'warning');
     addSchedule({ ...formData, filiere, annee });
-    showToast('Séance ajoutée au planning', 'success');
     setShowAddModal(false);
     setFormData({ ...formData, module: '', room: '' });
   };
@@ -77,7 +76,6 @@ const ScheduleManagement = () => {
   const handleDelete = async (id) => {
     if (await confirmAction({ title: "Supprimer séance ?", message: "Voulez-vous retirer cette séance de l'emploi du temps ?", type: "danger" })) {
       deleteSchedule(id);
-      showToast('Séance supprimée', 'success');
     }
   };
 

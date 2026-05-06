@@ -105,10 +105,8 @@ const ModuleManagement = () => {
         for (const id of selectedIds) {
           await updateModule(id, { ...formData, name: trimmedName, coefficient: parseFloat(formData.coefficient) });
         }
-        showToast('Module mis à jour', 'success');
       } else {
         await addModule({ ...formData, name: trimmedName, coefficient: parseFloat(formData.coefficient) });
-        showToast('Module ajouté', 'success');
       }
       setIsModalOpen(false);
       resetForm();
@@ -153,7 +151,6 @@ const ModuleManagement = () => {
       for (const id of group.ids) {
         await deleteModule(id);
       }
-      showToast('Module supprimé', 'success');
     }
   };
 

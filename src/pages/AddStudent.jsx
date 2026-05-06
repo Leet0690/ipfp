@@ -43,20 +43,21 @@ const AddStudent = () => {
   };
 
   return (
-    <div className="max-w-container section-padding" style={{ maxWidth: '680px' }}>
+    <div className="max-w-container section-padding">
+    <div className="page-shell narrow">
       <button onClick={() => navigate('/admin/students')} className="action-btn" style={{ marginBottom: 'var(--space-8)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
         <ArrowLeft size={16} />
         <span style={{ fontSize: '13px', fontWeight: '800' }}>Retour à la liste</span>
       </button>
 
-      <div style={{ marginBottom: 'var(--space-8)' }}>
-        <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <UserPlus size={28} style={{ color: 'var(--primary)' }} /> Inscription Stagiaire
+      <div className="page-header">
+        <h1 className="page-title">
+          <UserPlus size={28} className="page-title-icon" /> Inscription Stagiaire
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Ajouter un nouveau profil académique à la base de données.</p>
+        <p className="page-subtitle">Ajouter un nouveau profil académique à la base de données.</p>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card" style={{ padding: '32px' }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card form-card">
         {isSuccess ? (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -67,34 +68,34 @@ const AddStudent = () => {
             <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Redirection vers la liste des stagiaires...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div style={fGroup}>
-                <label style={lbl}>Nom de famille</label>
-                <div style={{ position: 'relative' }}>
-                  <User size={14} style={fIcon} />
+          <form onSubmit={handleSubmit} className="form-stack">
+            <div className="form-grid">
+              <div className="field-group">
+                <label className="field-label">Nom de famille</label>
+                <div className="input-with-icon">
+                  <User size={14} className="field-icon" />
                   <input required className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} placeholder="Ex: ALAMI" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} />
                 </div>
               </div>
-              <div style={fGroup}>
-                <label style={lbl}>Prénom</label>
-                <div style={{ position: 'relative' }}>
-                  <User size={14} style={fIcon} />
+              <div className="field-group">
+                <label className="field-label">Prénom</label>
+                <div className="input-with-icon">
+                  <User size={14} className="field-icon" />
                   <input required className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} placeholder="Ex: Omar" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} />
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div style={fGroup}>
-                <label style={lbl}>Niveau de formation</label>
+            <div className="form-grid">
+              <div className="field-group">
+                <label className="field-label">Niveau de formation</label>
                 <select required className="input-premium" value={formData.diploma} onChange={(e) => setFormData({...formData, diploma: e.target.value, major: ''})}>
                   <option value="">Sélectionner...</option>
                   {allDiplomas.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
-              <div style={fGroup}>
-                <label style={lbl}>Année d'étude</label>
+              <div className="field-group">
+                <label className="field-label">Année d'étude</label>
                 <select required className="input-premium" value={formData.year} onChange={(e) => setFormData({...formData, year: e.target.value})}>
                   <option value="">Sélectionner...</option>
                   <option value="1ère année">1ère année</option>
@@ -103,10 +104,10 @@ const AddStudent = () => {
               </div>
             </div>
 
-            <div style={fGroup}>
-              <label style={lbl}>Filière spécifique</label>
-              <div style={{ position: 'relative' }}>
-                <Layers size={14} style={fIcon} />
+            <div className="field-group">
+              <label className="field-label">Filière spécifique</label>
+              <div className="input-with-icon">
+                <Layers size={14} className="field-icon" />
                 <select required className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} value={formData.major} onChange={(e) => setFormData({...formData, major: e.target.value})} disabled={!formData.diploma}>
                   <option value="">{formData.diploma ? 'Choisir la filière' : 'Veuillez choisir un niveau'}</option>
                   {availableFilieres.map(f => <option key={f} value={f}>{f}</option>)}
@@ -114,10 +115,10 @@ const AddStudent = () => {
               </div>
             </div>
 
-            <div style={fGroup}>
-              <label style={lbl}>Numéro de Matricule</label>
-              <div style={{ position: 'relative' }}>
-                <Hash size={14} style={fIcon} />
+            <div className="field-group">
+              <label className="field-label">Numéro de Matricule</label>
+              <div className="input-with-icon">
+                <Hash size={14} className="field-icon" />
                 <input required className="input-premium" style={{ width: '100%', paddingLeft: '34px', fontFamily: 'monospace' }} placeholder="IPFP-XXXX-XXXX" value={formData.regNo} onChange={(e) => setFormData({...formData, regNo: e.target.value})} />
               </div>
             </div>
@@ -128,12 +129,9 @@ const AddStudent = () => {
           </form>
         )}
       </motion.div>
+      </div>
     </div>
   );
 };
-
-const fGroup = { display: 'flex', flexDirection: 'column', gap: '6px' };
-const lbl = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' };
-const fIcon = { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' };
 
 export default AddStudent;

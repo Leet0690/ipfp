@@ -81,26 +81,26 @@ const AddTeacher = () => {
     if (formData.groups.length === 0) return showToast('Sélectionnez au moins une filière.', 'warning');
     if (formData.years.length === 0) return showToast('Sélectionnez au moins un niveau.', 'warning');
     addTeacher(formData);
-    showToast('Profil formateur créé avec succès !', 'success');
     setIsSuccess(true);
     setTimeout(() => { setIsSuccess(false); navigate('/admin/teachers'); }, 1200);
   };
 
   return (
-    <div className="max-w-container section-padding" style={{ maxWidth: '1000px' }}>
+    <div className="max-w-container section-padding">
+    <div className="page-shell">
       <button onClick={() => navigate('/admin/teachers')} className="action-btn" style={{ marginBottom: 'var(--space-8)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
         <ArrowLeft size={16} />
         <span style={{ fontSize: '13px', fontWeight: '800' }}>Retour à la liste</span>
       </button>
 
-      <div style={{ marginBottom: 'var(--space-8)' }}>
-        <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <UserPlus size={28} style={{ color: 'var(--primary)' }} /> Profil Formateur
+      <div className="page-header">
+        <h1 className="page-title">
+          <UserPlus size={28} className="page-title-icon" /> Profil Formateur
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Définir un nouveau membre du corps enseignant et ses habilitations.</p>
+        <p className="page-subtitle">Définir un nouveau membre du corps enseignant et ses habilitations.</p>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card" style={{ padding: '32px' }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card form-card">
         {isSuccess ? (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -111,38 +111,38 @@ const AddTeacher = () => {
             <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Redirection en cours...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          <form onSubmit={handleSubmit} className="form-stack spacious">
             {/* Identity & Rate */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: '20px' }}>
-              <div style={fGroup}>
-                <label style={lbl}>Nom complet du formateur</label>
-                <div style={{ position: 'relative' }}>
-                  <User size={14} style={fIcon} />
+            <div className="form-grid identity-grid">
+              <div className="field-group">
+                <label className="field-label">Nom complet du formateur</label>
+                <div className="input-with-icon">
+                  <User size={14} className="field-icon" />
                   <input required className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} placeholder="Ex: Dr. ALAMI Mohamed" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                 </div>
               </div>
-              <div style={fGroup}>
-                <label style={lbl}>Tarif horaire (DH)</label>
-                <div style={{ position: 'relative' }}>
-                  <Banknote size={14} style={fIcon} />
+              <div className="field-group">
+                <label className="field-label">Tarif horaire (DH)</label>
+                <div className="input-with-icon">
+                  <Banknote size={14} className="field-icon" />
                   <input type="number" required className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} placeholder="Ex: 150" value={formData.hourlyRate || ''} onChange={(e) => setFormData({...formData, hourlyRate: parseFloat(e.target.value) || 0})} />
                 </div>
               </div>
             </div>
 
             {/* Selection Steps */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-              <div style={fGroup}>
-                <label style={lbl}>1. Diplômes préparés</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <div className="form-grid wide">
+              <div className="field-group">
+                <label className="field-label">1. Diplômes préparés</label>
+                <div className="choice-list">
                   {allDiplomas.map(dip => (
                     <SelectionTag key={dip} active={formData.diplomas.includes(dip)} onClick={() => toggleDiploma(dip)} label={dip} />
                   ))}
                 </div>
               </div>
-              <div style={fGroup}>
-                <label style={lbl}>2. Niveaux d'enseignement</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <div className="field-group">
+                <label className="field-label">2. Niveaux d'enseignement</label>
+                <div className="choice-list">
                   {['1ère année', '2ème année'].map(y => (
                     <SelectionTag key={y} active={formData.years.includes(y)} onClick={() => toggleYear(y)} label={y} />
                   ))}
@@ -150,9 +150,9 @@ const AddTeacher = () => {
               </div>
             </div>
 
-              <div style={fGroup}>
-                <label style={lbl}>3. Filières assignées</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <div className="field-group">
+                <label className="field-label">3. Filières assignées</label>
+                <div className="choice-list">
                   {Array.from(new Set(allModules.filter(m => formData.diplomas.includes(m.diploma)).map(m => m.major))).map(f => (
                     <SelectionTag key={f} active={formData.groups.includes(f)} onClick={() => toggleGroup(f)} label={f} />
                   ))}
@@ -161,15 +161,15 @@ const AddTeacher = () => {
               </div>
 
             {/* Modules Grid */}
-            <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '32px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div className="section-divider">
+              <div className="toolbar-row" style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <BookOpen size={20} style={{ color: 'var(--primary)' }} />
-                  <label style={lbl}>4. Modules enseignés ({formData.subjects.length})</label>
+                  <label className="field-label">4. Modules enseignés ({formData.subjects.length})</label>
                 </div>
                 {(formData.years.length > 0 && formData.groups.length > 0) && (
-                  <div style={{ position: 'relative', width: '260px' }}>
-                    <Search size={14} style={fIcon} />
+                  <div className="input-with-icon responsive-search">
+                    <Search size={14} className="field-icon" />
                     <input className="input-premium" style={{ width: '100%', paddingLeft: '34px', height: '36px', fontSize: '12px' }} placeholder="Rechercher un module..." value={moduleSearch} onChange={(e) => setModuleSearch(e.target.value)} />
                   </div>
                 )}
@@ -186,7 +186,7 @@ const AddTeacher = () => {
               )}
 
               {formData.years.length === 0 || formData.groups.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '48px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-2xl)', border: '2px dashed var(--border-light)' }}>
+                <div className="empty-panel">
                   <Target size={32} style={{ color: 'var(--text-faint)', marginBottom: '16px' }} />
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>Veuillez définir les Niveaux et Filières pour lister les modules.</p>
                 </div>
@@ -246,6 +246,7 @@ const AddTeacher = () => {
           </form>
         )}
       </motion.div>
+      </div>
     </div>
   );
 };
@@ -259,9 +260,5 @@ const SelectionTag = ({ active, label, onClick }) => (
     boxShadow: active ? 'var(--shadow-glow)' : 'none'
   }}>{label}</button>
 );
-
-const fGroup = { display: 'flex', flexDirection: 'column', gap: '6px' };
-const lbl = { fontSize: '10px', fontWeight: '900', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' };
-const fIcon = { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' };
 
 export default AddTeacher;

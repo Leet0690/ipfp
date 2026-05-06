@@ -255,7 +255,6 @@ const FinanceDashboard = () => {
                             <button onClick={async () => {
                               if (await confirmAction({ title: "Supprimer paiement ?", message: "Voulez-vous supprimer ce reçu de paiement ?", type: "danger" })) {
                                 deletePayment(p.id);
-                                showToast('Paiement supprimé', 'success');
                               }
                             }} className="action-btn delete"><Trash2 size={16} /></button>
                           </div>
@@ -323,7 +322,6 @@ const FinanceDashboard = () => {
                           onClick={async () => {
                             if (await confirmAction({ title: "Confirmer paiement ?", message: `Voulez-vous valider le salaire de ${s.total} DH pour ${s.name} ?`, type: "warning" })) {
                               await addSalary({ teacherId: s.id, teacherName: s.name, amount: s.total, hours: s.hours, month: months[salaryFilter.month], year: salaryFilter.year, date: new Date().toISOString().split('T')[0] });
-                              showToast('Paiement validé', 'success');
                             }
                           }}>Valider Paiement</button>
                       )}
@@ -333,7 +331,6 @@ const FinanceDashboard = () => {
                             const sal = salaries.find(sal => sal.teacherId === s.id && sal.month === months[salaryFilter.month] && sal.year === salaryFilter.year);
                             if (sal) {
                               await deleteSalary(sal.id);
-                              showToast('Paiement annulé', 'info');
                             }
                           }
                         }}><RotateCcw size={16} /></button>
@@ -373,7 +370,6 @@ const FinanceDashboard = () => {
                         <button onClick={async () => {
                           if (await confirmAction({ title: "Supprimer ?", message: "Voulez-vous supprimer cet historique ?", type: "danger" })) {
                             deleteSalary(s.id);
-                            showToast('Historique supprimé', 'info');
                           }
                         }} className="action-btn delete"><Trash2 size={16} /></button>
                       </td>
@@ -460,7 +456,6 @@ const FinanceDashboard = () => {
                     await addPayment(paymentData);
                     setShowPaymentModal(false);
                     setPaymentData({ ...paymentData, studentId: '', amount: '' });
-                    showToast('Encaissement validé', 'success');
                   }}><CreditCard size={18} style={{ marginRight: '8px' }} /> Valider l'encaissement</button>
               </div>
             </motion.div>

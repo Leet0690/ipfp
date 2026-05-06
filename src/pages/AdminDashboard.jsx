@@ -133,8 +133,8 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
       </div>
       
       <div style={{ width: '100%', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'auto', scrollbarColor: 'var(--primary-light) var(--bg-subtle)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(160px, 1fr))', gap: '6px', padding: '4px', minWidth: 'fit-content' }}>
+        <div className="schedule-scroll">
+          <div className="schedule-week-grid">
           {scheduleData.map((dayPlan, i) => (
             <div key={i} style={{ 
               display: 'flex', flexDirection: 'column', 
@@ -335,7 +335,6 @@ const AdminDashboard = () => {
     })) {
       if (activeTab === 'students') deleteStudent(item.id);
       else deleteTeacher(item.id);
-      showToast('Supprimé avec succès', 'success');
     }
   }, [activeTab, deleteStudent, deleteTeacher, confirmAction, showToast]);
 
@@ -359,7 +358,6 @@ const AdminDashboard = () => {
       }
       
       setSaveSuccess(true);
-      showToast('Enregistré avec succès', 'success');
       setTimeout(() => {
         setSaveSuccess(false);
         closeModal();
