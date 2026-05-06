@@ -53,6 +53,13 @@ const FinanceDashboard = () => {
   const [salariesPage, setSalariesPage] = useState(1);
   const itemsPerPage = 10;
   
+  // Expense Filter State
+  const [expenseFilter, setExpenseFilter] = useState({
+    month: '',
+    year: new Date().getFullYear(),
+    category: ''
+  });
+
   // Expense Modal State
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenseData, setExpenseData] = useState({
@@ -173,6 +180,20 @@ const FinanceDashboard = () => {
   }, [salaries, salariesPage, itemsPerPage]);
   
   const totalSalariesPages = Math.ceil(salaries.length / itemsPerPage);
+
+  const filteredExpenses = useMemo(() => {
+    return (expenses || []).filter(e => {
+      if (expenseFilter.month && e.month !== expenseFilter.month) return false;
+      if (expenseFilter.year && e.year !== expenseFilter.year) return false;
+      if (expenseFilter.category && e.category !== expenseFilter.category) return false;
+      return true;
+    });
+  }, [expenses, expenseFilter]);
+
+  const filteredExpensesTotal = useMemo(() =>
+    filteredExpenses.reduce((acc, e) => acc + (parseFloat(e.amount) || 0), 0),
+    [filteredExpenses]
+  );
 
   const stats = useMemo(() => {
     const totalRevenue = payments.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
@@ -425,14 +446,48 @@ const FinanceDashboard = () => {
 
       {activeTab === 'expenses' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="glass-card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Total autres charges</p>
-              <p style={{ fontSize: '22px', fontWeight: '900', color: 'var(--danger)' }}>{stats.otherExpenses.toLocaleString()} DH</p>
+          {/* Filter bar */}
+          <div className="glass-card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <CalendarDays size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <select className="input-premium" style={{ minWidth: '130px' }}
+              value={expenseFilter.month}
+              onChange={e => setExpenseFilter(f => ({ ...f, month: e.target.value }))}>
+              <option value="">Tous les mois</option>
+              {months.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select className="input-premium" style={{ minWidth: '90px' }}
+              value={expenseFilter.year}
+              onChange={e => setExpenseFilter(f => ({ ...f, year: parseInt(e.target.value) }))}>
+              <option value={2026}>2026</option>
+              <option value={2025}>2025</option>
+              <option value={2024}>2024</option>
+            </select>
+            <select className="input-premium" style={{ minWidth: '140px' }}
+              value={expenseFilter.category}
+              onChange={e => setExpenseFilter(f => ({ ...f, category: e.target.value }))}>
+              <option value="">Toutes catégories</option>
+              {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {(expenseFilter.month || expenseFilter.category) && (
+              <button className="action-btn" title="Réinitialiser les filtres"
+                onClick={() => setExpenseFilter({ month: '', year: new Date().getFullYear(), category: '' })}>
+                <X size={14} />
+              </button>
+            )}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                  {filteredExpenses.length} charge{filteredExpenses.length !== 1 ? 's' : ''}
+                  {expenseFilter.month ? ` · ${expenseFilter.month} ${expenseFilter.year}` : ''}
+                </p>
+                <p style={{ fontSize: '18px', fontWeight: '900', color: '#dc2626', lineHeight: 1.2 }}>
+                  {filteredExpensesTotal.toLocaleString()} DH
+                </p>
+              </div>
+              <button onClick={() => setShowExpenseModal(true)} className="btn-modern primary">
+                <Plus size={16} style={{ marginRight: '8px' }} /> Ajouter
+              </button>
             </div>
-            <button onClick={() => setShowExpenseModal(true)} className="btn-modern primary">
-              <Plus size={16} style={{ marginRight: '8px' }} /> Ajouter une charge
-            </button>
           </div>
 
           <div className="glass-card" style={{ overflow: 'hidden' }}>
@@ -449,9 +504,9 @@ const FinanceDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(expenses || []).length === 0 ? (
-                    <tr><td colSpan="6"><EmptyState title="Aucune charge" message="Aucune autre charge enregistrée pour le moment." icon="file" /></td></tr>
-                  ) : (expenses || []).map(e => (
+                  {filteredExpenses.length === 0 ? (
+                    <tr><td colSpan="6"><EmptyState title="Aucune charge" message={expenseFilter.month || expenseFilter.category ? "Aucune charge pour ces filtres." : "Aucune autre charge enregistrée."} icon="file" /></td></tr>
+                  ) : filteredExpenses.map(e => (
                     <tr key={e.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
