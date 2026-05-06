@@ -51,7 +51,9 @@ const FinanceDashboard = () => {
   
   const [paymentsPage, setPaymentsPage] = useState(1);
   const [salariesPage, setSalariesPage] = useState(1);
+  const [teachersPage, setTeachersPage] = useState(1);
   const itemsPerPage = 10;
+  const teachersPerPage = 5;
   
   const [expenseFilter, setExpenseFilter] = useState({
     month: '',
@@ -191,6 +193,12 @@ const FinanceDashboard = () => {
       return { ...t, hours, hourlyRate, total, isPaid };
     });
   }, [teachers, teacherAttendance, salaryFilter, salaries]);
+
+  const paginatedTeachers = useMemo(() => {
+    return calculatedSalaries.slice((teachersPage - 1) * teachersPerPage, teachersPage * teachersPerPage);
+  }, [calculatedSalaries, teachersPage, teachersPerPage]);
+
+  const totalTeachersPages = Math.ceil(calculatedSalaries.length / teachersPerPage);
 
   const paginatedSalaries = useMemo(() => {
     return salaries.slice((salariesPage - 1) * itemsPerPage, salariesPage * itemsPerPage);
@@ -374,7 +382,7 @@ const FinanceDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {calculatedSalaries.map(s => (
+                {paginatedTeachers.map(s => (
                   <tr key={s.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <td style={tdStyle}><p style={{ fontWeight: '700' }}>{s.name}</p></td>
                     <td style={tdStyle}><span style={{ fontWeight: '800' }}>{s.hours} h</span></td>
@@ -435,6 +443,20 @@ const FinanceDashboard = () => {
               </tbody>
             </table>
           </div>
+
+          {totalTeachersPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '16px' }}>
+              <button className="action-btn" onClick={() => setTeachersPage(p => Math.max(1, p - 1))} disabled={teachersPage === 1}>
+                <ChevronLeft size={16} />
+              </button>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                Page {teachersPage} / {totalTeachersPages}
+              </span>
+              <button className="action-btn" onClick={() => setTeachersPage(p => Math.min(totalTeachersPages, p + 1))} disabled={teachersPage === totalTeachersPages}>
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
 
           <div style={{ marginTop: 'var(--space-10)' }}>
             <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: '900', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
