@@ -68,6 +68,23 @@ const getGroupAbbreviation = (filiere, annee) => {
   return diplomaAbbr + majorAbbr + yearNum;
 };
 
+const DASH_DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const DASH_START = 8;
+const DASH_END = 19;
+const DASH_HOURS = Array.from({ length: DASH_END - DASH_START + 1 }, (_, i) => DASH_START + i);
+const DASH_PX = 52;
+
+const parseTimeRangeDash = (timeStr = '') => {
+  const parts = timeStr.split('-');
+  if (parts.length >= 2) return { start: parts[0].trim(), end: parts[1].trim() };
+  return { start: '08:00', end: '10:00' };
+};
+
+const timeToPxDash = (t = '08:00') => {
+  const [h, m] = t.split(':').map(Number);
+  return ((h - DASH_START) * 60 + (m || 0)) * (DASH_PX / 60);
+};
+
 const ScheduleCalendar = ({ realSchedules, teachers }) => {
   const allFilieres = useMemo(() => Array.from(new Set(Object.values(FILIERES).flat())), []);
   const allAnnees = ['1ère année', '2ème année'];
@@ -76,157 +93,152 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
 
   const groupLabel = useMemo(() => getGroupAbbreviation(selectedFiliere, selectedAnnee), [selectedFiliere, selectedAnnee]);
 
-  const modules = useMemo(() => {
-    for (const dip in MODULES_DATA) {
-      if (MODULES_DATA[dip][selectedFiliere] && MODULES_DATA[dip][selectedFiliere][selectedAnnee]) {
-        return MODULES_DATA[dip][selectedFiliere][selectedAnnee];
-      }
-    }
-    return ['Atelier Pratique', 'Cours Général', 'Formation Générale'];
-  }, [selectedFiliere, selectedAnnee]);
+  const filteredSessions = useMemo(
+    () => realSchedules.filter(s => s.filiere === selectedFiliere && s.annee === selectedAnnee),
+    [realSchedules, selectedFiliere, selectedAnnee]
+  );
 
-  const scheduleData = useMemo(() => {
-    const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-    
-    // Check real schedules
-    const filteredReal = realSchedules.filter(s => s.filiere === selectedFiliere && s.annee === selectedAnnee);
-    return days.map(day => {
-      const sessions = filteredReal.filter(s => s.day === day).map(s => ({
-        id: s.id,
-        time: s.time,
-        title: s.module,
-        room: s.room,
-        type: s.type,
-        teacherId: s.teacherId
-      })).sort((a,b) => a.time.localeCompare(b.time));
-      return { day, sessions };
-    });
-  }, [selectedFiliere, selectedAnnee, realSchedules]);
+  const totalGridH = (DASH_END - DASH_START + 1) * DASH_PX;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Emploi du temps
           </span>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <select className="input-premium" style={{ fontSize: '12px', padding: '6px 12px', maxWidth: '220px', cursor: 'pointer', appearance: 'auto' }} value={selectedFiliere} onChange={(e) => setSelectedFiliere(e.target.value)}>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <select className="input-premium" style={{ fontSize: '11px', padding: '5px 10px', maxWidth: '200px', cursor: 'pointer' }} value={selectedFiliere} onChange={e => setSelectedFiliere(e.target.value)}>
               {allFilieres.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
-            <select className="input-premium" style={{ fontSize: '12px', padding: '6px 12px', width: '130px', cursor: 'pointer', appearance: 'auto' }} value={selectedAnnee} onChange={(e) => setSelectedAnnee(e.target.value)}>
+            <select className="input-premium" style={{ fontSize: '11px', padding: '5px 10px', width: '120px', cursor: 'pointer' }} value={selectedAnnee} onChange={e => setSelectedAnnee(e.target.value)}>
               {allAnnees.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
         </div>
-        <Link to="/admin/schedules" className="btn-modern" style={{ padding: '6px 14px', fontSize: '12px', textDecoration: 'none' }}>
-          <CalendarPlus size={14} style={{ marginRight: '6px' }} /> Gérer le planning
-        </Link>
-      </div>
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '18px' }}>
-        <div style={{ padding: '10px 14px', borderRadius: '16px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', fontSize: '12px', fontWeight: '800' }}>
-          {groupLabel}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ padding: '5px 12px', borderRadius: '999px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', fontSize: '11px', fontWeight: '800' }}>
+            {groupLabel}
+          </span>
+          <span style={{ padding: '5px 12px', borderRadius: '999px', background: 'rgba(254,205,8,0.12)', color: '#a06208', fontSize: '11px', fontWeight: '800' }}>
+            {filteredSessions.length} séances
+          </span>
+          <Link to="/admin/schedules" className="btn-modern" style={{ padding: '5px 12px', fontSize: '11px', textDecoration: 'none' }}>
+            <CalendarPlus size={12} style={{ marginRight: '5px' }} /> Gérer
+          </Link>
         </div>
-        <div style={{ padding: '10px 14px', borderRadius: '16px', background: 'rgba(254,205,8,0.12)', color: '#a06208', fontSize: '12px', fontWeight: '800' }}>
-          {scheduleData.reduce((acc, day) => acc + day.sessions.length, 0)} séance(s)
-        </div>
       </div>
-      
-      <div style={{ width: '100%', overflow: 'hidden' }}>
-        <div className="schedule-scroll">
-          <div className="schedule-week-grid">
-          {scheduleData.map((dayPlan, i) => (
-            <div key={i} style={{ 
-              display: 'flex', flexDirection: 'column', 
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 100%)', 
-              borderRadius: '20px', padding: '6px', border: '1px solid rgba(255,255,255,0.8)',
-              boxShadow: '0 4px 16px -4px rgba(0,0,0,0.03)' 
-            }}>
-              <div style={{ margin: '2px 2px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'var(--white)', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                <span style={{ fontWeight: '900', fontSize: '13px', color: 'var(--text-primary)' }}>{dayPlan.day}</span>
-                <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)' }}>{dayPlan.sessions.length}</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 4px 10px', flex: 1 }}>
-                {(() => {
-                  const daySessions = dayPlan.sessions.filter(s => parseInt(s.time.split(':')[0]) < 18);
-                  const eveningSessions = dayPlan.sessions.filter(s => parseInt(s.time.split(':')[0]) >= 18);
-                  
-                  const renderSession = (session, j) => (
-                    <motion.div key={j} whileHover={{ scale: 1.02, y: -2 }} style={{ 
-                      background: 'var(--white)', padding: '8px', minHeight: '90px', display: 'flex', flexDirection: 'column', borderRadius: '14px', 
-                      boxShadow: '0 2px 10px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.04)', 
-                      position: 'relative', overflow: 'hidden', cursor: 'pointer'
-                    }}>
-                      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: session.type === 'TP' ? 'var(--primary)' : 'var(--accent)' }}></div>
-                      
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#475569', background: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={10} style={{ color: session.type === 'TP' ? '#8b5cf6' : '#d97706'}} />{session.time}
-                        </span>
-                        {session.type && session.type !== 'Cours' && session.type.toLowerCase() !== 'cours' && (
-                          <span style={{ fontSize: '9px', fontWeight: '800', color: session.type === 'TP' ? '#8b5cf6' : '#d97706', background: session.type === 'TP' ? '#f3e8ff' : '#fef3c7', padding: '3px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            {session.type}
-                          </span>
-                        )}
-                      </div>
 
-                      <h4 style={{ 
-                        fontSize: '12px', 
-                        fontWeight: '800', 
-                        color: 'var(--text-primary)', 
-                        lineHeight: '1.3', 
-                        marginBottom: '10px',
-                        wordBreak: 'break-word'
-                      }}>
-                        {session.title}
-                      </h4>
-
-                      {session.teacherId && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px dashed var(--border-light)' }}>
-                          <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                             <User size={12} />
-                          </div>
-                          <span style={{ 
-                            fontSize: '11px', 
-                            fontWeight: '600', 
-                            color: 'var(--text-secondary)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            flex: 1
-                          }}>
-                             {teachers.find(t => t.id === session.teacherId)?.name || 'Formateur'}
-                          </span>
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex' }}>
-                        <span style={{ fontSize: '9px', background: 'rgba(0,0,0,0.03)', padding: '4px 8px', borderRadius: '6px', fontWeight: '800', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <UsersIcon size={10} style={{ opacity: 0.5 }} />{groupLabel}
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-
-                  return dayPlan.sessions.length === 0 ? (
-                    <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: '12px', fontWeight: '700', minHeight: '100px', background: 'rgba(255,255,255,0.4)', borderRadius: '14px', border: '1px dashed rgba(0,0,0,0.05)' }}>
-                      Libre
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {daySessions.map((session, j) => renderSession(session, `day-${j}`))}
-                      
-                      {daySessions.length > 0 && eveningSessions.length > 0 && (
-                        <div style={{ margin: '4px 24px', borderBottom: '1px dashed var(--border)', opacity: 0.5 }}></div>
-                      )}
-                      
-                      {eveningSessions.map((session, j) => renderSession(session, `ev-${j}`))}
-                    </div>
-                  );
-                })()}
-              </div>
+      {/* Time Grid */}
+      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '480px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+        <div style={{ display: 'flex', minWidth: '700px' }}>
+          {/* Time axis */}
+          <div style={{ width: '48px', flexShrink: 0, borderRight: '1px solid var(--border-light)', background: 'rgba(248,249,251,0.9)', position: 'sticky', left: 0, zIndex: 20 }}>
+            <div style={{ height: '36px', borderBottom: '1px solid var(--border-light)' }} />
+            <div style={{ position: 'relative', height: `${totalGridH}px` }}>
+              {DASH_HOURS.map(hour => (
+                <div key={hour} style={{ position: 'absolute', top: `${(hour - DASH_START) * DASH_PX - 8}px`, right: '6px' }}>
+                  <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>
+                    {hour.toString().padStart(2, '0')}:00
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Day columns */}
+          <div style={{ flex: 1, display: 'flex' }}>
+            {DASH_DAYS.map(day => {
+              const daySessions = filteredSessions
+                .filter(s => s.day === day)
+                .map(s => { const { start, end } = parseTimeRangeDash(s.time); return { ...s, start, end }; })
+                .sort((a, b) => a.start.localeCompare(b.start));
+
+              return (
+                <div key={day} style={{ flex: 1, borderRight: '1px solid var(--border-light)', minWidth: '110px' }}>
+                  {/* Day header */}
+                  <div style={{
+                    height: '36px', borderBottom: '1px solid var(--border-light)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '0 8px',
+                    background: daySessions.length > 0 ? 'rgba(176,104,185,0.04)' : 'rgba(248,249,251,0.6)',
+                    position: 'sticky', top: 0, zIndex: 10
+                  }}>
+                    <span style={{ fontSize: '10px', fontWeight: '900', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {day.slice(0, 3)}
+                    </span>
+                    {daySessions.length > 0 && (
+                      <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '1px 5px', borderRadius: '999px' }}>
+                        {daySessions.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Grid body */}
+                  <div style={{ position: 'relative', height: `${totalGridH}px` }}>
+                    {DASH_HOURS.map(hour => (
+                      <div key={hour} style={{ position: 'absolute', top: `${(hour - DASH_START) * DASH_PX}px`, left: 0, right: 0, borderTop: '1px solid var(--border-light)', pointerEvents: 'none' }} />
+                    ))}
+                    {DASH_HOURS.map(hour => (
+                      <div key={`h-${hour}`} style={{ position: 'absolute', top: `${(hour - DASH_START) * DASH_PX + DASH_PX / 2}px`, left: 0, right: 0, borderTop: '1px dashed rgba(0,0,0,0.04)', pointerEvents: 'none' }} />
+                    ))}
+
+                    {daySessions.length === 0 && (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--text-faint)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Libre</span>
+                      </div>
+                    )}
+
+                    {daySessions.map(session => {
+                      const top = timeToPxDash(session.start);
+                      const height = Math.max(timeToPxDash(session.end) - top, DASH_PX * 0.7);
+                      const isTP = session.type === 'TP';
+                      const teacher = teachers.find(t => t.id === session.teacherId);
+                      return (
+                        <motion.div
+                          key={session.id}
+                          whileHover={{ scale: 1.02, zIndex: 10 }}
+                          style={{
+                            position: 'absolute', top: `${top}px`, height: `${height}px`,
+                            left: '4px', right: '4px',
+                            borderRadius: '7px', padding: '5px 7px', overflow: 'hidden', zIndex: 5,
+                            backgroundColor: isTP ? '#fdf4fe' : '#fffdf0',
+                            border: `1px solid ${isTP ? 'rgba(176,104,185,0.3)' : 'rgba(254,205,8,0.4)'}`,
+                            boxShadow: isTP ? '0 1px 6px rgba(176,104,185,0.10)' : '0 1px 6px rgba(254,205,8,0.08)',
+                          }}
+                        >
+                          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', borderRadius: '7px 0 0 7px', backgroundColor: isTP ? 'var(--primary)' : '#fecd08' }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '3px' }}>
+                            <Clock size={8} style={{ color: isTP ? 'var(--primary)' : '#a06208', flexShrink: 0 }} />
+                            <span style={{ fontSize: '8px', fontWeight: '700', color: isTP ? 'var(--primary)' : '#a06208', fontVariantNumeric: 'tabular-nums' }}>
+                              {session.start}–{session.end}
+                            </span>
+                          </div>
+                          <div style={{
+                            fontSize: '9px', fontWeight: '800',
+                            color: isTP ? '#7a3d82' : '#8a6a00',
+                            lineHeight: 1.3,
+                            display: '-webkit-box', WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                          }}>
+                            {session.module}
+                          </div>
+                          {height >= 44 && teacher && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '3px' }}>
+                              <User size={7} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+                              <span style={{ fontSize: '8px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {teacher.name}
+                              </span>
+                            </div>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

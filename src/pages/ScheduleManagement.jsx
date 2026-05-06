@@ -3,280 +3,483 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { FILIERES, MODULES_DATA } from '../data/modules';
-import EmptyState from '../components/EmptyState';
-import { 
-  CalendarDays, 
-  Plus, 
-  Trash2, 
-  Clock, 
-  User, 
-  MapPin, 
-  Filter, 
-  ChevronRight, 
-  X,
-  BookOpen,
-  Layout,
-  Layers
+import {
+  CalendarDays, Plus, Trash2, Clock, User, MapPin, Filter,
+  X, Layers, Users, Calendar
 } from 'lucide-react';
 
+const START_HOUR = 8;
+const END_HOUR = 19;
+const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
+const PX_PER_HOUR = 64;
+const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+
+const parseTimeRange = (timeStr = '') => {
+  const parts = timeStr.split('-');
+  if (parts.length >= 2) return { start: parts[0].trim(), end: parts[1].trim() };
+  return { start: '08:00', end: '10:00' };
+};
+
+const timeToPixels = (timeStr = '08:00') => {
+  const [h, m] = timeStr.split(':').map(Number);
+  return ((h - START_HOUR) * 60 + (m || 0)) * (PX_PER_HOUR / 60);
+};
+
 const getGroupAbbreviation = (filiere, annee) => {
-  let diplomaAbbr = "";
-  let majorAbbr = "";
+  let diplomaAbbr = '';
   for (const dip in MODULES_DATA) {
     if (MODULES_DATA[dip][filiere]) {
-      diplomaAbbr = dip.includes('Spécialisé') ? "TS" : "T";
+      diplomaAbbr = dip.includes('Spécialisé') ? 'TS' : 'T';
       break;
     }
   }
-  if (filiere.includes('Développement')) majorAbbr = "DI";
-  else if (filiere.includes('Gestion Informatisée')) majorAbbr = "GI";
-  else if (filiere.includes('Logistique')) majorAbbr = "GTL";
-  else if (filiere.includes('Entreprises')) majorAbbr = "GE";
+  let majorAbbr = '';
+  if (filiere.includes('Développement')) majorAbbr = 'DI';
+  else if (filiere.includes('Gestion Informatisée')) majorAbbr = 'GI';
+  else if (filiere.includes('Logistique')) majorAbbr = 'GTL';
+  else if (filiere.includes('Entreprises')) majorAbbr = 'GE';
   else majorAbbr = filiere.split(' ').map(w => w[0]).join('').toUpperCase();
-  const yearNum = annee.includes('1') ? "1" : "2";
+  const yearNum = annee.includes('1') ? '1' : '2';
   return diplomaAbbr + majorAbbr + yearNum;
+};
+
+const labelStyle = {
+  fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)',
+  textTransform: 'uppercase', letterSpacing: '0.08em'
 };
 
 const ScheduleManagement = () => {
   const { teachers, schedules, addSchedule, deleteSchedule, modules: allModules, confirmAction } = useApp();
   const { showToast } = useToast();
-  
+
   const allFilieres = useMemo(() => Array.from(new Set(Object.values(FILIERES).flat())), []);
   const allAnnees = ['1ère année', '2ème année'];
-  
-  const [filiere, setFiliere] = useState(allFilieres.includes('Développement Informatique') ? 'Développement Informatique' : allFilieres[0]);
+
+  const [filiere, setFiliere] = useState(
+    allFilieres.includes('Développement Informatique') ? 'Développement Informatique' : allFilieres[0]
+  );
   const [annee, setAnnee] = useState(allAnnees[0]);
+
   const groupLabel = useMemo(() => getGroupAbbreviation(filiere, annee), [filiere, annee]);
-  
+  const filteredSchedules = useMemo(
+    () => schedules.filter(s => s.filiere === filiere && s.annee === annee),
+    [schedules, filiere, annee]
+  );
+  const activeDays = useMemo(
+    () => DAYS.filter(day => filteredSchedules.some(s => s.day === day)).length,
+    [filteredSchedules]
+  );
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
-    day: 'Lundi',
-    time: '08:30-10:30',
-    module: '',
-    teacherId: '',
-    room: '',
-    type: 'Cours'
+    day: 'Lundi', time: '08:30-10:30', module: '', teacherId: '', room: '', type: 'Cours'
   });
 
-  const currentModules = useMemo(() => {
-    return allModules.filter(m => m.major === filiere && m.year === annee).map(m => m.name);
-  }, [filiere, annee, allModules]);
-
-  const filteredSchedules = schedules.filter(s => s.filiere === filiere && s.annee === annee);
-  const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+  const currentModules = useMemo(
+    () => allModules.filter(m => m.major === filiere && m.year === annee).map(m => m.name),
+    [filiere, annee, allModules]
+  );
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.module || !formData.teacherId) return showToast('Veuillez remplir tous les champs', 'warning');
     addSchedule({ ...formData, filiere, annee });
     setShowAddModal(false);
-    setFormData({ ...formData, module: '', room: '' });
+    setFormData(prev => ({ ...prev, module: '', room: '' }));
   };
 
   const handleDelete = async (id) => {
-    if (await confirmAction({ title: "Supprimer séance ?", message: "Voulez-vous retirer cette séance de l'emploi du temps ?", type: "danger" })) {
+    if (await confirmAction({ title: 'Supprimer séance ?', message: "Voulez-vous retirer cette séance de l'emploi du temps ?", type: 'danger' })) {
       deleteSchedule(id);
     }
   };
 
-  const totalSessions = filteredSchedules.length;
+  const totalGridHeight = (END_HOUR - START_HOUR + 1) * PX_PER_HOUR;
 
   return (
     <div className="max-w-container section-padding">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-8)', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
+      {/* Page Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
         <div>
           <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <CalendarDays size={28} style={{ color: 'var(--primary)' }} /> Emplois du Temps
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Plannings hebdomadaires par filière et groupe.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginTop: '4px' }}>
+            Plannings hebdomadaires par filière et groupe.
+          </p>
         </div>
         <button onClick={() => setShowAddModal(true)} className="btn-modern primary">
           <Plus size={18} style={{ marginRight: '8px' }} /> Ajouter une séance
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: 'var(--space-6)' }}>
-        <div className="glass-card" style={{ padding: '18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Groupe</div>
-          <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)' }}>{groupLabel}</div>
+      {/* Filter + Stats Bar */}
+      <div className="glass-card" style={{ padding: '16px 20px', marginBottom: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
+          <Filter size={15} />
         </div>
-        <div className="glass-card" style={{ padding: '18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Séances</div>
-          <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)' }}>{totalSessions}</div>
-        </div>
-        <div className="glass-card" style={{ padding: '18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Jours actifs</div>
-          <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)' }}>{days.filter(day => filteredSchedules.some(s => s.day === day)).length}</div>
-        </div>
-      </div>
+        <select
+          className="input-premium"
+          style={{ flex: 1, minWidth: '200px', maxWidth: '280px', fontSize: '13px', padding: '7px 12px' }}
+          value={filiere}
+          onChange={e => setFiliere(e.target.value)}
+        >
+          {allFilieres.map(f => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <select
+          className="input-premium"
+          style={{ width: '150px', fontSize: '13px', padding: '7px 12px' }}
+          value={annee}
+          onChange={e => setAnnee(e.target.value)}
+        >
+          {allAnnees.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
 
-      <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)', display: 'flex', gap: 'var(--space-4)', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1, minWidth: '280px' }}>
-          <div style={{ padding: '8px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', borderRadius: 'var(--radius-lg)' }}><Filter size={18} /></div>
-          <select className="input-premium" style={{ flex: 1 }} value={filiere} onChange={(e) => setFiliere(e.target.value)}>
-            {allFilieres.map(f => <option key={f} value={f}>{f}</option>)}
-          </select>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '200px' }}>
-          <Layers size={18} style={{ color: 'var(--text-faint)' }} />
-          <select className="input-premium" style={{ width: '100%' }} value={annee} onChange={(e) => setAnnee(e.target.value)}>
-            {allAnnees.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
-        <div className="badge-status primary" style={{ height: '40px', display: 'flex', alignItems: 'center', padding: '0 16px', borderRadius: 'var(--radius-lg)' }}>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>Groupe : {groupLabel}</span>
-        </div>
-      </div>
-
-      <div style={{ width: '100%', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', paddingBottom: 'var(--space-6)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${days.length}, minmax(180px, 1fr))`, gap: '12px', minWidth: 'fit-content' }}>
-            {days.map(day => (
-              <div key={day} style={{ display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(248,249,251,0.95))', borderRadius: 'var(--radius-2xl)', padding: '10px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', padding: '8px 10px', background: 'white', borderRadius: 'var(--radius-lg)' }}>
-                  <span style={{ fontWeight: '900', fontSize: '12px', color: 'var(--text-primary)', textTransform: 'uppercase' }}>
-                    {day}
-                  </span>
-                  <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)' }}>
-                    {(filteredSchedules.filter(s => s.day === day).length)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                  {(() => {
-                    const daySessions = filteredSchedules.filter(s => s.day === day).sort((a,b) => a.time.localeCompare(b.time));
-                    if (daySessions.length === 0) return (
-                      <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: '11px', fontWeight: '700', padding: '36px 0', border: '1px dashed var(--border-light)', borderRadius: 'var(--radius-xl)', background: 'rgba(255,255,255,0.6)' }}>
-                        LIBRE
-                      </div>
-                    );
-                    return daySessions.map((session) => {
-                      const teacher = teachers.find(t => t.id === session.teacherId);
-                      return (
-                        <motion.div key={session.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                          style={{ position: 'relative', background: 'white', padding: '12px', minHeight: '108px', display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', borderTop: `3px solid ${session.type === 'TP' ? 'var(--primary)' : 'var(--accent)'}` }}>
-                          <button onClick={() => handleDelete(session.id)} 
-                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'transparent', color: 'var(--text-faint)', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: 'var(--radius-md)' }} 
-                            onMouseEnter={e => e.currentTarget.style.color = 'var(--danger)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-faint)'}>
-                            <Trash2 size={12} />
-                          </button>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                            <Clock size={10} /> {session.time}
-                          </div>
-                          <div style={{ 
-                            fontSize: 'var(--text-xs)', 
-                            fontWeight: '800', 
-                            color: 'var(--text-primary)', 
-                            lineHeight: '1.3', 
-                            marginBottom: '8px',
-                            wordBreak: 'break-word'
-                          }}>{session.module}</div>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '9px', fontWeight: '800', padding: '4px 8px', borderRadius: '999px', background: session.type === 'TP' ? 'var(--primary-ultra-light)' : 'rgba(254,205,8,0.14)', color: session.type === 'TP' ? 'var(--primary)' : '#a06208' }}>
-                              {session.type || 'Cours'}
-                            </span>
-                            {session.room && (
-                              <span style={{ fontSize: '9px', fontWeight: '800', padding: '4px 8px', borderRadius: '999px', background: 'var(--bg-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <MapPin size={10} /> {session.room}
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)' }}>
-                            <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: 'var(--bg-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <User size={10} />
-                            </div>
-                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
-                              {teacher ? teacher.name : 'N/A'}
-                            </span>
-                          </div>
-                        </motion.div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-            ))}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '999px', background: 'var(--primary-ultra-light)', border: '1px solid rgba(176,104,185,0.15)' }}>
+            <Users size={13} style={{ color: 'var(--primary)' }} />
+            <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary)' }}>{groupLabel}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '999px', background: 'rgba(254,205,8,0.12)', border: '1px solid rgba(254,205,8,0.2)' }}>
+            <Clock size={13} style={{ color: '#a06208' }} />
+            <span style={{ fontSize: '12px', fontWeight: '800', color: '#a06208' }}>{filteredSchedules.length} séances</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '999px', background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.15)' }}>
+            <Calendar size={13} style={{ color: '#16a34a' }} />
+            <span style={{ fontSize: '12px', fontWeight: '800', color: '#16a34a' }}>{activeDays} jours actifs</span>
           </div>
         </div>
       </div>
 
+      {/* Time Grid */}
+      <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' }}>
+          <div style={{ display: 'flex', minWidth: '900px' }}>
+
+            {/* Time Axis */}
+            <div style={{
+              width: '64px', flexShrink: 0,
+              borderRight: '1px solid var(--border-light)',
+              background: 'rgba(248,249,251,0.8)',
+              position: 'sticky', left: 0, zIndex: 20
+            }}>
+              {/* Corner spacer */}
+              <div style={{ height: '48px', borderBottom: '1px solid var(--border-light)' }} />
+              {/* Hour labels */}
+              <div style={{ position: 'relative', height: `${totalGridHeight}px` }}>
+                {HOURS.map(hour => (
+                  <div key={hour} style={{ position: 'absolute', top: `${(hour - START_HOUR) * PX_PER_HOUR - 9}px`, right: '10px', width: '100%' }}>
+                    <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>
+                      {hour.toString().padStart(2, '0')}:00
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Day Columns */}
+            <div style={{ flex: 1, display: 'flex' }}>
+              {DAYS.map(day => {
+                const daySessions = filteredSchedules
+                  .filter(s => s.day === day)
+                  .map(s => {
+                    const { start, end } = parseTimeRange(s.time);
+                    return { ...s, start, end };
+                  })
+                  .sort((a, b) => a.start.localeCompare(b.start));
+
+                return (
+                  <div key={day} style={{ flex: 1, borderRight: '1px solid var(--border-light)', minWidth: '140px' }}>
+                    {/* Day header */}
+                    <div style={{
+                      height: '48px', borderBottom: '1px solid var(--border-light)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '0 12px',
+                      background: daySessions.length > 0 ? 'rgba(176,104,185,0.04)' : 'rgba(248,249,251,0.6)',
+                      position: 'sticky', top: 0, zIndex: 10
+                    }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {day}
+                      </span>
+                      {daySessions.length > 0 && (
+                        <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '2px 7px', borderRadius: '999px' }}>
+                          {daySessions.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Grid body */}
+                    <div style={{ position: 'relative', height: `${totalGridHeight}px` }}>
+                      {/* Hour grid lines */}
+                      {HOURS.map(hour => (
+                        <div key={hour} style={{
+                          position: 'absolute', top: `${(hour - START_HOUR) * PX_PER_HOUR}px`,
+                          left: 0, right: 0, borderTop: '1px solid var(--border-light)',
+                          pointerEvents: 'none'
+                        }} />
+                      ))}
+
+                      {/* Half-hour lines */}
+                      {HOURS.map(hour => (
+                        <div key={`h-${hour}`} style={{
+                          position: 'absolute', top: `${(hour - START_HOUR) * PX_PER_HOUR + PX_PER_HOUR / 2}px`,
+                          left: 0, right: 0,
+                          borderTop: '1px dashed rgba(0,0,0,0.04)',
+                          pointerEvents: 'none'
+                        }} />
+                      ))}
+
+                      {/* Empty state */}
+                      {daySessions.length === 0 && (
+                        <div style={{
+                          position: 'absolute', inset: 0, display: 'flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          flexDirection: 'column', gap: '6px'
+                        }}>
+                          <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-faint)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                            Libre
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Session cards */}
+                      {daySessions.map(session => {
+                        const top = timeToPixels(session.start);
+                        const height = Math.max(timeToPixels(session.end) - top, PX_PER_HOUR * 0.75);
+                        const isTP = session.type === 'TP';
+                        const teacher = teachers.find(t => t.id === session.teacherId);
+
+                        return (
+                          <motion.div
+                            key={session.id}
+                            layout
+                            initial={{ opacity: 0, scale: 0.96 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            style={{
+                              position: 'absolute',
+                              top: `${top}px`,
+                              height: `${height}px`,
+                              left: '6px', right: '6px',
+                              borderRadius: '10px',
+                              padding: '8px 10px',
+                              overflow: 'hidden',
+                              cursor: 'default',
+                              backgroundColor: isTP ? '#fdf4fe' : '#fffdf0',
+                              border: `1px solid ${isTP ? 'rgba(176,104,185,0.3)' : 'rgba(254,205,8,0.4)'}`,
+                              boxShadow: isTP
+                                ? '0 2px 8px rgba(176,104,185,0.10)'
+                                : '0 2px 8px rgba(254,205,8,0.08)',
+                              zIndex: 5
+                            }}
+                            whileHover={{ scale: 1.015, zIndex: 10, boxShadow: isTP ? '0 4px 16px rgba(176,104,185,0.18)' : '0 4px 16px rgba(254,205,8,0.18)' }}
+                          >
+                            {/* Left accent bar */}
+                            <div style={{
+                              position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px',
+                              borderRadius: '10px 0 0 10px',
+                              backgroundColor: isTP ? 'var(--primary)' : '#fecd08'
+                            }} />
+
+                            {/* Delete button */}
+                            <button
+                              onClick={() => handleDelete(session.id)}
+                              style={{
+                                position: 'absolute', top: '5px', right: '5px',
+                                background: 'transparent', border: 'none', cursor: 'pointer',
+                                color: 'var(--text-faint)', padding: '2px', borderRadius: '4px',
+                                lineHeight: 1, opacity: 0.6,
+                                transition: 'opacity 0.15s, color 0.15s'
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.opacity = '1'; }}
+                              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.opacity = '0.6'; }}
+                            >
+                              <Trash2 size={11} />
+                            </button>
+
+                            {/* Time range */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '5px' }}>
+                              <Clock size={9} style={{ color: isTP ? 'var(--primary)' : '#a06208', flexShrink: 0 }} />
+                              <span style={{ fontSize: '9px', fontWeight: '700', color: isTP ? 'var(--primary)' : '#a06208', fontVariantNumeric: 'tabular-nums' }}>
+                                {session.start} – {session.end}
+                              </span>
+                              <span style={{
+                                marginLeft: 'auto',
+                                fontSize: '9px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px',
+                                backgroundColor: isTP ? 'rgba(176,104,185,0.15)' : 'rgba(254,205,8,0.2)',
+                                color: isTP ? '#8a4d92' : '#a06208'
+                              }}>
+                                {session.type || 'Cours'}
+                              </span>
+                            </div>
+
+                            {/* Module name */}
+                            <div style={{
+                              fontSize: '11px', fontWeight: '800',
+                              color: isTP ? '#7a3d82' : '#8a6a00',
+                              lineHeight: 1.3, marginBottom: '6px',
+                              display: '-webkit-box', WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                            }}>
+                              {session.module}
+                            </div>
+
+                            {/* Meta */}
+                            {height >= 56 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                {session.room && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <MapPin size={9} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+                                    <span style={{ fontSize: '9px', fontWeight: '600', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {session.room}
+                                    </span>
+                                  </div>
+                                )}
+                                {teacher && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <User size={9} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+                                    <span style={{ fontSize: '9px', fontWeight: '600', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {teacher.name}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Session Modal */}
       <AnimatePresence>
         {showAddModal && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-6)' }}>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
-              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)' }} onClick={() => setShowAddModal(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 16 }} 
-              className="glass-premium" style={{ width: '100%', maxWidth: '500px', padding: '32px', position: 'relative', zIndex: 101, borderRadius: 'var(--radius-3xl)' }}>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)' }}
+              onClick={() => setShowAddModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              className="glass-premium"
+              style={{ width: '100%', maxWidth: '500px', padding: '32px', position: 'relative', zIndex: 101, borderRadius: 'var(--radius-3xl)' }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: '900' }}>Ajouter une séance</h3>
                 <button onClick={() => setShowAddModal(false)} className="action-btn"><X size={20} /></button>
               </div>
-              
+
               <div className="badge-status primary" style={{ marginBottom: '24px', justifyContent: 'flex-start', padding: '12px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Layout size={14} />
-                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>{filiere} — {annee}</span>
-                </div>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>{filiere} — {annee}</span>
               </div>
 
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                   <div>
                     <label style={labelStyle}>Jour</label>
-                    <select className="input-premium" style={{ width: '100%', marginTop: '6px' }} value={formData.day} onChange={e => setFormData({...formData, day: e.target.value})}>
-                      {days.map(d => <option key={d} value={d}>{d}</option>)}
+                    <select className="input-premium" style={{ width: '100%', marginTop: '6px' }} value={formData.day} onChange={e => setFormData({ ...formData, day: e.target.value })}>
+                      {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
                   <div>
                     <label style={labelStyle}>Horaire</label>
-                    <input type="text" className="input-premium" style={{ width: '100%', marginTop: '6px' }} placeholder="Ex: 08:30-10:30" required value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} />
+                    <input
+                      type="text" className="input-premium"
+                      style={{ width: '100%', marginTop: '6px' }}
+                      placeholder="Ex: 08:30-10:30" required
+                      value={formData.time}
+                      onChange={e => setFormData({ ...formData, time: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Type de séance</label>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    {['Cours', 'TP', 'TD'].map(type => (
+                      <button
+                        key={type} type="button"
+                        onClick={() => setFormData({ ...formData, type })}
+                        style={{
+                          flex: 1, padding: '8px', borderRadius: 'var(--radius-lg)', border: '1.5px solid',
+                          fontWeight: '800', fontSize: '12px', cursor: 'pointer', transition: 'all 0.15s',
+                          borderColor: formData.type === type ? 'var(--primary)' : 'var(--border)',
+                          background: formData.type === type ? 'var(--primary-ultra-light)' : 'white',
+                          color: formData.type === type ? 'var(--primary)' : 'var(--text-muted)'
+                        }}
+                      >
+                        {type}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div>
                   <label style={labelStyle}>Intervenant</label>
-                  <select className="input-premium" style={{ width: '100%', marginTop: '6px' }} required value={formData.teacherId} onChange={e => {
-                    const teacher = teachers.find(t => t.id === e.target.value);
-                    setFormData({...formData, teacherId: e.target.value, module: teacher?.subjects?.[0] || ''});
-                  }}>
+                  <select
+                    className="input-premium" style={{ width: '100%', marginTop: '6px' }} required
+                    value={formData.teacherId}
+                    onChange={e => {
+                      const teacher = teachers.find(t => t.id === e.target.value);
+                      setFormData({ ...formData, teacherId: e.target.value, module: teacher?.subjects?.[0] || '' });
+                    }}
+                  >
                     <option value="">Sélectionner un formateur...</option>
                     {(() => {
-                      const filteredTeachers = teachers.filter(t => 
-                        (t.groups || []).includes(filiere) && 
-                        (t.years || []).includes(annee)
+                      const filtered = teachers.filter(t =>
+                        (t.groups || []).includes(filiere) && (t.years || []).includes(annee)
                       );
-                      
-                      if (filteredTeachers.length === 0) return <option disabled>Aucun formateur assigné à cette filière/année</option>;
-                      
-                      return filteredTeachers.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ));
+                      if (filtered.length === 0) return <option disabled>Aucun formateur assigné à cette filière/année</option>;
+                      return filtered.map(t => <option key={t.id} value={t.id}>{t.name}</option>);
                     })()}
                   </select>
                 </div>
 
                 <div>
                   <label style={labelStyle}>Module / Matière</label>
-                  <select className="input-premium" style={{ width: '100%', marginTop: '6px' }} required value={formData.module} onChange={e => setFormData({...formData, module: e.target.value})}>
+                  <select
+                    className="input-premium" style={{ width: '100%', marginTop: '6px' }} required
+                    value={formData.module}
+                    onChange={e => setFormData({ ...formData, module: e.target.value })}
+                  >
                     <option value="">Sélectionner un module...</option>
                     {(() => {
                       const teacher = teachers.find(t => t.id === formData.teacherId);
                       if (!teacher) return <option disabled>Veuillez sélectionner un formateur d'abord</option>;
-                      
                       const teacherModules = teacher.subjects || (teacher.subject ? [teacher.subject] : []);
                       const filtered = currentModules.filter(m => teacherModules.includes(m));
-                      
-                      if (filtered.length === 0) return <option disabled>Aucun module de cette filière n'est assigné à ce formateur</option>;
-                      
-                      return filtered.map(m => (
-                        <option key={m} value={m}>{m}</option>
-                      ));
+                      if (filtered.length === 0) return <option disabled>Aucun module commun disponible</option>;
+                      return filtered.map(m => <option key={m} value={m}>{m}</option>);
                     })()}
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                  <button type="button" onClick={() => setShowAddModal(false)} className="btn-modern" style={{ flex: 1, justifyContent: 'center' }}>Annuler</button>
-                  <button type="submit" className="btn-modern primary" style={{ flex: 2, justifyContent: 'center' }}>Valider la séance</button>
+                <div>
+                  <label style={labelStyle}>Salle (optionnel)</label>
+                  <input
+                    type="text" className="input-premium"
+                    style={{ width: '100%', marginTop: '6px' }}
+                    placeholder="Ex: Salle A1, Amphi…"
+                    value={formData.room}
+                    onChange={e => setFormData({ ...formData, room: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                  <button type="button" onClick={() => setShowAddModal(false)} className="btn-modern" style={{ flex: 1, justifyContent: 'center' }}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn-modern primary" style={{ flex: 2, justifyContent: 'center' }}>
+                    Valider la séance
+                  </button>
                 </div>
               </form>
             </motion.div>
@@ -286,7 +489,5 @@ const ScheduleManagement = () => {
     </div>
   );
 };
-
-const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' };
 
 export default ScheduleManagement;
