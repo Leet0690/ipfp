@@ -198,8 +198,8 @@ const ScheduleManagement = () => {
                       background: daySessions.length > 0 ? 'rgba(176,104,185,0.04)' : 'rgba(248,249,251,0.6)',
                       position: 'sticky', top: 0, zIndex: 10
                     }}>
-                      <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        {day}
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {day.toUpperCase()}
                       </span>
                       {daySessions.length > 0 && (
                         <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '2px 7px', borderRadius: '999px' }}>
