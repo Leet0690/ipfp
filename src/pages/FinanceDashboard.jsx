@@ -80,6 +80,7 @@ const FinanceDashboard = () => {
     date: new Date().toISOString().split('T')[0],
     status: 'payé'
   });
+  const [paymentModalFilter, setPaymentModalFilter] = useState({ diploma: '', major: '', year: '' });
 
   // Salary Calculation State
   const [salaryFilter, setSalaryFilter] = useState({
@@ -157,6 +158,26 @@ const FinanceDashboard = () => {
       return searchStr.includes(searchTerm.toLowerCase());
     });
   }, [payments, students, searchTerm]);
+
+  const modalDiplomas = useMemo(() => [...new Set(students.map(s => s.diploma).filter(Boolean))].sort(), [students]);
+  const modalMajors = useMemo(() => {
+    const base = paymentModalFilter.diploma ? students.filter(s => s.diploma === paymentModalFilter.diploma) : students;
+    return [...new Set(base.map(s => s.major).filter(Boolean))].sort();
+  }, [students, paymentModalFilter.diploma]);
+  const modalYears = useMemo(() => {
+    let base = students;
+    if (paymentModalFilter.diploma) base = base.filter(s => s.diploma === paymentModalFilter.diploma);
+    if (paymentModalFilter.major) base = base.filter(s => s.major === paymentModalFilter.major);
+    return [...new Set(base.map(s => s.year).filter(Boolean))].sort();
+  }, [students, paymentModalFilter.diploma, paymentModalFilter.major]);
+  const modalStudents = useMemo(() => {
+    return students.filter(s => {
+      if (paymentModalFilter.diploma && s.diploma !== paymentModalFilter.diploma) return false;
+      if (paymentModalFilter.major && s.major !== paymentModalFilter.major) return false;
+      if (paymentModalFilter.year && s.year !== paymentModalFilter.year) return false;
+      return true;
+    });
+  }, [students, paymentModalFilter]);
 
   const calculatedSalaries = useMemo(() => {
     return teachers.map(t => {
@@ -354,8 +375,7 @@ const FinanceDashboard = () => {
                   <th style={thStyle}>Volume H.</th>
                   <th style={thStyle}>Tarif (DH/h)</th>
                   <th style={thStyle}>Net à payer</th>
-                  <th style={thStyle}>Statut</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+                  <th style={thStyle}>Statut Paiement</th>
                 </tr>
               </thead>
               <tbody>
@@ -367,36 +387,53 @@ const FinanceDashboard = () => {
                       {editingTeacherId === s.id ? (
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                           <input type="number" className="input-premium" style={{ width: '80px', padding: '6px' }} defaultValue={s.hourlyRate} id={`rate-${s.id}`} autoFocus />
-                          <button className="action-btn" onClick={() => handleSaveRate(s.id)}><Check size={16} style={{ color: 'var(--success)' }} /></button>
+                          <button className="action-btn" onClick={() => handleSaveRate(s.id)} title="Confirmer">
+                            <Check size={14} style={{ color: 'var(--success)' }} />
+                          </button>
+                          <button className="action-btn" onClick={() => setEditingTeacherId(null)} title="Annuler">
+                            <X size={14} style={{ color: 'var(--danger)' }} />
+                          </button>
                         </div>
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: '700' }}>{s.hourlyRate} DH</span>
-                          <button className="action-btn" onClick={() => setEditingTeacherId(s.id)}><Edit3 size={12} /></button>
+                          <span style={{ fontWeight: '800', fontSize: '14px' }}>{s.hourlyRate} DH</span>
+                          <button onClick={() => setEditingTeacherId(s.id)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', fontSize: '10px', fontWeight: '700', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-pill)', background: 'var(--bg-subtle)', color: 'var(--text-secondary)', cursor: 'pointer', transition: 'all 0.15s' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.background = 'var(--primary-ultra-light)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-subtle)'; }}>
+                            <Edit3 size={10} /> Modifier
+                          </button>
                         </div>
                       )}
                     </td>
                     <td style={tdStyle}><span style={{ fontWeight: '900', color: 'var(--primary)' }}>{s.total.toLocaleString()} DH</span></td>
-                    <td style={tdStyle}><span className={`badge-status ${s.isPaid ? 'success' : 'warning'}`}>{s.isPaid ? 'Règlé' : 'À régler'}</span></td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>
-                      {!s.isPaid && s.total > 0 && (
-                        <button className="btn-modern primary" style={{ padding: '6px 12px', fontSize: '11px' }}
-                          onClick={async () => {
-                            if (await confirmAction({ title: "Confirmer paiement ?", message: `Voulez-vous valider le salaire de ${s.total} DH pour ${s.name} ?`, type: "warning" })) {
+                    <td style={tdStyle}>
+                      <button
+                        disabled={s.total === 0}
+                        onClick={async () => {
+                          if (s.isPaid) {
+                            if (await confirmAction({ title: "Annuler le paiement ?", message: `Marquer le salaire de ${s.name} comme non réglé ?`, type: "danger" })) {
+                              const sal = salaries.find(sal => sal.teacherId === s.id && sal.month === months[salaryFilter.month] && sal.year === salaryFilter.year);
+                              if (sal) await deleteSalary(sal.id);
+                            }
+                          } else {
+                            if (await confirmAction({ title: "Confirmer paiement ?", message: `Valider le salaire de ${s.total.toLocaleString()} DH pour ${s.name} ?`, type: "warning" })) {
                               await addSalary({ teacherId: s.id, teacherName: s.name, amount: s.total, hours: s.hours, month: months[salaryFilter.month], year: salaryFilter.year, date: new Date().toISOString().split('T')[0] });
                             }
-                          }}>Valider Paiement</button>
-                      )}
-                      {s.isPaid && (
-                        <button className="action-btn delete" onClick={async () => {
-                          if (await confirmAction({ title: "Annuler paiement ?", message: "Voulez-vous supprimer ce versement ?", type: "danger" })) {
-                            const sal = salaries.find(sal => sal.teacherId === s.id && sal.month === months[salaryFilter.month] && sal.year === salaryFilter.year);
-                            if (sal) {
-                              await deleteSalary(sal.id);
-                            }
                           }
-                        }}><RotateCcw size={16} /></button>
-                      )}
+                        }}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '6px',
+                          padding: '5px 14px', fontSize: '11px', fontWeight: '800',
+                          borderRadius: 'var(--radius-pill)', cursor: s.total === 0 ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.2s', border: '1.5px solid',
+                          opacity: s.total === 0 ? 0.45 : 1,
+                          background: s.isPaid ? 'rgba(22,163,74,0.10)' : 'rgba(234,179,8,0.10)',
+                          borderColor: s.isPaid ? '#16a34a' : '#ca8a04',
+                          color: s.isPaid ? '#16a34a' : '#a16207',
+                        }}>
+                        {s.isPaid ? <><Check size={12} /> Règlé</> : <><RotateCcw size={11} /> À régler</>}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -664,14 +701,54 @@ const FinanceDashboard = () => {
                 <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>Enregistrer un Paiement</h2>
                 <button onClick={() => setShowPaymentModal(false)} className="action-btn"><X size={20} /></button>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                {/* Filters row */}
+                <div style={{ background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <p style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Filtrer la liste des stagiaires</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ ...lbl, fontSize: '9px' }}>Niveau</label>
+                      <select className="input-premium" style={{ width: '100%', marginTop: '4px', fontSize: '12px' }}
+                        value={paymentModalFilter.diploma}
+                        onChange={e => { setPaymentModalFilter(f => ({ ...f, diploma: e.target.value, major: '', year: '' })); setPaymentData(d => ({ ...d, studentId: '' })); }}>
+                        <option value="">Tous</option>
+                        {modalDiplomas.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ ...lbl, fontSize: '9px' }}>Filière</label>
+                      <select className="input-premium" style={{ width: '100%', marginTop: '4px', fontSize: '12px' }}
+                        value={paymentModalFilter.major}
+                        onChange={e => { setPaymentModalFilter(f => ({ ...f, major: e.target.value, year: '' })); setPaymentData(d => ({ ...d, studentId: '' })); }}>
+                        <option value="">Toutes</option>
+                        {modalMajors.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ ...lbl, fontSize: '9px' }}>Année</label>
+                      <select className="input-premium" style={{ width: '100%', marginTop: '4px', fontSize: '12px' }}
+                        value={paymentModalFilter.year}
+                        onChange={e => { setPaymentModalFilter(f => ({ ...f, year: e.target.value })); setPaymentData(d => ({ ...d, studentId: '' })); }}>
+                        <option value="">Toutes</option>
+                        {modalYears.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
-                  <label style={lbl}>Stagiaire Bénéficiaire</label>
+                  <label style={lbl}>
+                    Stagiaire Bénéficiaire
+                    <span style={{ marginLeft: '6px', fontWeight: '600', color: 'var(--primary)', textTransform: 'none', fontSize: '10px' }}>
+                      {modalStudents.length} stagiaire{modalStudents.length !== 1 ? 's' : ''}
+                    </span>
+                  </label>
                   <select className="input-premium" style={{ width: '100%', marginTop: '6px' }} value={paymentData.studentId} onChange={(e) => setPaymentData({...paymentData, studentId: e.target.value})}>
                     <option value="">Sélectionner un stagiaire...</option>
-                    {students.map(s => <option key={s.id} value={s.id}>{s.lastName} {s.firstName}</option>)}
+                    {modalStudents.map(s => <option key={s.id} value={s.id}>{s.lastName} {s.firstName}</option>)}
                   </select>
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>
                     <label style={lbl}>Montant (DH)</label>
@@ -684,12 +761,14 @@ const FinanceDashboard = () => {
                     </select>
                   </div>
                 </div>
+
                 <button className="btn-modern primary" style={{ width: '100%', padding: '14px', justifyContent: 'center' }}
                   onClick={async () => {
                     if (!paymentData.studentId || !paymentData.amount) return showToast('Champs requis', 'warning');
                     await addPayment(paymentData);
                     setShowPaymentModal(false);
                     setPaymentData({ ...paymentData, studentId: '', amount: '' });
+                    setPaymentModalFilter({ diploma: '', major: '', year: '' });
                   }}><CreditCard size={18} style={{ marginRight: '8px' }} /> Valider l'encaissement</button>
               </div>
             </motion.div>
