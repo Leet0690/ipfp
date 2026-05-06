@@ -47,6 +47,7 @@ const FinanceDashboard = () => {
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState('payments');
   const [searchTerm, setSearchTerm] = useState('');
+  const [teacherSearchTerm, setTeacherSearchTerm] = useState('');
   const [editingTeacherId, setEditingTeacherId] = useState(null);
   
   const [paymentsPage, setPaymentsPage] = useState(1);
@@ -194,11 +195,17 @@ const FinanceDashboard = () => {
     });
   }, [teachers, teacherAttendance, salaryFilter, salaries]);
 
-  const paginatedTeachers = useMemo(() => {
-    return calculatedSalaries.slice((teachersPage - 1) * teachersPerPage, teachersPage * teachersPerPage);
-  }, [calculatedSalaries, teachersPage, teachersPerPage]);
+  const filteredTeachers = useMemo(() => {
+    const q = teacherSearchTerm.trim().toLowerCase();
+    if (!q) return calculatedSalaries;
+    return calculatedSalaries.filter(t => `${t.name}`.toLowerCase().includes(q));
+  }, [calculatedSalaries, teacherSearchTerm]);
 
-  const totalTeachersPages = Math.ceil(calculatedSalaries.length / teachersPerPage);
+  const paginatedTeachers = useMemo(() => {
+    return filteredTeachers.slice((teachersPage - 1) * teachersPerPage, teachersPage * teachersPerPage);
+  }, [filteredTeachers, teachersPage, teachersPerPage]);
+
+  const totalTeachersPages = Math.ceil(filteredTeachers.length / teachersPerPage);
 
   const paginatedSalaries = useMemo(() => {
     return salaries.slice((salariesPage - 1) * itemsPerPage, salariesPage * itemsPerPage);
@@ -368,6 +375,21 @@ const FinanceDashboard = () => {
               <option value={2026}>2026</option>
               <option value={2025}>2025</option>
             </select>
+          </div>
+
+          <div className="glass-card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Search size={16} style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              className="input-premium"
+              style={{ width: '100%' }}
+              placeholder="Rechercher un formateur..."
+              value={teacherSearchTerm}
+              onChange={e => {
+                setTeacherSearchTerm(e.target.value);
+                setTeachersPage(1);
+              }}
+            />
           </div>
 
           <div className="glass-card" style={{ overflow: 'hidden' }}>
