@@ -48,9 +48,7 @@ const NAV_CATEGORIES = [
     icon: UserCheck,
     items: [
       { to: "/admin/attendance-students", icon: UserCheck, label: "Absences Stagiaires" },
-      { to: "/admin/monthly-attendance", icon: CalendarDays, label: "Présences Mensuelles" },
       { to: "/admin/attendance-teachers", icon: CalendarCheck, label: "Présences Formateurs" },
-      { to: "/admin/monthly-attendance-teachers", icon: CalendarDays, label: "Présences Mensuelles" },
     ]
   },
   {

@@ -1,28 +1,59 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { FILIERES, getModulesForFiliere } from '../data/modules';
 import { TableSkeleton } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
-import { 
-  UserCheck, 
-  FileSpreadsheet, 
-  Search, 
-  Calendar, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Users, 
-  Filter,
-  MousePointer2,
-  Download,
-  MoreVertical
+import {
+  UserCheck, FileSpreadsheet, Search, Calendar, CheckCircle2,
+  XCircle, Clock, Users, Filter, Download, CalendarRange,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 
+/* ─── Monthly-view helpers ─── */
+const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const PRIORITY = { absent: 0, retard: 1, present: 2 };
+const aggregateStatus = (records) => {
+  if (!records?.length) return null;
+  return records.reduce((best, r) => {
+    if (!best) return r.status;
+    return (PRIORITY[r.status] ?? 3) < (PRIORITY[best] ?? 3) ? r.status : best;
+  }, null);
+};
+const StatusCell = ({ status }) => {
+  if (!status) return (
+    <div style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--border-light)' }} />
+    </div>
+  );
+  const cfg = {
+    present: { label: 'P', bg: 'rgba(22,163,74,0.10)',  color: '#15803d', border: 'rgba(22,163,74,0.25)' },
+    absent:  { label: 'A', bg: 'rgba(220,38,38,0.10)',   color: '#dc2626', border: 'rgba(220,38,38,0.25)' },
+    retard:  { label: 'R', bg: 'rgba(234,179,8,0.12)',   color: '#ca8a04', border: 'rgba(234,179,8,0.3)' },
+  }[status] || {};
+  return (
+    <div style={{ width: '28px', height: '28px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: cfg.bg, border: `1px solid ${cfg.border}`, fontSize: '10px', fontWeight: '900', color: cfg.color }}>
+      {cfg.label}
+    </div>
+  );
+};
+
+/* ─── Shared styles ─── */
+const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', display: 'block' };
+const filterGroupStyle = { display: 'flex', flexDirection: 'column' };
+const filterIconStyle = { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' };
+const thStyle = { padding: '16px', fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' };
+const tdStyle = { padding: '16px' };
+
 const StudentAttendance = () => {
-  const { students, studentAttendance, updateStudentAttendance, loadAttendanceForSession, loading, schedules } = useApp();
+  const { students, studentAttendance, updateStudentAttendance, loadAttendanceForSession, loadStudentAttendanceForMonth, loading, schedules } = useApp();
   const { showToast } = useToast();
+
+  /* Tab state */
+  const [view, setView] = useState('daily');
+
+  /* ── Daily view state ── */
   const [filterDiploma, setFilterDiploma] = useState('');
   const [filterMajor, setFilterMajor] = useState('');
   const [filterYear, setFilterYear] = useState('');
@@ -39,7 +70,6 @@ const StudentAttendance = () => {
     return (students || []).filter(s => {
       const hasClassToday = (schedules || []).some(sc => sc.filiere === s.major && sc.annee === s.year && sc.day === dayOfWeek);
       if (!hasClassToday) return false;
-
       if (filterDiploma && s.diploma !== filterDiploma) return false;
       if (filterMajor && s.major !== filterMajor) return false;
       if (filterYear && s.year !== filterYear) return false;
@@ -52,13 +82,9 @@ const StudentAttendance = () => {
   }, [students, filterDiploma, filterMajor, filterYear, searchTerm, schedules, dayOfWeek]);
 
   const availableMajors = filterDiploma ? (FILIERES[filterDiploma] || []) : Array.from(new Set(students.map(s => s.major)));
-  
   const availableModules = useMemo(() => {
     if (filterMajor && filterYear) {
-      const scheduledModules = (schedules || [])
-        .filter(sc => sc.filiere === filterMajor && sc.annee === filterYear && sc.day === dayOfWeek)
-        .map(sc => sc.module);
-      
+      const scheduledModules = (schedules || []).filter(sc => sc.filiere === filterMajor && sc.annee === filterYear && sc.day === dayOfWeek).map(sc => sc.module);
       if (scheduledModules.length > 0) return Array.from(new Set(scheduledModules));
       if (filterDiploma) return getModulesForFiliere(filterDiploma, filterMajor, filterYear);
     }
@@ -79,35 +105,27 @@ const StudentAttendance = () => {
     return { presents, absents, retards, total: filteredStudents.length };
   }, [filteredStudents, studentAttendance, filterModule, selectedDate]);
 
-  React.useEffect(() => {
-    if (filterModule && selectedDate) {
-      loadAttendanceForSession(filterModule, selectedDate);
-    }
+  useEffect(() => {
+    if (filterModule && selectedDate) loadAttendanceForSession(filterModule, selectedDate);
   }, [filterModule, selectedDate, loadAttendanceForSession]);
 
   const handleStatusChange = async (studentId, status) => {
-    if (!filterModule) {
-      showToast("Veuillez d'abord sélectionner un module.", 'warning');
-      return;
-    }
+    if (!filterModule) { showToast("Veuillez d'abord sélectionner un module.", 'warning'); return; }
     try {
       const docId = `${studentId}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
       const record = studentAttendance.find(a => a.id === docId);
       await updateStudentAttendance(studentId, filterModule, selectedDate, status, record?.comment || '', 'admin');
-    } catch (error) {
-      showToast("Erreur lors de l'enregistrement.", 'error');
-    }
+    } catch { showToast("Erreur lors de l'enregistrement.", 'error'); }
   };
 
   const handleCommentChange = async (studentId, comment) => {
     if (!filterModule) return;
     const docId = `${studentId}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
-    let record = studentAttendance.find(a => a.id === docId);
-    let status = record ? record.status : 'present'; 
-    await updateStudentAttendance(studentId, filterModule, selectedDate, status, comment, 'admin');
+    const record = studentAttendance.find(a => a.id === docId);
+    await updateStudentAttendance(studentId, filterModule, selectedDate, record?.status || 'present', comment, 'admin');
   };
 
-  const exportCSV = () => {
+  const exportDailyCSV = () => {
     if (!filteredStudents.length) return showToast('Aucune donnée.', 'info');
     const headers = "\uFEFFStagiaire,Matricule,Module,Date,Statut,Commentaire\n";
     const rows = filteredStudents.map(s => {
@@ -121,138 +139,364 @@ const StudentAttendance = () => {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
+  /* ── Monthly view state ── */
+  const now = new Date();
+  const [mMonth, setMMonth] = useState(now.getMonth());
+  const [mYear, setMYear] = useState(now.getFullYear());
+  const [mFilterFiliere, setMFilterFiliere] = useState('');
+  const [mFilterAnnee, setMFilterAnnee] = useState('');
+  const [mSearch, setMSearch] = useState('');
+  const allFilieres = useMemo(() => Array.from(new Set(Object.values(FILIERES).flat())), []);
+  const availableYears = useMemo(() => { const y = now.getFullYear(); return [y - 1, y, y + 1]; }, []);
+
+  useEffect(() => {
+    if (view === 'monthly') loadStudentAttendanceForMonth(mMonth, mYear);
+  }, [view, mMonth, mYear, loadStudentAttendanceForMonth]);
+
+  const daysInMonth = useMemo(() => new Date(mYear, mMonth + 1, 0).getDate(), [mMonth, mYear]);
+  const mDays = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
+  const pad = (n) => String(n).padStart(2, '0');
+  const monthPrefix = `${mYear}-${pad(mMonth + 1)}`;
+
+  const mFilteredStudents = useMemo(() =>
+    (students || []).filter(s => {
+      if (mFilterFiliere && s.major !== mFilterFiliere) return false;
+      if (mFilterAnnee && s.year !== mFilterAnnee) return false;
+      if (mSearch) {
+        const full = `${s.lastName} ${s.firstName}`.toLowerCase();
+        if (!full.includes(mSearch.toLowerCase())) return false;
+      }
+      return true;
+    }).sort((a, b) => (a.lastName || '').localeCompare(b.lastName || '')),
+    [students, mFilterFiliere, mFilterAnnee, mSearch]
+  );
+
+  const mGridData = useMemo(() => mFilteredStudents.map(student => {
+    const byDay = {};
+    mDays.forEach(d => {
+      const dateStr = `${monthPrefix}-${pad(d)}`;
+      const recs = studentAttendance.filter(a => a.studentId === student.id && a.date === dateStr);
+      byDay[d] = aggregateStatus(recs);
+    });
+    const counts = { present: 0, absent: 0, retard: 0 };
+    mDays.forEach(d => { if (byDay[d]) counts[byDay[d]]++; });
+    return { student, byDay, counts };
+  }), [mFilteredStudents, studentAttendance, mDays, monthPrefix]);
+
+  const mGlobalStats = useMemo(() => {
+    const t = { present: 0, absent: 0, retard: 0 };
+    mGridData.forEach(({ counts }) => { t.present += counts.present; t.absent += counts.absent; t.retard += counts.retard; });
+    return t;
+  }, [mGridData]);
+
+  const exportMonthlyCSV = () => {
+    const dayHeaders = mDays.map(d => `${pad(d)}/${pad(mMonth + 1)}`).join(',');
+    const header = `\uFEFFNom,Prénom,Matricule,${dayHeaders},Présents,Absents,Retards\n`;
+    const rows = mGridData.map(({ student, byDay, counts }) => {
+      const cells = mDays.map(d => byDay[d] ? byDay[d][0].toUpperCase() : '-').join(',');
+      return `"${student.lastName}","${student.firstName}","${student.regNo || ''}",${cells},${counts.present},${counts.absent},${counts.retard}`;
+    }).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `Presences_Stagiaires_${MONTHS[mMonth]}_${mYear}.csv`);
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  };
+
+  const prevMonth = () => { if (mMonth === 0) { setMMonth(11); setMYear(y => y - 1); } else setMMonth(m => m - 1); };
+  const nextMonth = () => { if (mMonth === 11) { setMMonth(0); setMYear(y => y + 1); } else setMMonth(m => m + 1); };
+
   return (
     <div className="max-w-container section-padding">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
+      {/* Page header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         <div>
           <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <UserCheck size={28} style={{ color: 'var(--primary)' }} /> Absences Stagiaires
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Feuilles d'appel et suivi quotidien par module.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Feuilles d'appel et suivi de l'assiduité.</p>
         </div>
-        <button onClick={exportCSV} className="btn-modern secondary">
+        <button onClick={view === 'daily' ? exportDailyCSV : exportMonthlyCSV} className="btn-modern secondary">
           <Download size={16} style={{ marginRight: '8px' }} /> Exporter (CSV)
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
-          <div style={filterGroupStyle}>
-            <label style={labelStyle}>Date de l'appel</label>
-            <div style={{ position: 'relative' }}>
-              <Calendar size={14} style={filterIconStyle} />
-              <input type="date" className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
-            </div>
-          </div>
-          <div style={filterGroupStyle}>
-            <label style={labelStyle}>Niveau</label>
-            <select className="input-premium" value={filterDiploma} onChange={(e) => { setFilterDiploma(e.target.value); setFilterMajor(''); setFilterModule(''); }}>
-              <option value="" disabled>-- Choisir niveau --</option>
-              {Object.keys(FILIERES).map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div style={filterGroupStyle}>
-            <label style={labelStyle}>Filière</label>
-            <select className="input-premium" value={filterMajor} onChange={(e) => { setFilterMajor(e.target.value); setFilterModule(''); }}>
-              <option value="" disabled>-- Choisir filière --</option>
-              {availableMajors.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-          <div style={filterGroupStyle}>
-            <label style={labelStyle}>Année</label>
-            <select className="input-premium" value={filterYear} onChange={(e) => { setFilterYear(e.target.value); setFilterModule(''); }}>
-              <option value="" disabled>-- Année --</option>
-              <option value="1ère année">1ère année</option>
-              <option value="2ème année">2ème année</option>
-            </select>
-          </div>
-          <div style={filterGroupStyle}>
-            <label style={labelStyle}>Module</label>
-            <select className="input-premium" value={filterModule} onChange={(e) => setFilterModule(e.target.value)}>
-              <option value="">(Module requis)</option>
-              {availableModules.map(m => <option key={m} value={m}>{m}</option>)}
-              {availableModules.length === 0 && <option value="global">Général</option>}
-            </select>
-          </div>
-        </div>
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: '4px', padding: '4px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', marginBottom: 'var(--space-6)', width: 'fit-content' }}>
+        {[
+          { key: 'daily',   label: 'Appel Quotidien', icon: UserCheck },
+          { key: 'monthly', label: 'Vue Mensuelle',    icon: CalendarRange },
+        ].map(({ key, label, icon: Icon }) => (
+          <button key={key} onClick={() => setView(key)} style={{
+            display: 'flex', alignItems: 'center', gap: '7px',
+            padding: '8px 18px', borderRadius: 'var(--radius-lg)', border: 'none', cursor: 'pointer',
+            fontSize: '13px', fontWeight: '700', transition: 'all 0.2s',
+            background: view === key ? 'white' : 'transparent',
+            color: view === key ? 'var(--primary)' : 'var(--text-muted)',
+            boxShadow: view === key ? 'var(--shadow-xs)' : 'none',
+          }}>
+            <Icon size={15} /> {label}
+          </button>
+        ))}
       </div>
 
-      {/* Stats Summary */}
-      {filteredStudents.length > 0 && filterModule && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
-          <MiniStat label="Effectif" value={stats.total} />
-          <MiniStat label="Présents" value={stats.presents} />
-          <MiniStat label="Absents" value={stats.absents} />
-          <MiniStat label="Taux" value={stats.total > 0 ? `${Math.round((stats.presents / stats.total) * 100)}%` : '—'} />
-        </motion.div>
+      {/* ════ DAILY VIEW ════ */}
+      {view === 'daily' && (
+        <>
+          <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
+              <div style={filterGroupStyle}>
+                <label style={labelStyle}>Date de l'appel</label>
+                <div style={{ position: 'relative' }}>
+                  <Calendar size={14} style={filterIconStyle} />
+                  <input type="date" className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+                </div>
+              </div>
+              <div style={filterGroupStyle}>
+                <label style={labelStyle}>Niveau</label>
+                <select className="input-premium" value={filterDiploma} onChange={(e) => { setFilterDiploma(e.target.value); setFilterMajor(''); setFilterModule(''); }}>
+                  <option value="" disabled>-- Choisir niveau --</option>
+                  {Object.keys(FILIERES).map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div style={filterGroupStyle}>
+                <label style={labelStyle}>Filière</label>
+                <select className="input-premium" value={filterMajor} onChange={(e) => { setFilterMajor(e.target.value); setFilterModule(''); }}>
+                  <option value="" disabled>-- Choisir filière --</option>
+                  {availableMajors.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div style={filterGroupStyle}>
+                <label style={labelStyle}>Année</label>
+                <select className="input-premium" value={filterYear} onChange={(e) => { setFilterYear(e.target.value); setFilterModule(''); }}>
+                  <option value="" disabled>-- Année --</option>
+                  <option value="1ère année">1ère année</option>
+                  <option value="2ème année">2ème année</option>
+                </select>
+              </div>
+              <div style={filterGroupStyle}>
+                <label style={labelStyle}>Module</label>
+                <select className="input-premium" value={filterModule} onChange={(e) => setFilterModule(e.target.value)}>
+                  <option value="">(Module requis)</option>
+                  {availableModules.map(m => <option key={m} value={m}>{m}</option>)}
+                  {availableModules.length === 0 && <option value="global">Général</option>}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {filteredStudents.length > 0 && filterModule && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
+              <MiniStat label="Effectif" value={stats.total} />
+              <MiniStat label="Présents" value={stats.presents} />
+              <MiniStat label="Absents" value={stats.absents} />
+              <MiniStat label="Taux" value={stats.total > 0 ? `${Math.round((stats.presents / stats.total) * 100)}%` : '—'} />
+            </motion.div>
+          )}
+
+          <div className="glass-card" style={{ overflow: 'hidden' }}>
+            {loading ? <TableSkeleton rows={10} /> : (
+              !filterDiploma || !filterMajor || !filterYear ? (
+                <EmptyState title="Filtres requis" message="Sélectionnez le niveau, la filière et l'année pour voir les stagiaires." icon="filter" />
+              ) : !filterModule ? (
+                <EmptyState title="Module manquant" message="Veuillez sélectionner un module pour lancer l'appel." icon="mouse-pointer" />
+              ) : filteredStudents.length === 0 ? (
+                <EmptyState title="Aucun cours aujourd'hui" message={`Aucun cours n'est programmé le ${dayOfWeek} pour ce groupe.`} icon="calendar" />
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '750px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-subtle)' }}>
+                        <th style={{ ...thStyle, textAlign: 'center', width: '60px' }}>#</th>
+                        <th style={thStyle}>Stagiaire</th>
+                        <th style={{ ...thStyle, textAlign: 'center', width: '260px' }}>Pointage</th>
+                        <th style={thStyle}>Commentaire / Motif</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.map((student, idx) => {
+                        const docId = `${student.id}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
+                        const record = studentAttendance.find(a => a.id === docId);
+                        const status = record?.status || '';
+                        const comment = record?.comment || '';
+                        return (
+                          <tr key={student.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}>
+                              <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-faint)' }}>{idx + 1}</span>
+                            </td>
+                            <td style={tdStyle}>
+                              <p style={{ fontSize: 'var(--text-sm)', fontWeight: '700', color: 'var(--text-primary)' }}>{student.lastName} {student.firstName}</p>
+                              <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Matricule: {student.regNo}</p>
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}>
+                              <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '4px' }}>
+                                <StatusBtn active={status === 'present'} color="var(--success)" onClick={() => handleStatusChange(student.id, 'present')}>Présent</StatusBtn>
+                                <StatusBtn active={status === 'absent'} color="var(--danger)" onClick={() => handleStatusChange(student.id, 'absent')}>Absent</StatusBtn>
+                                <StatusBtn active={status === 'retard'} color="var(--warning)" onClick={() => handleStatusChange(student.id, 'retard')}>Retard</StatusBtn>
+                              </div>
+                            </td>
+                            <td style={tdStyle}>
+                              <input type="text" className="input-premium" placeholder="Note d'absence..."
+                                style={{ width: '100%', fontSize: '12px', background: 'transparent', border: '1px solid transparent' }}
+                                value={comment} onChange={(e) => handleCommentChange(student.id, e.target.value)} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            )}
+          </div>
+        </>
       )}
 
-      {/* Main Table Area */}
-      <div className="glass-card" style={{ overflow: 'hidden' }}>
-        {loading ? <TableSkeleton rows={10} /> : (
-          !filterDiploma || !filterMajor || !filterYear ? (
-            <EmptyState title="Filtres requis" message="Sélectionnez le niveau, la filière et l'année pour voir les stagiaires." icon="filter" />
-          ) : !filterModule ? (
-            <EmptyState title="Module manquant" message="Veuillez sélectionner un module pour lancer l'appel." icon="mouse-pointer" />
-          ) : filteredStudents.length === 0 ? (
-            <EmptyState title="Aucun cours aujourd'hui" message={`Aucun cours n'est programmé le ${dayOfWeek} pour ce groupe.`} icon="calendar" />
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '750px' }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg-subtle)' }}>
-                    <th style={{ ...thStyle, textAlign: 'center', width: '60px' }}>#</th>
-                    <th style={thStyle}>Stagiaire</th>
-                    <th style={{ ...thStyle, textAlign: 'center', width: '260px' }}>Pointage</th>
-                    <th style={thStyle}>Commentaire / Motif</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStudents.map((student, idx) => {
-                    const docId = `${student.id}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
-                    const record = studentAttendance.find(a => a.id === docId);
-                    const status = record?.status || '';
-                    const comment = record?.comment || '';
-
-                    return (
-                      <tr key={student.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-faint)' }}>{idx + 1}</span>
-                        </td>
-                        <td style={tdStyle}>
-                          <p style={{ fontSize: 'var(--text-sm)', fontWeight: '700', color: 'var(--text-primary)' }}>{student.lastName} {student.firstName}</p>
-                          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Matricule: {student.regNo}</p>
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '4px' }}>
-                            <StatusBtn active={status === 'present'} color="var(--success)" onClick={() => handleStatusChange(student.id, 'present')}>Présent</StatusBtn>
-                            <StatusBtn active={status === 'absent'} color="var(--danger)" onClick={() => handleStatusChange(student.id, 'absent')}>Absent</StatusBtn>
-                            <StatusBtn active={status === 'retard'} color="var(--warning)" onClick={() => handleStatusChange(student.id, 'retard')}>Retard</StatusBtn>
-                          </div>
-                        </td>
-                        <td style={tdStyle}>
-                          <input type="text" className="input-premium" placeholder="Note d'absence..." 
-                            style={{ width: '100%', fontSize: '12px', background: 'transparent', border: '1px solid transparent' }}
-                            value={comment} onChange={(e) => handleCommentChange(student.id, e.target.value)} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+      {/* ════ MONTHLY VIEW ════ */}
+      {view === 'monthly' && (
+        <>
+          {/* Monthly filters */}
+          <div className="glass-card" style={{ padding: '20px', marginBottom: 'var(--space-5)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', alignItems: 'end' }}>
+              <div>
+                <label style={labelStyle}>Mois</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button onClick={prevMonth} className="action-btn" style={{ flexShrink: 0 }}><ChevronLeft size={16} /></button>
+                  <select className="input-premium" style={{ flex: 1, textAlign: 'center' }} value={mMonth} onChange={e => setMMonth(Number(e.target.value))}>
+                    {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                  </select>
+                  <button onClick={nextMonth} className="action-btn" style={{ flexShrink: 0 }}><ChevronRight size={16} /></button>
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Année</label>
+                <select className="input-premium" style={{ width: '100%' }} value={mYear} onChange={e => setMYear(Number(e.target.value))}>
+                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Filière</label>
+                <select className="input-premium" style={{ width: '100%' }} value={mFilterFiliere} onChange={e => setMFilterFiliere(e.target.value)}>
+                  <option value="">Toutes les filières</option>
+                  {allFilieres.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Année d'étude</label>
+                <select className="input-premium" style={{ width: '100%' }} value={mFilterAnnee} onChange={e => setMFilterAnnee(e.target.value)}>
+                  <option value="">Toutes années</option>
+                  <option value="1ère année">1ère année</option>
+                  <option value="2ème année">2ème année</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Rechercher</label>
+                <div style={{ position: 'relative' }}>
+                  <Search size={13} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
+                  <input type="text" className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} placeholder="Nom du stagiaire..." value={mSearch} onChange={e => setMSearch(e.target.value)} />
+                </div>
+              </div>
             </div>
-          )
-        )}
-      </div>
+          </div>
+
+          {/* Monthly stats */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: '12px', marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Stagiaires', value: mFilteredStudents.length, color: 'var(--primary)', bg: 'var(--primary-ultra-light)' },
+              { label: 'Total Présences', value: mGlobalStats.present, color: '#15803d', bg: 'rgba(22,163,74,0.08)' },
+              { label: 'Total Absences', value: mGlobalStats.absent, color: '#dc2626', bg: 'rgba(220,38,38,0.08)' },
+              { label: 'Total Retards', value: mGlobalStats.retard, color: '#ca8a04', bg: 'rgba(234,179,8,0.08)' },
+            ].map(({ label, value, color, bg }) => (
+              <div key={label} style={{ padding: '12px 18px', background: bg, border: `1px solid ${color}22`, borderRadius: 'var(--radius-xl)', flex: '1 1 120px', textAlign: 'center' }}>
+                <div style={{ fontSize: 'var(--text-xl)', fontWeight: '900', color, lineHeight: 1 }}>{value}</div>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: '4px' }}>{label}</div>
+              </div>
+            ))}
+          </motion.div>
+
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: '14px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Présent', code: 'P', color: '#15803d', bg: 'rgba(22,163,74,0.10)',  border: 'rgba(22,163,74,0.25)' },
+              { label: 'Absent',  code: 'A', color: '#dc2626', bg: 'rgba(220,38,38,0.10)',   border: 'rgba(220,38,38,0.25)' },
+              { label: 'Retard',  code: 'R', color: '#ca8a04', bg: 'rgba(234,179,8,0.12)',   border: 'rgba(234,179,8,0.3)' },
+              { label: 'Non renseigné', code: '·', color: 'var(--text-faint)', bg: 'transparent', border: 'transparent' },
+            ].map(l => (
+              <div key={l.code} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ width: '22px', height: '22px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '900', color: l.color, background: l.bg, border: `1px solid ${l.border}` }}>{l.code}</div>
+                <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)' }}>{l.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Monthly grid */}
+          <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+            {mFilteredStudents.length === 0 ? (
+              <div style={{ padding: '64px', textAlign: 'center' }}>
+                <CalendarRange size={40} style={{ color: 'var(--text-faint)', margin: '0 auto 16px', display: 'block' }} />
+                <p style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                  {!mFilterFiliere ? 'Sélectionnez une filière pour afficher les stagiaires.' : 'Aucun stagiaire trouvé.'}
+                </p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ borderCollapse: 'collapse', minWidth: '100%', tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '44px' }} />
+                    <col style={{ width: '180px' }} />
+                    {mDays.map(d => <col key={d} style={{ width: '38px' }} />)}
+                    <col style={{ width: '38px' }} /><col style={{ width: '38px' }} /><col style={{ width: '38px' }} />
+                  </colgroup>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-subtle)' }}>
+                      <th style={mThStyle}>#</th>
+                      <th style={{ ...mThStyle, textAlign: 'left', position: 'sticky', left: 0, background: 'var(--bg-subtle)', zIndex: 10 }}>Stagiaire</th>
+                      {mDays.map(d => {
+                        const isWeekend = new Date(mYear, mMonth, d).getDay() % 6 === 0;
+                        return <th key={d} style={{ ...mThStyle, color: isWeekend ? 'var(--primary)' : 'var(--text-muted)', background: isWeekend ? 'rgba(176,104,185,0.05)' : 'var(--bg-subtle)' }}>{d}</th>;
+                      })}
+                      <th style={{ ...mThStyle, color: '#15803d', background: 'rgba(22,163,74,0.06)' }}>P</th>
+                      <th style={{ ...mThStyle, color: '#dc2626', background: 'rgba(220,38,38,0.06)' }}>A</th>
+                      <th style={{ ...mThStyle, color: '#ca8a04', background: 'rgba(234,179,8,0.08)' }}>R</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mGridData.map(({ student, byDay, counts }, idx) => (
+                      <tr key={student.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        <td style={{ ...mTdStyle, textAlign: 'center' }}><span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-faint)' }}>{idx + 1}</span></td>
+                        <td style={{ ...mTdStyle, position: 'sticky', left: 0, zIndex: 5, background: idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.8)', borderRight: '1px solid var(--border-light)' }}>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '164px' }}>{student.lastName} {student.firstName}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-faint)', fontWeight: '600', marginTop: '2px' }}>{student.regNo || '—'}</div>
+                        </td>
+                        {mDays.map(d => {
+                          const isWeekend = new Date(mYear, mMonth, d).getDay() % 6 === 0;
+                          return (
+                            <td key={d} style={{ ...mTdStyle, padding: '6px 4px', textAlign: 'center', background: isWeekend ? 'rgba(176,104,185,0.03)' : (idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.5)') }}>
+                              <div style={{ display: 'flex', justifyContent: 'center' }}><StatusCell status={byDay[d]} /></div>
+                            </td>
+                          );
+                        })}
+                        <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(22,163,74,0.06)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#15803d' }}>{counts.present}</span></td>
+                        <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(220,38,38,0.06)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#dc2626' }}>{counts.absent}</span></td>
+                        <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(234,179,8,0.08)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#ca8a04' }}>{counts.retard}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: '14px', textAlign: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-faint)' }}>{MONTHS[mMonth]} {mYear} · {daysInMonth} jours</span>
+          </div>
+        </>
+      )}
     </div>
   );
 };
 
 const StatusBtn = ({ active, color, children, onClick }) => (
-  <button onClick={onClick}
-    style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-lg)', fontSize: '11px', fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s',
-      background: active ? color : 'transparent', color: active ? 'white' : 'var(--text-muted)' }}>
+  <button onClick={onClick} style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-lg)', fontSize: '11px', fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s', background: active ? color : 'transparent', color: active ? 'white' : 'var(--text-muted)' }}>
     {children}
   </button>
 );
@@ -264,10 +508,7 @@ const MiniStat = ({ label, value }) => (
   </div>
 );
 
-const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', display: 'block' };
-const filterGroupStyle = { display: 'flex', flexDirection: 'column' };
-const filterIconStyle = { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' };
-const thStyle = { padding: '16px', fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' };
-const tdStyle = { padding: '16px' };
+const mThStyle = { padding: '12px 4px', fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border-light)' };
+const mTdStyle = { padding: '10px 8px', verticalAlign: 'middle' };
 
 export default StudentAttendance;
