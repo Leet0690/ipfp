@@ -1,25 +1,31 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { AdminAuthProvider } from './context/AdminAuthContext';
 import DashboardLayout from './layouts/DashboardLayout';
-import { School, Link as LinkIcon, Globe, ShieldAlert, Loader2 } from 'lucide-react';
+import { School, Link as LinkIcon, Loader2 } from 'lucide-react';
 
-import Login from './pages/Login';
-import AdminDashboard from './pages/AdminDashboard';
-import AddStudent from './pages/AddStudent';
-import AddTeacher from './pages/AddTeacher';
-import TeacherPortal from './pages/TeacherPortal';
-import StudentResults from './pages/StudentResults';
-import GradeManagement from './pages/GradeManagement';
-import StudentAttendance from './pages/StudentAttendance';
-import TeacherAttendance from './pages/TeacherAttendance';
-import Reports from './pages/Reports';
-import ScheduleManagement from './pages/ScheduleManagement';
-import FinanceDashboard from './pages/FinanceDashboard';
-import ModuleManagement from './pages/ModuleManagement';
-import MonthlyAttendance from './pages/MonthlyAttendance';
-import MonthlyAttendanceTeachers from './pages/MonthlyAttendanceTeachers';
+const Login                    = lazy(() => import('./pages/Login'));
+const AdminDashboard           = lazy(() => import('./pages/AdminDashboard'));
+const AddStudent               = lazy(() => import('./pages/AddStudent'));
+const AddTeacher               = lazy(() => import('./pages/AddTeacher'));
+const TeacherPortal            = lazy(() => import('./pages/TeacherPortal'));
+const StudentResults           = lazy(() => import('./pages/StudentResults'));
+const GradeManagement          = lazy(() => import('./pages/GradeManagement'));
+const StudentAttendance        = lazy(() => import('./pages/StudentAttendance'));
+const TeacherAttendance        = lazy(() => import('./pages/TeacherAttendance'));
+const Reports                  = lazy(() => import('./pages/Reports'));
+const ScheduleManagement       = lazy(() => import('./pages/ScheduleManagement'));
+const FinanceDashboard         = lazy(() => import('./pages/FinanceDashboard'));
+const ModuleManagement         = lazy(() => import('./pages/ModuleManagement'));
+const MonthlyAttendance        = lazy(() => import('./pages/MonthlyAttendance'));
+const MonthlyAttendanceTeachers = lazy(() => import('./pages/MonthlyAttendanceTeachers'));
+
+const PageLoader = () => (
+  <div className="flex-center" style={{ height: '100vh' }}>
+    <Loader2 className="spinner" size={32} style={{ color: 'var(--primary)' }} />
+  </div>
+);
 
 const isPortailDomain = typeof window !== 'undefined' && window.location.hostname === 'portail-ipfp.web.app';
 
@@ -55,17 +61,19 @@ const AppContent = () => {
   const isPublicRoute = location.pathname.startsWith('/portal/') || location.pathname.startsWith('/results/') || location.pathname.startsWith('/teacher/');
 
   if (isPortailDomain) {
-    if (loading) return <div className="flex-center" style={{ height: '100vh' }}><Loader2 className="spinner" size={32} style={{ color: 'var(--primary)' }} /></div>;
+    if (loading) return <PageLoader />;
     if (!isPublicRoute) return <PortailBlockedPage />;
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <main style={{ flex: 1 }}>
-          <Routes>
-            <Route path="/portal/:teacherId" element={<TeacherPortal />} />
-            <Route path="/teacher/:teacherId" element={<TeacherPortal />} />
-            <Route path="/results/:studentId" element={<StudentResults />} />
-            <Route path="*" element={<PortailBlockedPage />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/portal/:teacherId" element={<TeacherPortal />} />
+              <Route path="/teacher/:teacherId" element={<TeacherPortal />} />
+              <Route path="/results/:studentId" element={<StudentResults />} />
+              <Route path="*" element={<PortailBlockedPage />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     );
@@ -74,27 +82,29 @@ const AppContent = () => {
   if (!isAuthenticated && !isPublicRoute && location.pathname !== '/login') return <Navigate to="/login" />;
 
   const appRoutes = (
-    <Routes>
-      <Route path="/" element={<AdminDashboard />} />
-      <Route path="/admin/students" element={<AdminDashboard />} />
-      <Route path="/admin/teachers" element={<AdminDashboard />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/admin/add-student" element={<AddStudent />} />
-      <Route path="/admin/add-teacher" element={<AddTeacher />} />
-      <Route path="/admin/schedules" element={<ScheduleManagement />} />
-      <Route path="/admin/grades" element={<GradeManagement />} />
-      <Route path="/admin/attendance-students" element={<StudentAttendance />} />
-      <Route path="/admin/monthly-attendance" element={<MonthlyAttendance />} />
-      <Route path="/admin/monthly-attendance-teachers" element={<MonthlyAttendanceTeachers />} />
-      <Route path="/admin/modules" element={<ModuleManagement />} />
-      <Route path="/admin/reports" element={<Reports />} />
-      <Route path="/admin/attendance-teachers" element={<TeacherAttendance />} />
-      <Route path="/admin/finance" element={<FinanceDashboard />} />
-      <Route path="/portal/:teacherId" element={<TeacherPortal />} />
-      <Route path="/teacher/:teacherId" element={<TeacherPortal />} />
-      <Route path="/results/:studentId" element={<StudentResults />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<AdminDashboard />} />
+        <Route path="/admin/students" element={<AdminDashboard />} />
+        <Route path="/admin/teachers" element={<AdminDashboard />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/admin/add-student" element={<AddStudent />} />
+        <Route path="/admin/add-teacher" element={<AddTeacher />} />
+        <Route path="/admin/schedules" element={<ScheduleManagement />} />
+        <Route path="/admin/grades" element={<GradeManagement />} />
+        <Route path="/admin/attendance-students" element={<StudentAttendance />} />
+        <Route path="/admin/monthly-attendance" element={<MonthlyAttendance />} />
+        <Route path="/admin/monthly-attendance-teachers" element={<MonthlyAttendanceTeachers />} />
+        <Route path="/admin/modules" element={<ModuleManagement />} />
+        <Route path="/admin/reports" element={<Reports />} />
+        <Route path="/admin/attendance-teachers" element={<TeacherAttendance />} />
+        <Route path="/admin/finance" element={<FinanceDashboard />} />
+        <Route path="/portal/:teacherId" element={<TeacherPortal />} />
+        <Route path="/teacher/:teacherId" element={<TeacherPortal />} />
+        <Route path="/results/:studentId" element={<StudentResults />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 
   if (!isAuthenticated || isPublicRoute) return <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}><main style={{ flex: 1 }}>{appRoutes}</main></div>;
