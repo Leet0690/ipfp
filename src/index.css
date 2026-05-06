@@ -737,6 +737,25 @@ h1, h2, h3, h4, h5, h6 {
   width: 4px;
 }
 
+@media (max-width: 640px) {
+  .toast-container {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .toast-item {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    padding: 12px 14px;
+  }
+
+  .schedule-week-grid {
+    min-width: 640px;
+  }
+}
+
 .toast-item.success::before { background: var(--success); }
 .toast-item.error::before { background: var(--danger); }
 .toast-item.warning::before { background: var(--warning); }

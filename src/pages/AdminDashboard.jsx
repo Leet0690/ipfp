@@ -159,12 +159,12 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
                   {/* Day header */}
                   <div style={{
                     height: '36px', borderBottom: '1px solid var(--border-light)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: '0 8px',
                     background: daySessions.length > 0 ? 'rgba(176,104,185,0.04)' : 'rgba(248,249,251,0.6)',
                     position: 'sticky', top: 0, zIndex: 10
                   }}>
-                    <span style={{ fontSize: '10px', fontWeight: '900', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <span style={{ fontSize: '10px', fontWeight: '900', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
                       {day.slice(0, 3)}
                     </span>
                     {daySessions.length > 0 && (
