@@ -468,6 +468,25 @@ export const AppProvider = ({ children }) => {
     }
   }, [showToast]);
 
+  const loadStudentAttendanceForMonth = useCallback(async (monthIndex, year) => {
+    const { start, end } = getMonthBounds(monthIndex, year);
+    const cacheKey = `student-month:${year}-${monthIndex}`;
+    if (studentAttendanceKeysRef.current.has(cacheKey)) return;
+    try {
+      const snapshot = await getDocs(query(
+        collection(db, 'attendance_stagiaires'),
+        where('date', '>=', start),
+        where('date', '<=', end)
+      ));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setStudentAttendance(prev => mergeById(prev, data));
+      studentAttendanceKeysRef.current.add(cacheKey);
+    } catch (e) {
+      console.error("Error loading monthly student attendance:", e);
+      showToast('Erreur de chargement des présences mensuelles', 'error');
+    }
+  }, [showToast]);
+
   const loadTeacherAttendanceForDate = useCallback(async (date) => {
     if (!date) return;
     const cacheKey = `date:${date}`;
@@ -635,7 +654,7 @@ export const AppProvider = ({ children }) => {
       login, logout, loginDirector, logoutDirector,
       addStudent, addTeacher, updateStudent, updateTeacher, deleteStudent, deleteTeacher, updateGrades,
       studentAttendance, teacherAttendance, updateStudentAttendance, updateTeacherAttendance,
-      loadAttendanceForSession, loadTeacherAttendanceForDate, loadTeacherAttendanceForMonth,
+      loadAttendanceForSession, loadStudentAttendanceForMonth, loadTeacherAttendanceForDate, loadTeacherAttendanceForMonth,
       schedules, addSchedule, deleteSchedule, clearAllSchedules, migrateTeacherTokens,
       payments, salaries, loadFinancialData, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary,
       modules, addModule, updateModule, deleteModule,

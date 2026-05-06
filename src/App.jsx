@@ -18,6 +18,7 @@ import Reports from './pages/Reports';
 import ScheduleManagement from './pages/ScheduleManagement';
 import FinanceDashboard from './pages/FinanceDashboard';
 import ModuleManagement from './pages/ModuleManagement';
+import MonthlyAttendance from './pages/MonthlyAttendance';
 
 const isPortailDomain = typeof window !== 'undefined' && window.location.hostname === 'portail-ipfp.web.app';
 
@@ -82,6 +83,7 @@ const AppContent = () => {
       <Route path="/admin/schedules" element={<ScheduleManagement />} />
       <Route path="/admin/grades" element={<GradeManagement />} />
       <Route path="/admin/attendance-students" element={<StudentAttendance />} />
+      <Route path="/admin/monthly-attendance" element={<MonthlyAttendance />} />
       <Route path="/admin/modules" element={<ModuleManagement />} />
       <Route path="/admin/reports" element={<Reports />} />
       <Route path="/admin/attendance-teachers" element={<TeacherAttendance />} />
