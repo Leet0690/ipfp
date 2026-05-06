@@ -68,7 +68,7 @@ const getGroupAbbreviation = (filiere, annee) => {
   return diplomaAbbr + majorAbbr + yearNum;
 };
 
-const DASH_DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const DASH_DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 const DASH_START = 8;
 const DASH_END = 19;
 const DASH_HOURS = Array.from({ length: DASH_END - DASH_START + 1 }, (_, i) => DASH_START + i);

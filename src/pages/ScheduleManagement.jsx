@@ -12,7 +12,7 @@ const START_HOUR = 8;
 const END_HOUR = 19;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
 const PX_PER_HOUR = 64;
-const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
 const parseTimeRange = (timeStr = '') => {
   const parts = timeStr.split('-');
