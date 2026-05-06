@@ -72,6 +72,7 @@ export const AppProvider = ({ children }) => {
   const [schedules, setSchedules] = useState([]);
   const [payments, setPayments] = useState([]);
   const [salaries, setSalaries] = useState([]);
+  const [expenses, setExpenses] = useState([]);
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const studentAttendanceKeysRef = useRef(new Set());
@@ -552,6 +553,7 @@ export const AppProvider = ({ children }) => {
     if (cached && !force) {
       setPayments(cached.payments || []);
       setSalaries(cached.salaries || []);
+      setExpenses(cached.expenses || []);
       financeLoadedRef.current = true;
       return;
     }
@@ -560,11 +562,13 @@ export const AppProvider = ({ children }) => {
     if (!pendingLoads.has(financeLoadKey)) {
       pendingLoads.set(financeLoadKey, Promise.all([
         getDocs(query(collection(db, 'payments'), orderBy('createdAt', 'desc'), limit(200))),
-        getDocs(query(collection(db, 'salaries'), orderBy('createdAt', 'desc'), limit(200)))
-      ]).then(([paySnap, salSnap]) => {
+        getDocs(query(collection(db, 'salaries'), orderBy('createdAt', 'desc'), limit(200))),
+        getDocs(query(collection(db, 'expenses'), orderBy('createdAt', 'desc'), limit(200)))
+      ]).then(([paySnap, salSnap, expSnap]) => {
         const data = {
           payments: paySnap.docs.map(d => ({ id: d.id, ...d.data() })),
-          salaries: salSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+          salaries: salSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          expenses: expSnap.docs.map(d => ({ id: d.id, ...d.data() }))
         };
         writeCache(FINANCE_CACHE_KEY, data);
         return data;
@@ -577,6 +581,7 @@ export const AppProvider = ({ children }) => {
       const data = await pendingLoads.get(financeLoadKey);
       setPayments(data.payments || []);
       setSalaries(data.salaries || []);
+      setExpenses(data.expenses || []);
       financeLoadedRef.current = true;
     } catch (e) {
       console.error("Error loading finance data:", e);
@@ -628,6 +633,21 @@ export const AppProvider = ({ children }) => {
     showToast('Salaire supprimé', 'warning');
   };
 
+  const addExpense = async (expenseData) => {
+    const newExpense = { ...expenseData, createdAt: serverTimestamp() };
+    const docRef = await addDoc(collection(db, 'expenses'), newExpense);
+    setExpenses(prev => [{ id: docRef.id, ...newExpense }, ...prev]);
+    localStorage.removeItem(FINANCE_CACHE_KEY);
+    showToast('Charge enregistrée', 'success');
+  };
+
+  const deleteExpense = async (id) => {
+    await deleteDoc(doc(db, 'expenses', id));
+    setExpenses(prev => prev.filter(e => e.id !== id));
+    localStorage.removeItem(FINANCE_CACHE_KEY);
+    showToast('Charge supprimée', 'warning');
+  };
+
   // --- MODULES ---
   const addModule = async (moduleData) => {
     const newModule = { ...moduleData, createdAt: serverTimestamp() };
@@ -656,7 +676,7 @@ export const AppProvider = ({ children }) => {
       studentAttendance, teacherAttendance, updateStudentAttendance, updateTeacherAttendance,
       loadAttendanceForSession, loadStudentAttendanceForMonth, loadTeacherAttendanceForDate, loadTeacherAttendanceForMonth,
       schedules, addSchedule, deleteSchedule, clearAllSchedules, migrateTeacherTokens,
-      payments, salaries, loadFinancialData, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary,
+      payments, salaries, expenses, loadFinancialData, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary, addExpense, deleteExpense,
       modules, addModule, updateModule, deleteModule,
       confirmAction
     }}>

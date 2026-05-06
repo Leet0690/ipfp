@@ -27,13 +27,18 @@ import {
   X,
   CreditCard,
   History,
-  CalendarDays
+  CalendarDays,
+  Receipt,
+  Tag
 } from 'lucide-react';
+
+const EXPENSE_CATEGORIES = ['Loyer', 'Matériel', 'Fournitures', 'Services', 'Entretien', 'Communication', 'Transport', 'Autre'];
 
 const FinanceDashboard = () => {
   const { 
-    students, teachers, payments, salaries, loading,
+    students, teachers, payments, salaries, expenses, loading,
     addPayment, deletePayment, addSalary, deleteSalary, updateTeacher,
+    addExpense, deleteExpense,
     teacherAttendance, loadFinancialData, loadTeacherAttendanceForMonth,
     isDirectorAuth, loginDirector, logoutDirector, logout, confirmAction
   } = useApp();
@@ -48,6 +53,17 @@ const FinanceDashboard = () => {
   const [salariesPage, setSalariesPage] = useState(1);
   const itemsPerPage = 10;
   
+  // Expense Modal State
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [expenseData, setExpenseData] = useState({
+    label: '',
+    amount: '',
+    category: 'Autre',
+    date: new Date().toISOString().split('T')[0],
+    month: new Date().toLocaleString('fr-FR', { month: 'long' }),
+    year: new Date().getFullYear()
+  });
+
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentData, setPaymentData] = useState({
@@ -161,13 +177,17 @@ const FinanceDashboard = () => {
   const stats = useMemo(() => {
     const totalRevenue = payments.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
     const totalSalaries = salaries.reduce((acc, s) => acc + (parseFloat(s.amount) || 0), 0);
+    const totalOtherExpenses = (expenses || []).reduce((acc, e) => acc + (parseFloat(e.amount) || 0), 0);
+    const totalExpenses = totalSalaries + totalOtherExpenses;
     return {
       revenue: totalRevenue,
-      expenses: totalSalaries,
-      balance: totalRevenue - totalSalaries,
+      expenses: totalExpenses,
+      salariesTotal: totalSalaries,
+      otherExpenses: totalOtherExpenses,
+      balance: totalRevenue - totalExpenses,
       pendingSalaries: calculatedSalaries.filter(s => !s.isPaid).reduce((acc, s) => acc + s.total, 0)
     };
-  }, [payments, salaries, calculatedSalaries]);
+  }, [payments, salaries, expenses, calculatedSalaries]);
 
   if (!isDirectorAuth) {
     return (
@@ -219,6 +239,14 @@ const FinanceDashboard = () => {
       <div className="modern-tabs-container" style={{ marginBottom: 'var(--space-6)' }}>
         <button onClick={() => setActiveTab('payments')} className={`modern-tab ${activeTab === 'payments' ? 'active' : ''}`}>Paiements</button>
         <button onClick={() => setActiveTab('salaries')} className={`modern-tab ${activeTab === 'salaries' ? 'active' : ''}`}>Salaires</button>
+        <button onClick={() => setActiveTab('expenses')} className={`modern-tab ${activeTab === 'expenses' ? 'active' : ''}`}>
+          Autres Charges
+          {(expenses || []).length > 0 && (
+            <span style={{ marginLeft: '6px', fontSize: '10px', fontWeight: '900', background: 'rgba(220,38,38,0.12)', color: '#dc2626', borderRadius: '999px', padding: '1px 7px' }}>
+              {(expenses || []).length}
+            </span>
+          )}
+        </button>
         <button onClick={() => setActiveTab('stats')} className={`modern-tab ${activeTab === 'stats' ? 'active' : ''}`}>Analyses</button>
       </div>
 
@@ -395,6 +423,68 @@ const FinanceDashboard = () => {
         </motion.div>
       )}
 
+      {activeTab === 'expenses' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="glass-card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Total autres charges</p>
+              <p style={{ fontSize: '22px', fontWeight: '900', color: 'var(--danger)' }}>{stats.otherExpenses.toLocaleString()} DH</p>
+            </div>
+            <button onClick={() => setShowExpenseModal(true)} className="btn-modern primary">
+              <Plus size={16} style={{ marginRight: '8px' }} /> Ajouter une charge
+            </button>
+          </div>
+
+          <div className="glass-card" style={{ overflow: 'hidden' }}>
+            {loading ? <TableSkeleton rows={6} /> : (
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-subtle)' }}>
+                    <th style={thStyle}>Libellé</th>
+                    <th style={thStyle}>Catégorie</th>
+                    <th style={thStyle}>Période</th>
+                    <th style={thStyle}>Date</th>
+                    <th style={thStyle}>Montant</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(expenses || []).length === 0 ? (
+                    <tr><td colSpan="6"><EmptyState title="Aucune charge" message="Aucune autre charge enregistrée pour le moment." icon="file" /></td></tr>
+                  ) : (expenses || []).map(e => (
+                    <tr key={e.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: '30px', height: '30px', borderRadius: 'var(--radius-lg)', background: 'rgba(220,38,38,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Receipt size={14} style={{ color: '#dc2626' }} />
+                          </div>
+                          <span style={{ fontWeight: '700', fontSize: 'var(--text-sm)' }}>{e.label}</span>
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', background: 'var(--bg-subtle)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-pill)', padding: '3px 10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Tag size={10} /> {e.category}
+                        </span>
+                      </td>
+                      <td style={tdStyle}><span style={{ fontWeight: '700' }}>{e.month} {e.year}</span></td>
+                      <td style={tdStyle}><span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{e.date}</span></td>
+                      <td style={tdStyle}><span style={{ fontWeight: '900', color: 'var(--danger)' }}>{parseFloat(e.amount).toLocaleString()} DH</span></td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <button onClick={async () => {
+                          if (await confirmAction({ title: "Supprimer la charge ?", message: `Voulez-vous supprimer "${e.label}" ?`, type: "danger" })) {
+                            deleteExpense(e.id);
+                          }
+                        }} className="action-btn delete"><Trash2 size={16} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       {activeTab === 'stats' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 'var(--space-4)' }}>
           <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
@@ -413,11 +503,20 @@ const FinanceDashboard = () => {
               </div>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', fontWeight: '700' }}>
-                  <span>Charges (Salaires)</span>
-                  <span style={{ color: 'var(--danger)' }}>-{stats.expenses.toLocaleString()} DH</span>
+                  <span>Charges Salariales</span>
+                  <span style={{ color: 'var(--danger)' }}>-{stats.salariesTotal.toLocaleString()} DH</span>
                 </div>
                 <div style={{ width: '100%', height: '10px', background: 'var(--bg-subtle)', borderRadius: '5px', overflow: 'hidden' }}>
-                  <div style={{ width: `${(stats.expenses / (stats.revenue || 1)) * 100}%`, height: '100%', background: 'var(--danger)' }}></div>
+                  <div style={{ width: `${(stats.salariesTotal / (stats.revenue || 1)) * 100}%`, height: '100%', background: 'var(--danger)' }}></div>
+                </div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', fontWeight: '700' }}>
+                  <span>Autres Charges</span>
+                  <span style={{ color: '#ea580c' }}>-{stats.otherExpenses.toLocaleString()} DH</span>
+                </div>
+                <div style={{ width: '100%', height: '10px', background: 'var(--bg-subtle)', borderRadius: '5px', overflow: 'hidden' }}>
+                  <div style={{ width: `${(stats.otherExpenses / (stats.revenue || 1)) * 100}%`, height: '100%', background: '#ea580c' }}></div>
                 </div>
               </div>
             </div>
@@ -432,6 +531,73 @@ const FinanceDashboard = () => {
           </div>
         </motion.div>
       )}
+
+      {/* Expense Modal */}
+      <AnimatePresence>
+        {showExpenseModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(6px)' }} onClick={() => setShowExpenseModal(false)} />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-premium" style={{ position: 'relative', width: '100%', maxWidth: '520px', padding: '32px', borderRadius: 'var(--radius-3xl)', boxShadow: 'var(--shadow-xl)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-lg)', background: 'rgba(220,38,38,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Receipt size={20} style={{ color: '#dc2626' }} />
+                  </div>
+                  <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>Ajouter une charge</h2>
+                </div>
+                <button onClick={() => setShowExpenseModal(false)} className="action-btn"><X size={20} /></button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div>
+                  <label style={lbl}>Libellé de la charge</label>
+                  <input type="text" className="input-premium" style={{ width: '100%', marginTop: '6px' }} placeholder="Ex : Loyer local, Achat fournitures..." value={expenseData.label} onChange={(e) => setExpenseData({...expenseData, label: e.target.value})} autoFocus />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={lbl}>Montant (DH)</label>
+                    <input type="number" className="input-premium" style={{ width: '100%', marginTop: '6px' }} placeholder="0" value={expenseData.amount} onChange={(e) => setExpenseData({...expenseData, amount: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={lbl}>Catégorie</label>
+                    <select className="input-premium" style={{ width: '100%', marginTop: '6px' }} value={expenseData.category} onChange={(e) => setExpenseData({...expenseData, category: e.target.value})}>
+                      {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={lbl}>Mois</label>
+                    <select className="input-premium" style={{ width: '100%', marginTop: '6px' }} value={expenseData.month} onChange={(e) => setExpenseData({...expenseData, month: e.target.value})}>
+                      {months.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={lbl}>Année</label>
+                    <select className="input-premium" style={{ width: '100%', marginTop: '6px' }} value={expenseData.year} onChange={(e) => setExpenseData({...expenseData, year: parseInt(e.target.value)})}>
+                      <option value={2026}>2026</option>
+                      <option value={2025}>2025</option>
+                      <option value={2024}>2024</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={lbl}>Date</label>
+                    <input type="date" className="input-premium" style={{ width: '100%', marginTop: '6px' }} value={expenseData.date} onChange={(e) => setExpenseData({...expenseData, date: e.target.value})} />
+                  </div>
+                </div>
+                <button className="btn-modern primary" style={{ width: '100%', padding: '14px', justifyContent: 'center', marginTop: '4px', background: '#dc2626' }}
+                  onClick={async () => {
+                    if (!expenseData.label || !expenseData.amount) return showToast('Libellé et montant requis', 'warning');
+                    await addExpense(expenseData);
+                    setShowExpenseModal(false);
+                    setExpenseData({ ...expenseData, label: '', amount: '' });
+                  }}>
+                  <Receipt size={18} style={{ marginRight: '8px' }} /> Enregistrer la charge
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Payment Modal */}
       <AnimatePresence>
