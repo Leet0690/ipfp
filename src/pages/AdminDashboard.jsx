@@ -68,6 +68,15 @@ const getGroupAbbreviation = (filiere, annee) => {
 };
 
 const DASH_DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+const DAY_ABBREVIATIONS = {
+  Lundi: 'LUN',
+  Mardi: 'MAR',
+  Mercredi: 'MER',
+  Jeudi: 'JEU',
+  Vendredi: 'VEN',
+  Samedi: 'SAM',
+  Dimanche: 'DIM'
+};
 const DASH_START = 8;
 const DASH_END = 19;
 const DASH_HOURS = Array.from({ length: DASH_END - DASH_START + 1 }, (_, i) => DASH_START + i);
@@ -165,7 +174,7 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
                     position: 'sticky', top: 0, zIndex: 10
                   }}>
                     <span style={{ fontSize: '10px', fontWeight: '900', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
-                      {day.slice(0, 3)}
+                      {DAY_ABBREVIATIONS[day] || day.slice(0, 3).toUpperCase()}
                     </span>
                     {daySessions.length > 0 && (
                       <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '1px 5px', borderRadius: '999px' }}>
