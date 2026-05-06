@@ -114,6 +114,14 @@ export const AppProvider = ({ children }) => {
     return sessionStorage.getItem('ipfp_director_auth') === 'true';
   });
 
+  useEffect(() => {
+    const clearDirectorSession = () => {
+      sessionStorage.removeItem('ipfp_director_auth');
+    };
+    window.addEventListener('beforeunload', clearDirectorSession);
+    return () => window.removeEventListener('beforeunload', clearDirectorSession);
+  }, []);
+
   // ──────────────────────────────────────────────────────────
   // OPTIMISATION FIREBASE (QUOTA) : Chargement ciblé et unique
   // Remplacement des `onSnapshot` par `getDocs` pour réduire drastiquement
