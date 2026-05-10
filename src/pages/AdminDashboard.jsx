@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   flexRender, getCoreRowModel, useReactTable, getFilteredRowModel, getPaginationRowModel,
 } from '@tanstack/react-table';
+import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { generateBulletinGlobal } from '../utils/pdfGenerator';
@@ -276,6 +277,13 @@ const AdminDashboard = () => {
   const [editFormData, setEditFormData] = useState({});
   const [editModuleSearch, setEditModuleSearch] = useState('');
 
+  // QR modal state
+  const [qrModal, setQrModal] = useState(null); // { title, links: [{ label, url, color }] }
+  const openQR = useCallback((title, links) => setQrModal({ title, links }), []);
+  const closeQR = useCallback(() => setQrModal(null), []);
+
+  const BASE = 'https://portail-ipfp.web.app';
+
   const allDiplomas = useMemo(() => Array.from(new Set(allModules.map(m => m.diploma))), [allModules]);
   const availableYears = useMemo(() => Array.from(new Set(allModules.map(m => m.year))), [allModules]);
   const availableMajors = useMemo(() => {
@@ -455,34 +463,34 @@ const AdminDashboard = () => {
     {
       accessorKey: 'token', header: activeTab === 'students' ? 'Lien' : 'Liens Formateur',
       cell: ({ row }) => {
-        const base = "https://portail-ipfp.web.app";
         if (activeTab === 'students') {
           const cleanToken = (row.original.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
-          const fullLink = base + `/results/${cleanToken}`;
+          const fullLink = BASE + `/results/${cleanToken}`;
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', maxWidth: '260px' }}
-              onClick={() => { navigator.clipboard?.writeText(fullLink); }} title="Copier le lien">
-              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', flexShrink: 0 }}>
+              onClick={(e) => { e.stopPropagation(); openQR(`${row.original.lastName} ${row.original.firstName}`, [{ label: 'Résultats', url: fullLink, color: 'var(--primary)' }]); }}
+              title="Voir le QR code">
+              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <LinkIcon size={12} />
               </div>
               <span style={{ fontSize: '10px', fontWeight: '500', fontFamily: 'monospace', color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullLink}</span>
             </div>
           );
         } else {
-          const linkAtt = base + `/portal/${row.original.tokenAttendance}`;
-          const linkNotes = base + `/portal/${row.original.tokenGrades}`;
+          const linkAtt   = BASE + `/portal/${row.original.tokenAttendance}`;
+          const linkNotes = BASE + `/portal/${row.original.tokenGrades}`;
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(linkAtt); }}>
-                <div style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', flexShrink: 0 }}>
+                onClick={(e) => { e.stopPropagation(); openQR(row.original.name, [{ label: 'Absences', url: linkAtt, color: 'var(--primary)' }]); }}>
+                <div style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <UserCheck size={10} />
                 </div>
                 <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--primary)' }}>Absences</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(linkNotes); }}>
-                <div style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'rgba(254, 205, 8, 0.1)', color: '#a06208', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', flexShrink: 0 }}>
+                onClick={(e) => { e.stopPropagation(); openQR(row.original.name, [{ label: 'Notes', url: linkNotes, color: '#a06208' }]); }}>
+                <div style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'rgba(254,205,8,0.1)', color: '#a06208', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <FileText size={10} />
                 </div>
                 <span style={{ fontSize: '10px', fontWeight: '700', color: '#a06208' }}>Notes</span>
@@ -496,9 +504,9 @@ const AdminDashboard = () => {
       id: 'actions', header: '',
       cell: ({ row }) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'flex-end' }}>
-          {activeTab === 'students' && <ActionBtn icon={Share2} title="Copier" color="var(--primary)" onClick={() => {
+          {activeTab === 'students' && <ActionBtn icon={Share2} title="QR Code" color="var(--primary)" onClick={() => {
             const cleanToken = (row.original.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
-            navigator.clipboard?.writeText(`https://portail-ipfp.web.app/results/${cleanToken}`);
+            openQR(`${row.original.lastName} ${row.original.firstName}`, [{ label: 'Résultats', url: BASE + `/results/${cleanToken}`, color: 'var(--primary)' }]);
           }} />}
           <ActionBtn icon={Eye} title="Détails" onClick={() => openDetails(row.original)} />
           <ActionBtn icon={Edit3} title="Modifier" onClick={() => openEdit(row.original)} />
@@ -820,19 +828,112 @@ const AdminDashboard = () => {
                     <InfoBox label="Année" value={selectedItem.year || 'N/A'} icon={Calendar} />
                     <InfoBox label="Statut" value="ACTIF" icon={CheckCircle2} valueColor="var(--primary)" />
                   </div>
-                  <div style={{ marginTop: '24px', padding: '16px', background: 'var(--primary-ultra-light)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--primary-light)' }}>
-                    <p style={{ fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <LinkIcon size={12} /> Lien d'accès
-                    </p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', background: 'white' }} value={`https://portail-ipfp.web.app/${activeTab === 'students' ? 'results' : 'portal'}/${selectedItem.token || selectedItem.tokenGrades}`} />
-                      <button className="btn-modern primary" onClick={() => { navigator.clipboard.writeText(`https://portail-ipfp.web.app/${activeTab === 'students' ? 'results' : 'portal'}/${selectedItem.token || selectedItem.tokenGrades}`); showToast('Copié !', 'success'); }}>
-                        <Copy size={14} />
-                      </button>
-                    </div>
-                  </div>
+                  {activeTab === 'students' ? (() => {
+                    const cleanToken = (selectedItem.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+                    const url = `${BASE}/results/${cleanToken}`;
+                    return (
+                      <div style={{ marginTop: '24px', padding: '20px', background: 'var(--primary-ultra-light)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--primary-light)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                        <p style={{ fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-start' }}>
+                          <LinkIcon size={12} /> Lien d'accès
+                        </p>
+                        <div style={{ padding: '12px', background: 'white', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+                          <QRCodeSVG value={url} size={160} fgColor="var(--primary)" />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                          <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', background: 'white' }} value={url} />
+                          <button className="btn-modern primary" onClick={() => { navigator.clipboard.writeText(url); showToast('Copié !', 'success'); }}>
+                            <Copy size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })() : (() => {
+                    const linkAtt   = `${BASE}/portal/${selectedItem.tokenAttendance}`;
+                    const linkNotes = `${BASE}/portal/${selectedItem.tokenGrades}`;
+                    return (
+                      <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {[
+                          { label: 'Absences', url: linkAtt, color: 'var(--primary)', bg: 'var(--primary-ultra-light)', border: 'var(--primary-light)' },
+                          { label: 'Notes', url: linkNotes, color: '#a06208', bg: 'rgba(254,205,8,0.1)', border: 'rgba(254,205,8,0.3)' },
+                        ].map(({ label, url, color, bg, border }) => (
+                          <div key={label} style={{ padding: '16px', background: bg, borderRadius: 'var(--radius-xl)', border: `1px solid ${border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                            <p style={{ fontSize: 'var(--text-xs)', fontWeight: '800', color, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-start' }}>
+                              <LinkIcon size={12} /> Lien — {label}
+                            </p>
+                            <div style={{ padding: '10px', background: 'white', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+                              <QRCodeSVG value={url} size={140} fgColor={color === 'var(--primary)' ? '#b068b9' : '#a06208'} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                              <input readOnly className="input-premium" style={{ flex: 1, fontSize: '11px', background: 'white' }} value={url} />
+                              <button className="btn-modern primary" style={{ background: color, borderColor: color }} onClick={() => { navigator.clipboard.writeText(url); showToast('Copié !', 'success'); }}>
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* QR Code Modal */}
+      <AnimatePresence>
+        {qrModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(4px)' }}
+              onClick={closeQR} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.93, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.93, y: 16 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+              className="glass-premium"
+              style={{ width: '100%', maxWidth: '380px', padding: '28px', borderRadius: 'var(--radius-3xl)', position: 'relative', zIndex: 201, boxShadow: 'var(--shadow-xl)' }}
+            >
+              <button onClick={closeQR} style={{ position: 'absolute', right: '18px', top: '18px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </button>
+
+              <h3 style={{ fontSize: 'var(--text-base)', fontWeight: '900', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                QR Code
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px', fontWeight: '600' }}>
+                {qrModal.title}
+              </p>
+
+              {qrModal.links.map(({ label, url, color }) => (
+                <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+                  {qrModal.links.length > 1 && (
+                    <span style={{ fontSize: '11px', fontWeight: '800', color, textTransform: 'uppercase', letterSpacing: '0.07em', alignSelf: 'flex-start' }}>
+                      {label}
+                    </span>
+                  )}
+                  <div style={{ padding: '14px', background: 'white', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
+                    <QRCodeSVG value={url} size={180} fgColor={color === 'var(--primary)' ? '#b068b9' : (color || '#b068b9')} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                    <input
+                      readOnly
+                      className="input-premium"
+                      style={{ flex: 1, fontSize: '10px', background: 'var(--bg-subtle)', fontFamily: 'monospace' }}
+                      value={url}
+                    />
+                    <button
+                      className="btn-modern primary"
+                      onClick={() => { navigator.clipboard.writeText(url); showToast('Lien copié !', 'success'); }}
+                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Copy size={14} /> Copier
+                    </button>
+                  </div>
+                </div>
+              ))}
             </motion.div>
           </div>
         )}
