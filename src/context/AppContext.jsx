@@ -63,7 +63,23 @@ const getMonthBounds = (monthIndex, year) => {
 };
 
 export const AppProvider = ({ children }) => {
-  const { showToast } = useToast();
+  const { showToast: originalShowToast } = useToast();
+  const [notifications, setNotifications] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ipfp_notifications')) || []; } catch { return []; }
+  });
+  
+  useEffect(() => { localStorage.setItem('ipfp_notifications', JSON.stringify(notifications)); }, [notifications]);
+
+  const markNotificationAsRead = useCallback((id) => setNotifications(p => p.map(n => n.id === id ? { ...n, read: true } : n)), []);
+  const clearNotifications = useCallback(() => setNotifications([]), []);
+
+  const showToast = useCallback((msg, type = 'info') => {
+    originalShowToast(msg, type);
+    if ((type === 'success' || type === 'warning') && !msg.toLowerCase().includes('connexion') && !msg.toLowerCase().includes('déconnexion')) {
+      setNotifications(prev => [{ id: Date.now().toString() + Math.random(), message: msg, type, timestamp: Date.now(), read: false }, ...prev].slice(0, 50));
+    }
+  }, [originalShowToast]);
+
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [grades, setGrades] = useState({});
@@ -695,7 +711,7 @@ export const AppProvider = ({ children }) => {
       schedules, addSchedule, deleteSchedule, clearAllSchedules, migrateTeacherTokens,
       payments, salaries, expenses, loadFinancialData, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary, addExpense, deleteExpense,
       modules, addModule, updateModule, deleteModule,
-      confirmAction
+      confirmAction, notifications, markNotificationAsRead, clearNotifications
     }}>
       {children}
       <ConfirmModal 

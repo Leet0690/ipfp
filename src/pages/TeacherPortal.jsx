@@ -195,7 +195,19 @@ const TeacherPortal = () => {
 
   const relevantStudents = useMemo(() => {
     if (activeTab === 'attendance' && !currentSession) return [];
-    return students.filter(s => s.major === selectedGroup && s.year === filterYear && (!selectedDiploma || s.diploma === selectedDiploma));
+    const filtered = students.filter(s => s.major === selectedGroup && s.year === filterYear && (!selectedDiploma || s.diploma === selectedDiploma));
+    
+    // Anti-doublons : empêche l'affichage multiple si la DB contient des erreurs
+    const uniqueStudents = [];
+    const seen = new Set();
+    filtered.forEach(s => {
+      const key = s.regNo ? s.regNo.trim() : `${s.firstName?.toLowerCase()?.trim()}_${s.lastName?.toLowerCase()?.trim()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueStudents.push(s);
+      }
+    });
+    return uniqueStudents;
   }, [students, selectedGroup, filterYear, selectedDiploma, activeTab, currentSession]);
 
   const allAttended = useMemo(() => {
