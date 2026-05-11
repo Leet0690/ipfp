@@ -612,15 +612,15 @@ export const generateNoteObtentionDiplome = (student, allGrades, modules) => {
   //const firstname =student.lastName && student.major.length > 30 ? student.major.substring(0, 25) + '…' : (student.major || '');
   const fullName = `${(student.lastName || '').toUpperCase()} ${student.firstName || ''}`.trim();
   if (fullName.length > 20) {
-    const mid = Math.floor(fullName.length / 2);
-    let splitIdx = fullName.indexOf(' ', mid);
-    if (splitIdx === -1) splitIdx = fullName.lastIndexOf(' ', mid);
-    if (splitIdx === -1) splitIdx = mid;
-    doc.text(fullName.substring(0, splitIdx).trim(), margin + 25, y + 4);
-    doc.text(fullName.substring(splitIdx).trim(), margin + 25, y + 8);
+    doc.setFontSize(6.5);
+    const splitName = doc.splitTextToSize(fullName, 34);
+    doc.text(splitName[0] || '', margin + 25, y + 4);
+    doc.text(splitName.slice(1).join(' '), margin + 25, y + 7.5);
   } else {
+    doc.setFontSize(8);
     doc.text(fullName, margin + 25, y + 6);
   }
+  doc.setFontSize(8); // Restore for next blocks
 
   doc.setFont('helvetica', 'bold');
   doc.text('Année de formation', margin + cL + 12, y + 6);
