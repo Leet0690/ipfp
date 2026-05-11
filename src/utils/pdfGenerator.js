@@ -350,7 +350,17 @@ export const generateBulletinGlobal = (student, allGrades, modules) => {
   doc.setTextColor(0);
   doc.text('NOM ET PRENOM :', margin + 2, y + 5.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${student.lastName.toUpperCase()} ${student.firstName}`, margin + 38, y + 5.5);
+  const fullName = `${(student.lastName || '').toUpperCase()} ${student.firstName || ''}`.trim();
+  if (fullName.length > 20) {
+    const mid = Math.floor(fullName.length / 2);
+    let splitIdx = fullName.indexOf(' ', mid);
+    if (splitIdx === -1) splitIdx = fullName.lastIndexOf(' ', mid);
+    if (splitIdx === -1) splitIdx = mid;
+    doc.text(fullName.substring(0, splitIdx).trim(), margin + 38, y + 3.5);
+    doc.text(fullName.substring(splitIdx).trim(), margin + 38, y + 7.5);
+  } else {
+    doc.text(fullName, margin + 38, y + 5.5);
+  }
   doc.setFont('helvetica', 'bold');
   doc.text("N° d'inscription", margin + tableW * 0.5 + 2, y + 5.5);
   doc.setFont('helvetica', 'normal');
@@ -600,7 +610,17 @@ export const generateNoteObtentionDiplome = (student, allGrades, modules) => {
   //const lastname = student.lastName && student.major.length > 30 ? student.major.substring(0, 25) + '…' : (student.major || '');
   //const name = student.lastName.length + student.firstName.length > 30 ? margin += 40 : margin;
   //const firstname =student.lastName && student.major.length > 30 ? student.major.substring(0, 25) + '…' : (student.major || '');
-  doc.text(`${student.lastName.toUpperCase()} ${student.firstName}`, margin + 25, y + 6);
+  const fullName = `${(student.lastName || '').toUpperCase()} ${student.firstName || ''}`.trim();
+  if (fullName.length > 20) {
+    const mid = Math.floor(fullName.length / 2);
+    let splitIdx = fullName.indexOf(' ', mid);
+    if (splitIdx === -1) splitIdx = fullName.lastIndexOf(' ', mid);
+    if (splitIdx === -1) splitIdx = mid;
+    doc.text(fullName.substring(0, splitIdx).trim(), margin + 25, y + 4);
+    doc.text(fullName.substring(splitIdx).trim(), margin + 25, y + 8);
+  } else {
+    doc.text(fullName, margin + 25, y + 6);
+  }
 
   doc.setFont('helvetica', 'bold');
   doc.text('Année de formation', margin + cL + 12, y + 6);
