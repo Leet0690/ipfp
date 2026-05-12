@@ -124,10 +124,46 @@ const StudentAttendance = () => {
     if (selectedDate) loadTeacherAttendanceForDate(selectedDate);
   }, [selectedDate, loadTeacherAttendanceForDate]);
 
+  const autoMarkTeacherIfReady = useCallback(async (matchingSession, extraRecords = []) => {
+    if (!matchingSession?.teacherId || !matchingSession?.time) return;
+
+    const allTeacherSessions = (schedules || []).filter(sc =>
+      sc.teacherId === matchingSession.teacherId &&
+      sc.time === matchingSession.time &&
+      sc.day === dayOfWeek
+    );
+
+    const combinedAttendance = [...(studentAttendance || []), ...extraRecords];
+
+    const allGroupsComplete = allTeacherSessions.every(session => {
+      const groupStudents = (students || []).filter(s =>
+        s.major === session.filiere && s.year === session.annee
+      );
+      if (groupStudents.length === 0) return true;
+      const safeModule = (session.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+      return groupStudents.every(s => {
+        const docId = `${s.id}_${safeModule}_${selectedDate}`;
+        return combinedAttendance.some(a => a.id === docId && a.status);
+      });
+    });
+
+    if (!allGroupsComplete) return;
+
+    const safeModule = (matchingSession.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+    const safeTime = (matchingSession.time || '').replace(/[^0-9]/g, '') || 'x';
+    const teacherDocId = `${matchingSession.teacherId}_${safeModule}_${safeTime}_${selectedDate}`;
+    const existingTeacherRecord = (teacherAttendance || []).find(a => a.id === teacherDocId);
+    if (!existingTeacherRecord) {
+      const duration = calcDuration(matchingSession.time);
+      await updateTeacherAttendance(matchingSession.teacherId, selectedDate, 'present', '', duration, matchingSession.module, matchingSession.time);
+    }
+  }, [schedules, students, studentAttendance, teacherAttendance, dayOfWeek, selectedDate, updateTeacherAttendance]);
+
   const handleStatusChange = async (studentId, status) => {
     if (!filterModule) { showToast("Veuillez d'abord sélectionner un module.", 'warning'); return; }
     try {
-      const docId = `${studentId}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
+      const safeModule = filterModule.replace(/[^a-zA-Z0-9]/g, '_');
+      const docId = `${studentId}_${safeModule}_${selectedDate}`;
       const record = studentAttendance.find(a => a.id === docId);
       await updateStudentAttendance(studentId, filterModule, selectedDate, status, record?.comment || '', 'admin');
 
@@ -137,16 +173,8 @@ const StudentAttendance = () => {
         sc.day === dayOfWeek &&
         sc.module === filterModule
       );
-      if (matchingSession?.teacherId && matchingSession?.time) {
-        const duration = calcDuration(matchingSession.time);
-        const safeModule = (matchingSession.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
-        const safeTime = (matchingSession.time || '').replace(/[^0-9]/g, '') || 'x';
-        const teacherDocId = `${matchingSession.teacherId}_${safeModule}_${safeTime}_${selectedDate}`;
-        const existingTeacherRecord = (teacherAttendance || []).find(a => a.id === teacherDocId);
-        if (!existingTeacherRecord) {
-          await updateTeacherAttendance(matchingSession.teacherId, selectedDate, 'present', '', duration, matchingSession.module, matchingSession.time);
-        }
-      }
+      const extraRecord = { id: docId, studentId, status };
+      await autoMarkTeacherIfReady(matchingSession, [extraRecord]);
     } catch { showToast("Erreur lors de l'enregistrement.", 'error'); }
   };
 
@@ -157,9 +185,10 @@ const StudentAttendance = () => {
     if (!filteredStudents.length) return;
     setBulkLoading(true);
     try {
+      const safeModule = filterModule.replace(/[^a-zA-Z0-9]/g, '_');
       await Promise.all(
         filteredStudents.map(student => {
-          const docId = `${student.id}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
+          const docId = `${student.id}_${safeModule}_${selectedDate}`;
           const record = studentAttendance.find(a => a.id === docId);
           return updateStudentAttendance(student.id, filterModule, selectedDate, 'present', record?.comment || '', 'admin');
         })
@@ -171,16 +200,12 @@ const StudentAttendance = () => {
         sc.day === dayOfWeek &&
         sc.module === filterModule
       );
-      if (matchingSession?.teacherId && matchingSession?.time) {
-        const duration = calcDuration(matchingSession.time);
-        const safeModule = (matchingSession.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
-        const safeTime = (matchingSession.time || '').replace(/[^0-9]/g, '') || 'x';
-        const teacherDocId = `${matchingSession.teacherId}_${safeModule}_${safeTime}_${selectedDate}`;
-        const existingTeacherRecord = (teacherAttendance || []).find(a => a.id === teacherDocId);
-        if (!existingTeacherRecord) {
-          await updateTeacherAttendance(matchingSession.teacherId, selectedDate, 'present', '', duration, matchingSession.module, matchingSession.time);
-        }
-      }
+      const extraRecords = filteredStudents.map(s => ({
+        id: `${s.id}_${safeModule}_${selectedDate}`,
+        studentId: s.id,
+        status: 'present'
+      }));
+      await autoMarkTeacherIfReady(matchingSession, extraRecords);
 
       showToast(`${filteredStudents.length} stagiaire(s) marqué(s) présent(s).`, 'success');
     } catch { showToast("Erreur lors de l'enregistrement groupé.", 'error'); }
