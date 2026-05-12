@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
@@ -89,6 +89,7 @@ const TeacherPortal = () => {
   const [attendanceSuccess, setAttendanceSuccess] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [showUnmarkedWarning, setShowUnmarkedWarning] = useState(false);
+  const firstUnmarkedRef = useRef(null);
 
   const dayOfWeek = useMemo(() => {
     const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -233,6 +234,12 @@ const TeacherPortal = () => {
   useEffect(() => {
     if (allAttended) setShowUnmarkedWarning(false);
   }, [allAttended]);
+
+  useEffect(() => {
+    if (showUnmarkedWarning && firstUnmarkedRef.current) {
+      firstUnmarkedRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [showUnmarkedWarning]);
 
   React.useEffect(() => {
     if (activeTab === 'attendance' && !allAttended) {
@@ -525,14 +532,15 @@ const TeacherPortal = () => {
                 </tr>
               </thead>
               <tbody>
-                {relevantStudents.map((s, idx) => {
+                {(() => { let firstUnmarkedAssigned = false; return relevantStudents.map((s, idx) => {
                   const docId = `${s.id}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
                   const record = studentAttendance.find(a => a.id === docId);
                   const status = record?.status || '';
                   const comment = record?.comment || '';
                   const isUnmarked = showUnmarkedWarning && !['present', 'absent'].includes(status);
+                  const isFirstUnmarked = isUnmarked && !firstUnmarkedAssigned && (firstUnmarkedAssigned = true);
                   return (
-                    <tr key={s.id} style={{ borderBottom: '1px solid var(--border-light)', background: isUnmarked ? 'rgba(220,38,38,0.06)' : (idx % 2 === 0 ? 'white' : 'var(--bg-subtle)'), borderLeft: isUnmarked ? '3px solid rgba(220,38,38,0.5)' : '3px solid transparent', transition: 'background 0.25s, border-color 0.25s' }}>
+                    <tr key={s.id} ref={isFirstUnmarked ? firstUnmarkedRef : null} style={{ borderBottom: '1px solid var(--border-light)', background: isUnmarked ? 'rgba(220,38,38,0.06)' : (idx % 2 === 0 ? 'white' : 'var(--bg-subtle)'), borderLeft: isUnmarked ? '3px solid rgba(220,38,38,0.5)' : '3px solid transparent', transition: 'background 0.25s, border-color 0.25s' }}>
                       <td style={td}>
                         <p style={{ fontSize: '13px', fontWeight: '800', color: isUnmarked ? '#dc2626' : 'var(--text-primary)' }}>{s.lastName} {s.firstName}</p>
                         <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Matricule: {s.regNo}</p>
@@ -548,7 +556,7 @@ const TeacherPortal = () => {
                       </td>
                     </tr>
                   );
-                })}
+                }); })()}
               </tbody>
             </table>
           </div>
