@@ -88,6 +88,7 @@ const TeacherAttendance = () => {
   /* ── Daily state ── */
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [pendingHours, setPendingHours] = useState({});
 
   const dayOfWeek = useMemo(() => {
     const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -127,7 +128,13 @@ const TeacherAttendance = () => {
   useEffect(() => { loadTeacherAttendanceForDate(selectedDate); }, [selectedDate, loadTeacherAttendanceForDate]);
 
   const handleStatusChange = async (row, status) => {
-    try { await updateTeacherAttendance(row.teacher.id, selectedDate, status, '', status === 'present' ? row.duration : 0, row.module, row.time); }
+    try {
+      const savedHours = teacherAttendance.find(a => a.id === row.docId)?.hours;
+      const hours = status === 'present'
+        ? (pendingHours[row.docId] !== undefined ? parseFloat(pendingHours[row.docId]) || 0 : (savedHours !== undefined ? savedHours : row.duration))
+        : 0;
+      await updateTeacherAttendance(row.teacher.id, selectedDate, status, '', hours, row.module, row.time);
+    }
     catch { showToast("Erreur lors de l'enregistrement.", 'error'); }
   };
   const handleHoursChange = async (row, hours) => {
@@ -312,10 +319,29 @@ const TeacherAttendance = () => {
                               </div>
                             </td>
                             <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              <input type="number" step="0.5" className="input-premium"
-                                style={{ width: '64px', textAlign: 'center', padding: '4px', fontSize: '12px', fontWeight: '900' }}
-                                value={record?.hours !== undefined ? record.hours : row.duration}
-                                onChange={(e) => handleHoursChange(row, parseFloat(e.target.value) || 0)} />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                                <input type="number" step="0.5" className="input-premium"
+                                  style={{ width: '64px', textAlign: 'center', padding: '4px', fontSize: '12px', fontWeight: '900' }}
+                                  value={pendingHours[row.docId] !== undefined ? pendingHours[row.docId] : (record?.hours !== undefined ? record.hours : row.duration)}
+                                  onChange={(e) => setPendingHours(p => ({ ...p, [row.docId]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleHoursChange(row, parseFloat(pendingHours[row.docId]) || 0);
+                                      setPendingHours(p => { const n = { ...p }; delete n[row.docId]; return n; });
+                                    }
+                                  }} />
+                                {pendingHours[row.docId] !== undefined && (
+                                  <button
+                                    style={{ padding: '4px 5px', color: '#15803d', background: 'rgba(22,163,74,0.10)', border: '1px solid rgba(22,163,74,0.25)', borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                                    onClick={() => {
+                                      handleHoursChange(row, parseFloat(pendingHours[row.docId]) || 0);
+                                      setPendingHours(p => { const n = { ...p }; delete n[row.docId]; return n; });
+                                    }}
+                                  >
+                                    <CheckCircle2 size={14} />
+                                  </button>
+                                )}
+                              </div>
                             </td>
                             <td style={{ ...tdStyle, textAlign: 'center' }}>
                               <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '4px', gap: '2px' }}>
