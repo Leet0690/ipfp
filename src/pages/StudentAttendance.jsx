@@ -46,8 +46,19 @@ const filterIconStyle = { position: 'absolute', left: '12px', top: '50%', transf
 const thStyle = { padding: '16px', fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' };
 const tdStyle = { padding: '16px' };
 
+const calcDuration = (timeStr) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d{1,2})[h:]?(\d{2})?\s*[-–—]\s*(\d{1,2})[h:]?(\d{2})?/i);
+  if (!match) return 0;
+  try {
+    const h1 = parseInt(match[1] || 0, 10), m1 = parseInt(match[2] || 0, 10);
+    const h2 = parseInt(match[3] || 0, 10), m2 = parseInt(match[4] || 0, 10);
+    return Math.max(0, Math.round(((h2 * 60 + m2) - (h1 * 60 + m1)) / 60 * 100) / 100);
+  } catch { return 0; }
+};
+
 const StudentAttendance = () => {
-  const { students, studentAttendance, updateStudentAttendance, loadAttendanceForSession, loadStudentAttendanceForMonth, loading, schedules } = useApp();
+  const { students, studentAttendance, updateStudentAttendance, loadAttendanceForSession, loadStudentAttendanceForMonth, loading, schedules, teacherAttendance, updateTeacherAttendance, loadTeacherAttendanceForDate } = useApp();
   const { showToast } = useToast();
 
   /* Tab state */
@@ -109,12 +120,33 @@ const StudentAttendance = () => {
     if (filterModule && selectedDate) loadAttendanceForSession(filterModule, selectedDate);
   }, [filterModule, selectedDate, loadAttendanceForSession]);
 
+  useEffect(() => {
+    if (selectedDate) loadTeacherAttendanceForDate(selectedDate);
+  }, [selectedDate, loadTeacherAttendanceForDate]);
+
   const handleStatusChange = async (studentId, status) => {
     if (!filterModule) { showToast("Veuillez d'abord sélectionner un module.", 'warning'); return; }
     try {
       const docId = `${studentId}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
       const record = studentAttendance.find(a => a.id === docId);
       await updateStudentAttendance(studentId, filterModule, selectedDate, status, record?.comment || '', 'admin');
+
+      const matchingSession = (schedules || []).find(sc =>
+        sc.filiere === filterMajor &&
+        sc.annee === filterYear &&
+        sc.day === dayOfWeek &&
+        sc.module === filterModule
+      );
+      if (matchingSession?.teacherId && matchingSession?.time) {
+        const duration = calcDuration(matchingSession.time);
+        const safeModule = (matchingSession.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+        const safeTime = (matchingSession.time || '').replace(/[^0-9]/g, '') || 'x';
+        const teacherDocId = `${matchingSession.teacherId}_${safeModule}_${safeTime}_${selectedDate}`;
+        const existingTeacherRecord = (teacherAttendance || []).find(a => a.id === teacherDocId);
+        if (!existingTeacherRecord) {
+          await updateTeacherAttendance(matchingSession.teacherId, selectedDate, 'present', '', duration, matchingSession.module, matchingSession.time);
+        }
+      }
     } catch { showToast("Erreur lors de l'enregistrement.", 'error'); }
   };
 
