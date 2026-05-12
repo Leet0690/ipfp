@@ -8,7 +8,7 @@ import EmptyState from '../components/EmptyState';
 import {
   UserCheck, FileSpreadsheet, Search, Calendar, CheckCircle2,
   XCircle, Clock, Users, Filter, Download, CalendarRange,
-  ChevronLeft, ChevronRight, AlertTriangle
+  ChevronLeft, ChevronRight, AlertTriangle, CheckCheck
 } from 'lucide-react';
 
 /* ─── Monthly-view helpers ─── */
@@ -148,6 +148,43 @@ const StudentAttendance = () => {
         }
       }
     } catch { showToast("Erreur lors de l'enregistrement.", 'error'); }
+  };
+
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const handleMarkAllPresent = async () => {
+    if (!filterModule) { showToast("Veuillez d'abord sélectionner un module.", 'warning'); return; }
+    if (!filteredStudents.length) return;
+    setBulkLoading(true);
+    try {
+      await Promise.all(
+        filteredStudents.map(student => {
+          const docId = `${student.id}_${(filterModule).replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
+          const record = studentAttendance.find(a => a.id === docId);
+          return updateStudentAttendance(student.id, filterModule, selectedDate, 'present', record?.comment || '', 'admin');
+        })
+      );
+
+      const matchingSession = (schedules || []).find(sc =>
+        sc.filiere === filterMajor &&
+        sc.annee === filterYear &&
+        sc.day === dayOfWeek &&
+        sc.module === filterModule
+      );
+      if (matchingSession?.teacherId && matchingSession?.time) {
+        const duration = calcDuration(matchingSession.time);
+        const safeModule = (matchingSession.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+        const safeTime = (matchingSession.time || '').replace(/[^0-9]/g, '') || 'x';
+        const teacherDocId = `${matchingSession.teacherId}_${safeModule}_${safeTime}_${selectedDate}`;
+        const existingTeacherRecord = (teacherAttendance || []).find(a => a.id === teacherDocId);
+        if (!existingTeacherRecord) {
+          await updateTeacherAttendance(matchingSession.teacherId, selectedDate, 'present', '', duration, matchingSession.module, matchingSession.time);
+        }
+      }
+
+      showToast(`${filteredStudents.length} stagiaire(s) marqué(s) présent(s).`, 'success');
+    } catch { showToast("Erreur lors de l'enregistrement groupé.", 'error'); }
+    finally { setBulkLoading(false); }
   };
 
   const handleCommentChange = async (studentId, comment) => {
@@ -348,11 +385,20 @@ const StudentAttendance = () => {
           </div>
 
           {filteredStudents.length > 0 && filterModule && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)', flexWrap: 'wrap', alignItems: 'center' }}>
               <MiniStat label="Effectif" value={stats.total} />
               <MiniStat label="Présents" value={stats.presents} />
               <MiniStat label="Absents" value={stats.absents} />
               <MiniStat label="Taux" value={stats.total > 0 ? `${Math.round((stats.presents / stats.total) * 100)}%` : '—'} />
+              <button
+                onClick={handleMarkAllPresent}
+                disabled={bulkLoading}
+                className="btn-modern primary"
+                style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 18px', fontSize: '13px', opacity: bulkLoading ? 0.7 : 1 }}
+              >
+                <CheckCheck size={15} />
+                {bulkLoading ? 'Enregistrement...' : 'Tous Présents'}
+              </button>
             </motion.div>
           )}
 
