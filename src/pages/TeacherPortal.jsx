@@ -25,8 +25,13 @@ import {
   Presentation,
   UserCheck,
   Award,
-  ArrowRight
+  ArrowRight,
+  RefreshCw,
+  Heart
 } from 'lucide-react';
+
+const APP_VERSION = '2.5.0';
+const VERSION_KEY = 'ipfp_app_version';
 
 /* ── Components ── */
 const GradeInput = ({ value, onChange, placeholder = '—' }) => {
@@ -65,7 +70,7 @@ const getGroupAbbreviation = (filiere, annee) => {
 const TeacherPortal = () => {
   const { teacherId } = useParams();
   const navigate = useNavigate();
-  const { teachers, students, updateGrades, grades, loading, studentAttendance, updateStudentAttendance, schedules, updateTeacherAttendance, loadAttendanceForSession, confirmAction } = useApp();
+  const { teachers, students, updateGrades, grades, loading, studentAttendance, updateStudentAttendance, schedules, updateTeacherAttendance, loadAttendanceForSession, teacherAttendance, loadTeacherAttendanceForDate, confirmAction } = useApp();
   const { showToast } = useToast();
   
   const teacher = useMemo(() => {
@@ -89,6 +94,10 @@ const TeacherPortal = () => {
   const [attendanceSuccess, setAttendanceSuccess] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [showUnmarkedWarning, setShowUnmarkedWarning] = useState(false);
+  const [completedSessionIds, setCompletedSessionIds] = useState(new Set());
+  const [showVersionBanner, setShowVersionBanner] = useState(() => {
+    try { return localStorage.getItem(VERSION_KEY) !== APP_VERSION; } catch { return false; }
+  });
   const firstUnmarkedRef = useRef(null);
 
   const dayOfWeek = useMemo(() => {
@@ -100,6 +109,26 @@ const TeacherPortal = () => {
     if (!teacher) return [];
     return (schedules || []).filter(s => s.teacherId === teacher.id && s.day === dayOfWeek);
   }, [teacher, schedules, dayOfWeek]);
+
+  // Load teacher attendance for today to detect if already done
+  useEffect(() => {
+    if (teacher && selectedDate && accessMode === 'attendance') {
+      loadTeacherAttendanceForDate(selectedDate);
+    }
+  }, [teacher, selectedDate, accessMode, loadTeacherAttendanceForDate]);
+
+  // Check if attendance was already submitted today
+  const alreadyDoneToday = useMemo(() => {
+    if (!teacher || todaysSessions.length === 0 || accessMode !== 'attendance') return false;
+    // Check if ALL sessions have a 'present' teacher attendance record for today
+    return todaysSessions.every(session => {
+      const safeModule = (session.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeTime = (session.time || '').replace(/[^0-9]/g, '') || 'x';
+      const docId = `${teacher.id}_${safeModule}_${safeTime}_${selectedDate}`;
+      const record = teacherAttendance.find(a => a.id === docId);
+      return record && record.status === 'present';
+    });
+  }, [teacher, todaysSessions, teacherAttendance, selectedDate, accessMode]);
 
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const currentSession = useMemo(() => {
@@ -222,6 +251,12 @@ const TeacherPortal = () => {
     });
   }, [relevantStudents, selectedSubject, selectedDate, studentAttendance]);
 
+  // Track if ALL sessions for the day are completed
+  const allSessionsCompleted = useMemo(() => {
+    if (todaysSessions.length === 0) return false;
+    return todaysSessions.every(session => completedSessionIds.has(session.id));
+  }, [todaysSessions, completedSessionIds]);
+
   const unmarkedStudents = useMemo(() => {
     if (!selectedSubject || !relevantStudents.length) return [];
     return relevantStudents.filter(s => {
@@ -273,16 +308,105 @@ const TeacherPortal = () => {
     );
   }
 
-  const handleValidateAttendance = async () => {
-    if (allAttended) {
-      if (await confirmAction({ title: "Valider l'appel ?", message: "Cette action confirmera les présences et votre vacation.", type: "warning" })) {
-        setAttendanceSuccess(true);
-        await updateTeacherAttendance(teacher.id, selectedDate, 'present', `Appel validé: ${selectedSubject}`, sessionDuration, selectedSubject, currentSession?.time || '');
-        showToast("Appel enregistré et vacation validée.", 'success');
-        setTimeout(() => { setIsFinished(true); try { window.close(); } catch (e) {} }, 1500);
+  // Show "already done" screen if attendance was already taken today
+  if (alreadyDoneToday && activeTab === 'attendance' && !isFinished && !attendanceSuccess) {
+    // Deduplicate time slots for display
+    const uniqueTimeSlots = new Map();
+    todaysSessions.forEach(s => {
+      const timeKey = (s.time || '').replace(/[^0-9]/g, '');
+      if (!uniqueTimeSlots.has(timeKey)) {
+        try {
+          const [start, end] = s.time.split('-');
+          const [h1, m1] = start.split(':').map(Number);
+          const [h2, m2] = end.split(':').map(Number);
+          uniqueTimeSlots.set(timeKey, Math.max(0, ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60));
+        } catch { uniqueTimeSlots.set(timeKey, 0); }
       }
-    } else {
+    });
+    const totalH = Array.from(uniqueTimeSlots.values()).reduce((s, h) => s + h, 0);
+    return (
+      <div className="flex-center" style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f0f4ff 0%, #f8f0fa 100%)', padding: '24px' }}>
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 220, damping: 22 }} style={{ padding: '48px 32px', textAlign: 'center', maxWidth: '420px', width: '100%', background: 'white', borderRadius: '28px', boxShadow: '0 16px 48px rgba(0,0,0,0.06)' }}>
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.15, type: 'spring', stiffness: 300 }} style={{ width: '88px', height: '88px', background: 'linear-gradient(135deg, #6366f1, #818cf8)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', boxShadow: '0 12px 36px rgba(99,102,241,0.3)' }}>
+            <CheckCircle2 size={44} />
+          </motion.div>
+          <h1 style={{ fontSize: '24px', fontWeight: '900', marginBottom: '10px', color: 'var(--text-primary)' }}>Présence déjà enregistrée</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '15px', lineHeight: '1.7', marginBottom: '24px' }}>
+            L'appel pour le <strong>{new Date(selectedDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</strong> a déjà été validé.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+            <div style={{ padding: '12px 16px', background: 'var(--bg-subtle)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)' }}>📚 Séances validées</span>
+              <span style={{ fontSize: '15px', fontWeight: '900', color: 'var(--primary)' }}>{todaysSessions.length}</span>
+            </div>
+            <div style={{ padding: '12px 16px', background: 'var(--bg-subtle)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)' }}>⏰ Heures de vacation</span>
+              <span style={{ fontSize: '15px', fontWeight: '900', color: '#16a34a' }}>{formatHours(totalH)}</span>
+            </div>
+          </div>
+          <p style={{ fontSize: '12px', color: 'var(--text-faint)', fontWeight: '600' }}>Si vous pensez qu'il y a une erreur, veuillez contacter l'administration.</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  const handleValidateSession = async () => {
+    if (!currentSession || !allAttended) {
       setShowUnmarkedWarning(true);
+      return;
+    }
+    // Mark this session as completed
+    setCompletedSessionIds(prev => new Set([...prev, currentSession.id]));
+
+    // Build the docId that updateTeacherAttendance would produce
+    const safeModule = (selectedSubject || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+    const safeTime = (currentSession.time || '').replace(/[^0-9]/g, '') || 'x';
+    const wouldBeDocId = `${teacher.id}_${safeModule}_${safeTime}_${selectedDate}`;
+
+    // Check if a session with the SAME docId (same module + same time) was already validated
+    // If so, skip the DB write entirely to avoid overwriting the correct hours
+    const alreadyRecordedSameDocId = todaysSessions.some(s => {
+      if (s.id === currentSession.id || !completedSessionIds.has(s.id)) return false;
+      const sModule = (s.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+      const sTime = (s.time || '').replace(/[^0-9]/g, '') || 'x';
+      return `${teacher.id}_${sModule}_${sTime}_${selectedDate}` === wouldBeDocId;
+    });
+
+    if (!alreadyRecordedSameDocId) {
+      await updateTeacherAttendance(teacher.id, selectedDate, 'present', `Appel validé: ${selectedSubject}`, sessionDuration, selectedSubject, currentSession?.time || '');
+    }
+    showToast(`Séance "${selectedSubject}" validée.`, 'success');
+
+    // Move to next uncompleted session
+    const nextSession = todaysSessions.find(s => s.id !== currentSession.id && !completedSessionIds.has(s.id));
+    if (nextSession) {
+      setSelectedSessionId(nextSession.id);
+    }
+  };
+
+  const handleFinalValidation = async () => {
+    if (!allSessionsCompleted) return;
+    if (await confirmAction({ title: "Valider toutes les séances ?", message: `Vous avez complété ${todaysSessions.length} séance(s). Cette action finalisera votre journée.`, type: "warning" })) {
+      setAttendanceSuccess(true);
+      showToast("Journée validée avec succès.", 'success');
+      setTimeout(() => setIsFinished(true), 1200);
+    }
+  };
+
+  const handleForceRefresh = async () => {
+    try {
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map(name => caches.delete(name)));
+      }
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(r => r.unregister()));
+      }
+      localStorage.setItem(VERSION_KEY, APP_VERSION);
+      window.location.reload(true);
+    } catch (e) {
+      window.location.reload(true);
     }
   };
 
@@ -356,15 +480,37 @@ const TeacherPortal = () => {
   };
 
   if (isFinished) {
+    // Deduplicate time slots: sessions at the same time count as one
+    const uniqueTimeSlots = new Map();
+    todaysSessions.forEach(s => {
+      const timeKey = (s.time || '').replace(/[^0-9]/g, '');
+      if (!uniqueTimeSlots.has(timeKey)) {
+        try {
+          const [start, end] = s.time.split('-');
+          const [h1, m1] = start.split(':').map(Number);
+          const [h2, m2] = end.split(':').map(Number);
+          uniqueTimeSlots.set(timeKey, Math.max(0, ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60));
+        } catch { uniqueTimeSlots.set(timeKey, 0); }
+      }
+    });
+    const totalDuration = Array.from(uniqueTimeSlots.values()).reduce((sum, h) => sum + h, 0);
     return (
-      <div className="flex-center" style={{ minHeight: '100vh', background: 'var(--bg-page)' }}>
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-premium" style={{ padding: '64px', textAlign: 'center', maxWidth: '480px' }}>
-          <div style={{ width: '88px', height: '88px', background: 'var(--success)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 32px', boxShadow: '0 12px 40px rgba(22, 163, 74, 0.3)' }}>
-            <UserCheck size={48} />
-          </div>
-          <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', marginBottom: '16px' }}>Appel Validé</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '15px', lineHeight: '1.6', marginBottom: '32px' }}>La séance a été enregistrée. Votre vacation de <strong>{formatHours(sessionDuration)}</strong> a été transmise à l'administration.</p>
-          <button onClick={() => window.close()} className="btn-modern primary" style={{ width: '100%', justifyContent: 'center', padding: '14px' }}>Fermer la session <ArrowRight size={18} style={{ marginLeft: '8px' }} /></button>
+      <div className="flex-center" style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f8f0fa 0%, #e8f5e9 100%)' }}>
+        <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 20 }} style={{ padding: '48px 36px', textAlign: 'center', maxWidth: '420px', width: '100%', background: 'white', borderRadius: '28px', boxShadow: '0 20px 60px rgba(0,0,0,0.08)' }}>
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring', stiffness: 300 }} style={{ width: '96px', height: '96px', background: 'linear-gradient(135deg, #16a34a, #22c55e)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px', boxShadow: '0 12px 40px rgba(22, 163, 74, 0.35)' }}>
+            <Heart size={48} />
+          </motion.div>
+          <motion.h1 initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.35 }} style={{ fontSize: '26px', fontWeight: '900', marginBottom: '12px', color: 'var(--text-primary)' }}>Merci, {teacher.name.split(' ')[0]} !</motion.h1>
+          <motion.p initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.45 }} style={{ color: 'var(--text-muted)', fontSize: '15px', lineHeight: '1.7', marginBottom: '28px' }}>
+            Votre journée a été enregistrée avec succès.<br/>
+            <strong>{todaysSessions.length} séance(s)</strong> validée(s) — <strong>{formatHours(totalDuration)}</strong> de vacation transmise(s) à l'administration.
+          </motion.p>
+          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.55 }} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ padding: '14px 20px', background: 'var(--bg-subtle)', borderRadius: '14px', fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+              📅 {new Date(selectedDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </div>
+            <button onClick={() => window.close()} className="btn-modern primary" style={{ width: '100%', justifyContent: 'center', padding: '14px', borderRadius: '14px' }}>Fermer la page <ArrowRight size={18} style={{ marginLeft: '8px' }} /></button>
+          </motion.div>
         </motion.div>
       </div>
     );
@@ -372,6 +518,27 @@ const TeacherPortal = () => {
 
   return (
     <div className="max-w-container section-padding">
+      {/* Version / Cache Refresh Banner */}
+      {showVersionBanner && (
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
+          style={{ marginBottom: 'var(--space-4)', padding: '14px 18px', borderRadius: 'var(--radius-xl)', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(176,104,185,0.08))', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '200px' }}>
+            <RefreshCw size={18} style={{ color: '#6366f1', flexShrink: 0 }} />
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>Mise à jour disponible</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '2px 0 0' }}>Une nouvelle version est disponible. Rafraîchissez pour éviter les erreurs.</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            <button onClick={handleForceRefresh} style={{ padding: '8px 16px', borderRadius: 'var(--radius-pill)', background: '#6366f1', color: 'white', border: 'none', fontSize: '12px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <RefreshCw size={13} /> Rafraîchir
+            </button>
+            <button onClick={() => { setShowVersionBanner(false); localStorage.setItem(VERSION_KEY, APP_VERSION); }} style={{ padding: '8px', borderRadius: '50%', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <X size={14} />
+            </button>
+          </div>
+        </motion.div>
+      )}
       {/* Session Context Bar */}
       {activeTab === 'attendance' && todaysSessions.length > 0 && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
@@ -434,9 +601,19 @@ const TeacherPortal = () => {
             </button>
           ) : (
             todaysSessions.length > 0 && (
-              <button onClick={handleValidateAttendance} className={`btn-modern ${allAttended ? 'primary' : 'secondary'}`} style={{ padding: '12px 24px' }}>
-                <CheckCircle2 size={18} style={{ marginRight: '8px' }} /> Valider l'appel
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+                {currentSession && (
+                  <button onClick={handleValidateSession} disabled={!allAttended} className={`btn-modern ${allAttended ? 'primary' : 'secondary'}`} style={{ padding: '10px 20px', opacity: allAttended ? 1 : 0.5, cursor: allAttended ? 'pointer' : 'not-allowed' }}>
+                    <CheckCircle2 size={16} style={{ marginRight: '6px' }} />
+                    {completedSessionIds.has(currentSession.id) ? '✓ Séance validée' : `Valider cette séance (${completedSessionIds.size}/${todaysSessions.length})`}
+                  </button>
+                )}
+                {allSessionsCompleted && (
+                  <motion.button initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} onClick={handleFinalValidation} className="btn-modern primary" style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #16a34a, #22c55e)', border: 'none' }}>
+                    <Award size={18} style={{ marginRight: '8px' }} /> Finaliser la journée ({todaysSessions.length}/{todaysSessions.length})
+                  </motion.button>
+                )}
+              </div>
             )
           )}
         </div>

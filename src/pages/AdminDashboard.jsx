@@ -464,8 +464,8 @@ const AdminDashboard = () => {
       accessorKey: 'token', header: activeTab === 'students' ? 'Lien' : 'Liens Formateur',
       cell: ({ row }) => {
         if (activeTab === 'students') {
-          const cleanToken = (row.original.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
-          const fullLink = BASE + `/results/${cleanToken}`;
+          const tokenForLink = row.original.token || row.original.id;
+          const fullLink = BASE + `/results/${tokenForLink}`;
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', maxWidth: '260px' }}
               onClick={(e) => { e.stopPropagation(); openQR(`${row.original.lastName} ${row.original.firstName}`, [{ label: 'Résultats', url: fullLink, color: 'var(--primary)' }]); }}
@@ -505,8 +505,8 @@ const AdminDashboard = () => {
       cell: ({ row }) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'flex-end' }}>
           {activeTab === 'students' && <ActionBtn icon={Share2} title="QR Code" color="var(--primary)" onClick={() => {
-            const cleanToken = (row.original.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
-            openQR(`${row.original.lastName} ${row.original.firstName}`, [{ label: 'Résultats', url: BASE + `/results/${cleanToken}`, color: 'var(--primary)' }]);
+            const tokenForLink = row.original.token || row.original.id;
+            openQR(`${row.original.lastName} ${row.original.firstName}`, [{ label: 'Résultats', url: BASE + `/results/${tokenForLink}`, color: 'var(--primary)' }]);
           }} />}
           <ActionBtn icon={Eye} title="Détails" onClick={() => openDetails(row.original)} />
           <ActionBtn icon={Edit3} title="Modifier" onClick={() => openEdit(row.original)} />
@@ -829,8 +829,8 @@ const AdminDashboard = () => {
                     <InfoBox label="Statut" value="ACTIF" icon={CheckCircle2} valueColor="var(--primary)" />
                   </div>
                   {activeTab === 'students' ? (() => {
-                    const cleanToken = (selectedItem.token || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
-                    const url = `${BASE}/results/${cleanToken}`;
+                    const tokenForLink = selectedItem.token || selectedItem.id;
+                    const url = `${BASE}/results/${tokenForLink}`;
                     return (
                       <div style={{ marginTop: '24px', padding: '20px', background: 'var(--primary-ultra-light)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--primary-light)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
                         <p style={{ fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-start' }}>
