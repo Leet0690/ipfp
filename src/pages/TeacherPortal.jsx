@@ -530,10 +530,11 @@ const TeacherPortal = () => {
                   const record = studentAttendance.find(a => a.id === docId);
                   const status = record?.status || '';
                   const comment = record?.comment || '';
+                  const isUnmarked = showUnmarkedWarning && !['present', 'absent'].includes(status);
                   return (
-                    <tr key={s.id} style={{ borderBottom: '1px solid var(--border-light)', background: idx % 2 === 0 ? 'white' : 'var(--bg-subtle)' }}>
+                    <tr key={s.id} style={{ borderBottom: '1px solid var(--border-light)', background: isUnmarked ? 'rgba(220,38,38,0.06)' : (idx % 2 === 0 ? 'white' : 'var(--bg-subtle)'), borderLeft: isUnmarked ? '3px solid rgba(220,38,38,0.5)' : '3px solid transparent', transition: 'background 0.25s, border-color 0.25s' }}>
                       <td style={td}>
-                        <p style={{ fontSize: '13px', fontWeight: '800' }}>{s.lastName} {s.firstName}</p>
+                        <p style={{ fontSize: '13px', fontWeight: '800', color: isUnmarked ? '#dc2626' : 'var(--text-primary)' }}>{s.lastName} {s.firstName}</p>
                         <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Matricule: {s.regNo}</p>
                       </td>
                       <td style={tdCenter}>
