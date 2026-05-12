@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
@@ -12,6 +12,7 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertCircle, 
+  AlertTriangle,
   Wifi, 
   CloudUpload, 
   Save, 
@@ -87,6 +88,7 @@ const TeacherPortal = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceSuccess, setAttendanceSuccess] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [showUnmarkedWarning, setShowUnmarkedWarning] = useState(false);
 
   const dayOfWeek = useMemo(() => {
     const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -219,6 +221,19 @@ const TeacherPortal = () => {
     });
   }, [relevantStudents, selectedSubject, selectedDate, studentAttendance]);
 
+  const unmarkedStudents = useMemo(() => {
+    if (!selectedSubject || !relevantStudents.length) return [];
+    return relevantStudents.filter(s => {
+      const docId = `${s.id}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
+      const record = studentAttendance.find(a => a.id === docId);
+      return !record || !['present', 'absent'].includes(record.status);
+    });
+  }, [relevantStudents, selectedSubject, selectedDate, studentAttendance]);
+
+  useEffect(() => {
+    if (allAttended) setShowUnmarkedWarning(false);
+  }, [allAttended]);
+
   React.useEffect(() => {
     if (activeTab === 'attendance' && !allAttended) {
       const handleBeforeUnload = (e) => {
@@ -260,7 +275,7 @@ const TeacherPortal = () => {
         setTimeout(() => { setIsFinished(true); try { window.close(); } catch (e) {} }, 1500);
       }
     } else {
-      showToast("Veuillez marquer tous les stagiaires.", 'warning');
+      setShowUnmarkedWarning(true);
     }
   };
 
@@ -405,7 +420,7 @@ const TeacherPortal = () => {
             </button>
           ) : (
             todaysSessions.length > 0 && (
-              <button onClick={handleValidateAttendance} disabled={!allAttended} className={`btn-modern ${allAttended ? 'primary' : ''}`} style={{ padding: '12px 24px', opacity: allAttended ? 1 : 0.5 }}>
+              <button onClick={handleValidateAttendance} className={`btn-modern ${allAttended ? 'primary' : 'secondary'}`} style={{ padding: '12px 24px' }}>
                 <CheckCircle2 size={18} style={{ marginRight: '8px' }} /> Valider l'appel
               </button>
             )
@@ -425,6 +440,35 @@ const TeacherPortal = () => {
           </div>
         </motion.div>
       )}
+
+      {/* Unmarked warning banner */}
+      <AnimatePresence>
+        {showUnmarkedWarning && !allAttended && activeTab === 'attendance' && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            style={{ marginBottom: 'var(--space-4)', padding: '16px 20px', borderRadius: 'var(--radius-xl)', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.25)', display: 'flex', flexDirection: 'column', gap: '12px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <AlertTriangle size={18} style={{ color: '#dc2626', flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: '800', color: '#dc2626' }}>
+                  {unmarkedStudents.length} stagiaire{unmarkedStudents.length > 1 ? 's' : ''} n'ont pas encore été marqué{unmarkedStudents.length > 1 ? 's' : ''} — l'appel ne peut pas être validé.
+                </span>
+              </div>
+              <button onClick={() => setShowUnmarkedWarning(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '2px', flexShrink: 0 }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {unmarkedStudents.map(s => (
+                <span key={s.id} style={{ fontSize: '11px', fontWeight: '700', padding: '3px 10px', borderRadius: 'var(--radius-pill)', background: 'rgba(220,38,38,0.10)', border: '1px solid rgba(220,38,38,0.20)', color: '#dc2626' }}>
+                  {s.lastName} {s.firstName}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Table */}
       <div className="glass-card" style={{ overflow: 'hidden' }}>
