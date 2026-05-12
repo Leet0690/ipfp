@@ -7,7 +7,7 @@ import { TableSkeleton } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import {
   UserCheck, FileSpreadsheet, Search, Calendar, CheckCircle2,
-  XCircle, Clock, Users, Filter, Download, CalendarRange,
+  XCircle, X, Clock, Users, Filter, Download, CalendarRange,
   ChevronLeft, ChevronRight, AlertTriangle, CheckCheck
 } from 'lucide-react';
 
@@ -287,6 +287,12 @@ const StudentAttendance = () => {
       showToast(`${filteredStudents.length} stagiaire(s) marqué(s) présent(s).`, 'success');
     } catch { showToast("Erreur lors de l'enregistrement groupé.", 'error'); }
     finally { setBulkLoading(false); }
+  };
+
+  const handleClearStatus = async (studentId) => {
+    if (!filterModule) return;
+    const record = studentAttendance.find(a => a.id === `${studentId}_${filterModule.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`);
+    await updateStudentAttendance(studentId, filterModule, selectedDate, '', record?.comment || '', 'admin');
   };
 
   const handleCommentChange = async (studentId, comment) => {
@@ -583,9 +589,10 @@ const StudentAttendance = () => {
                               <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Matricule: {student.regNo}</p>
                             </td>
                             <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '4px' }}>
+                              <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '4px', alignItems: 'center' }}>
                                 <StatusBtn active={status === 'present'} color="var(--success)" onClick={() => handleStatusChange(student.id, 'present')}>Présent</StatusBtn>
                                 <StatusBtn active={status === 'absent'} color="var(--danger)" onClick={() => handleStatusChange(student.id, 'absent')}>Absent</StatusBtn>
+                                {status && <button onClick={() => handleClearStatus(student.id)} style={{ marginLeft: '2px', padding: '4px 6px', border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', alignItems: 'center' }} title="Effacer"><X size={13} /></button>}
                               </div>
                             </td>
                             <td style={tdStyle}>

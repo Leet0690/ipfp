@@ -331,6 +331,13 @@ const TeacherPortal = () => {
     }
   };
 
+  const handleClearAttendance = async (studentId) => {
+    if (!selectedSubject) return;
+    const docId = `${studentId}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
+    const record = studentAttendance.find(a => a.id === docId);
+    await updateStudentAttendance(studentId, selectedSubject, selectedDate, '', record?.comment || '', teacher.id);
+  };
+
   const handleAttendanceComment = async (studentId, comment) => {
     if (!selectedSubject) return;
     const docId = `${studentId}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
@@ -546,9 +553,10 @@ const TeacherPortal = () => {
                         <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Matricule: {s.regNo}</p>
                       </td>
                       <td style={tdCenter}>
-                        <div style={{ display: 'inline-flex', background: 'var(--bg-page)', borderRadius: 'var(--radius-xl)', padding: '4px' }}>
+                        <div style={{ display: 'inline-flex', background: 'var(--bg-page)', borderRadius: 'var(--radius-xl)', padding: '4px', alignItems: 'center' }}>
                           <StatusBtn active={status === 'present'} color="var(--success)" onClick={() => handleAttendanceChange(s.id, 'present')}>Présent</StatusBtn>
                           <StatusBtn active={status === 'absent'} color="var(--danger)" onClick={() => handleAttendanceChange(s.id, 'absent')}>Absent</StatusBtn>
+                          {status && <button onClick={() => handleClearAttendance(s.id)} style={{ marginLeft: '2px', padding: '4px 6px', border: 'none', borderRadius: 'var(--radius-md)', background: 'transparent', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', alignItems: 'center' }} title="Effacer"><X size={13} /></button>}
                         </div>
                       </td>
                       <td style={td}>
