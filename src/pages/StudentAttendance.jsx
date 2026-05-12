@@ -13,7 +13,7 @@ import {
 
 /* ─── Monthly-view helpers ─── */
 const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-const PRIORITY = { absent: 0, retard: 1, present: 2 };
+const PRIORITY = { absent: 0, present: 1 };
 const aggregateStatus = (records) => {
   if (!records?.length) return null;
   return records.reduce((best, r) => {
@@ -30,7 +30,6 @@ const StatusCell = ({ status }) => {
   const cfg = {
     present: { label: 'P', bg: 'rgba(22,163,74,0.10)',  color: '#15803d', border: 'rgba(22,163,74,0.25)' },
     absent:  { label: 'A', bg: 'rgba(220,38,38,0.10)',   color: '#dc2626', border: 'rgba(220,38,38,0.25)' },
-    retard:  { label: 'R', bg: 'rgba(234,179,8,0.12)',   color: '#ca8a04', border: 'rgba(234,179,8,0.3)' },
   }[status] || {};
   return (
     <div style={{ width: '28px', height: '28px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: cfg.bg, border: `1px solid ${cfg.border}`, fontSize: '10px', fontWeight: '900', color: cfg.color }}>
@@ -103,17 +102,16 @@ const StudentAttendance = () => {
   }, [filterDiploma, filterMajor, filterYear, schedules, dayOfWeek]);
 
   const stats = useMemo(() => {
-    let presents = 0, absents = 0, retards = 0;
+    let presents = 0, absents = 0;
     filteredStudents.forEach(s => {
       const docId = `${s.id}_${(filterModule || 'global').replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
       const record = studentAttendance.find(a => a.id === docId);
       if (record) {
         if (record.status === 'present') presents++;
         else if (record.status === 'absent') absents++;
-        else if (record.status === 'retard') retards++;
       }
     });
-    return { presents, absents, retards, total: filteredStudents.length };
+    return { presents, absents, total: filteredStudents.length };
   }, [filteredStudents, studentAttendance, filterModule, selectedDate]);
 
   const multiGroupProgress = useMemo(() => {
@@ -328,23 +326,23 @@ const StudentAttendance = () => {
       const recs = studentAttendance.filter(a => a.studentId === student.id && a.date === dateStr);
       byDay[d] = aggregateStatus(recs);
     });
-    const counts = { present: 0, absent: 0, retard: 0 };
+    const counts = { present: 0, absent: 0 };
     mDays.forEach(d => { if (byDay[d]) counts[byDay[d]]++; });
     return { student, byDay, counts };
   }), [mFilteredStudents, studentAttendance, mDays, monthPrefix]);
 
   const mGlobalStats = useMemo(() => {
-    const t = { present: 0, absent: 0, retard: 0 };
-    mGridData.forEach(({ counts }) => { t.present += counts.present; t.absent += counts.absent; t.retard += counts.retard; });
+    const t = { present: 0, absent: 0 };
+    mGridData.forEach(({ counts }) => { t.present += counts.present; t.absent += counts.absent; });
     return t;
   }, [mGridData]);
 
   const exportMonthlyCSV = () => {
     const dayHeaders = mDays.map(d => `${pad(d)}/${pad(mMonth + 1)}`).join(',');
-    const header = `\uFEFFNom,Prénom,Matricule,${dayHeaders},Présents,Absents,Retards\n`;
+    const header = `\uFEFFNom,Prénom,Matricule,${dayHeaders},Présents,Absents\n`;
     const rows = mGridData.map(({ student, byDay, counts }) => {
       const cells = mDays.map(d => byDay[d] ? byDay[d][0].toUpperCase() : '-').join(',');
-      return `"${student.lastName}","${student.firstName}","${student.regNo || ''}",${cells},${counts.present},${counts.absent},${counts.retard}`;
+      return `"${student.lastName}","${student.firstName}","${student.regNo || ''}",${cells},${counts.present},${counts.absent}`;
     }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -565,7 +563,6 @@ const StudentAttendance = () => {
                               <div style={{ display: 'inline-flex', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '4px' }}>
                                 <StatusBtn active={status === 'present'} color="var(--success)" onClick={() => handleStatusChange(student.id, 'present')}>Présent</StatusBtn>
                                 <StatusBtn active={status === 'absent'} color="var(--danger)" onClick={() => handleStatusChange(student.id, 'absent')}>Absent</StatusBtn>
-                                <StatusBtn active={status === 'retard'} color="var(--warning)" onClick={() => handleStatusChange(student.id, 'retard')}>Retard</StatusBtn>
                               </div>
                             </td>
                             <td style={tdStyle}>
@@ -638,7 +635,6 @@ const StudentAttendance = () => {
               { label: 'Stagiaires', value: mFilteredStudents.length, color: 'var(--primary)', bg: 'var(--primary-ultra-light)' },
               { label: 'Total Présences', value: mGlobalStats.present, color: '#15803d', bg: 'rgba(22,163,74,0.08)' },
               { label: 'Total Absences', value: mGlobalStats.absent, color: '#dc2626', bg: 'rgba(220,38,38,0.08)' },
-              { label: 'Total Retards', value: mGlobalStats.retard, color: '#ca8a04', bg: 'rgba(234,179,8,0.08)' },
             ].map(({ label, value, color, bg }) => (
               <div key={label} style={{ padding: '12px 18px', background: bg, border: `1px solid ${color}22`, borderRadius: 'var(--radius-xl)', flex: '1 1 120px', textAlign: 'center' }}>
                 <div style={{ fontSize: 'var(--text-xl)', fontWeight: '900', color, lineHeight: 1 }}>{value}</div>
@@ -652,7 +648,6 @@ const StudentAttendance = () => {
             {[
               { label: 'Présent', code: 'P', color: '#15803d', bg: 'rgba(22,163,74,0.10)',  border: 'rgba(22,163,74,0.25)' },
               { label: 'Absent',  code: 'A', color: '#dc2626', bg: 'rgba(220,38,38,0.10)',   border: 'rgba(220,38,38,0.25)' },
-              { label: 'Retard',  code: 'R', color: '#ca8a04', bg: 'rgba(234,179,8,0.12)',   border: 'rgba(234,179,8,0.3)' },
               { label: 'Non renseigné', code: '·', color: 'var(--text-faint)', bg: 'transparent', border: 'transparent' },
             ].map(l => (
               <div key={l.code} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -711,7 +706,6 @@ const StudentAttendance = () => {
                         })}
                         <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(22,163,74,0.06)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#15803d' }}>{counts.present}</span></td>
                         <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(220,38,38,0.06)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#dc2626' }}>{counts.absent}</span></td>
-                        <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(234,179,8,0.08)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#ca8a04' }}>{counts.retard}</span></td>
                       </tr>
                     ))}
                   </tbody>
