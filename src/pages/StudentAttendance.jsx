@@ -58,7 +58,7 @@ const calcDuration = (timeStr) => {
 };
 
 const StudentAttendance = () => {
-  const { students, studentAttendance, updateStudentAttendance, loadAttendanceForSession, loadStudentAttendanceForMonth, loading, schedules, teacherAttendance, updateTeacherAttendance, loadTeacherAttendanceForDate } = useApp();
+  const { students, teachers, studentAttendance, updateStudentAttendance, loadAttendanceForSession, loadStudentAttendanceForMonth, loading, schedules, teacherAttendance, updateTeacherAttendance, loadTeacherAttendanceForDate } = useApp();
   const { showToast } = useToast();
 
   /* Tab state */
@@ -115,6 +115,41 @@ const StudentAttendance = () => {
     });
     return { presents, absents, retards, total: filteredStudents.length };
   }, [filteredStudents, studentAttendance, filterModule, selectedDate]);
+
+  const multiGroupProgress = useMemo(() => {
+    if (!filterModule || !filterMajor || !filterYear) return null;
+    const matchingSession = (schedules || []).find(sc =>
+      sc.filiere === filterMajor && sc.annee === filterYear &&
+      sc.day === dayOfWeek && sc.module === filterModule
+    );
+    if (!matchingSession?.teacherId || !matchingSession?.time) return null;
+
+    const allTeacherSessions = (schedules || []).filter(sc =>
+      sc.teacherId === matchingSession.teacherId &&
+      sc.time === matchingSession.time &&
+      sc.day === dayOfWeek
+    );
+    if (allTeacherSessions.length <= 1) return null;
+
+    const teacherName = (teachers || []).find(t => t.id === matchingSession.teacherId)?.name || '—';
+
+    const groups = allTeacherSessions.map(session => {
+      const groupStudents = (students || []).filter(s =>
+        s.major === session.filiere && s.year === session.annee
+      );
+      const safeModule = (session.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+      const marked = groupStudents.filter(s =>
+        (studentAttendance || []).some(a => a.id === `${s.id}_${safeModule}_${selectedDate}` && a.status)
+      ).length;
+      const total = groupStudents.length;
+      const done = total > 0 && marked === total;
+      const isCurrent = session.filiere === filterMajor && session.annee === filterYear;
+      return { label: `${session.filiere} – ${session.annee}`, marked, total, done, isCurrent };
+    });
+
+    const completedCount = groups.filter(g => g.done).length;
+    return { teacherName, time: matchingSession.time, groups, completedCount, totalGroups: groups.length };
+  }, [filterModule, filterMajor, filterYear, dayOfWeek, schedules, students, studentAttendance, selectedDate, teachers]);
 
   useEffect(() => {
     if (filterModule && selectedDate) loadAttendanceForSession(filterModule, selectedDate);
@@ -424,6 +459,50 @@ const StudentAttendance = () => {
                 <CheckCheck size={15} />
                 {bulkLoading ? 'Enregistrement...' : 'Tous Présents'}
               </button>
+            </motion.div>
+          )}
+
+          {multiGroupProgress && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              style={{ marginBottom: 'var(--space-4)', padding: '14px 18px', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-light)', background: 'var(--bg-subtle)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                <Clock size={14} style={{ color: 'var(--primary)' }} />
+                <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-secondary)' }}>
+                  {multiGroupProgress.teacherName}
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '2px 8px', borderRadius: 'var(--radius-pill)' }}>
+                  {multiGroupProgress.time}
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  — {multiGroupProgress.completedCount}/{multiGroupProgress.totalGroups} groupes complétés
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {multiGroupProgress.groups.map((g, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '4px 10px', borderRadius: 'var(--radius-pill)',
+                    border: `1px solid ${g.done ? 'rgba(22,163,74,0.3)' : g.isCurrent ? 'var(--primary)' : 'var(--border-light)'}`,
+                    background: g.done ? 'rgba(22,163,74,0.08)' : g.isCurrent ? 'var(--primary-ultra-light)' : 'white',
+                  }}>
+                    {g.done
+                      ? <CheckCircle2 size={12} style={{ color: '#16a34a', flexShrink: 0 }} />
+                      : <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: `2px solid ${g.isCurrent ? 'var(--primary)' : 'var(--border-light)'}`, flexShrink: 0 }} />
+                    }
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: g.done ? '#15803d' : g.isCurrent ? 'var(--primary)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                      {g.label}
+                    </span>
+                    <span style={{ fontSize: '10px', fontWeight: '800', color: g.done ? '#15803d' : 'var(--text-faint)' }}>
+                      {g.marked}/{g.total}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {multiGroupProgress.completedCount === multiGroupProgress.totalGroups && (
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#15803d', background: 'rgba(22,163,74,0.10)', border: '1px solid rgba(22,163,74,0.25)', padding: '3px 10px', borderRadius: 'var(--radius-pill)', marginLeft: 'auto' }}>
+                  ✓ Présence formateur enregistrée
+                </span>
+              )}
             </motion.div>
           )}
 
