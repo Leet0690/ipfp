@@ -202,14 +202,35 @@ const StudentAttendance = () => {
       const record = studentAttendance.find(a => a.id === docId);
       await updateStudentAttendance(studentId, filterModule, selectedDate, status, record?.comment || '', 'admin');
 
+      const unmarkedStudents = filteredStudents.filter(s => {
+        if (s.id === studentId) return false;
+        const sDocId = `${s.id}_${safeModule}_${selectedDate}`;
+        const sRecord = studentAttendance.find(a => a.id === sDocId);
+        return !sRecord?.status;
+      });
+      if (unmarkedStudents.length > 0) {
+        await Promise.all(
+          unmarkedStudents.map(s =>
+            updateStudentAttendance(s.id, filterModule, selectedDate, 'absent', '', 'admin')
+          )
+        );
+      }
+
       const matchingSession = (schedules || []).find(sc =>
         sc.filiere === filterMajor &&
         sc.annee === filterYear &&
         sc.day === dayOfWeek &&
         sc.module === filterModule
       );
-      const extraRecord = { id: docId, studentId, status };
-      await autoMarkTeacherIfReady(matchingSession, [extraRecord]);
+      const extraRecords = [
+        { id: docId, studentId, status },
+        ...unmarkedStudents.map(s => ({
+          id: `${s.id}_${safeModule}_${selectedDate}`,
+          studentId: s.id,
+          status: 'absent'
+        }))
+      ];
+      await autoMarkTeacherIfReady(matchingSession, extraRecords);
     } catch { showToast("Erreur lors de l'enregistrement.", 'error'); }
   };
 
