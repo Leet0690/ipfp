@@ -153,6 +153,29 @@ const StudentAttendance = () => {
     if (filterModule && selectedDate) loadAttendanceForSession(filterModule, selectedDate);
   }, [filterModule, selectedDate, loadAttendanceForSession]);
 
+  const otherTeacherSessions = useMemo(() => {
+    if (!filterModule || !filterMajor || !filterYear || !dayOfWeek) return [];
+    const matchingSession = (schedules || []).find(sc =>
+      sc.filiere === filterMajor && sc.annee === filterYear &&
+      sc.day === dayOfWeek && sc.module === filterModule
+    );
+    if (!matchingSession?.teacherId || !matchingSession?.time) return [];
+    return (schedules || []).filter(sc =>
+      sc.teacherId === matchingSession.teacherId &&
+      sc.time === matchingSession.time &&
+      sc.day === dayOfWeek &&
+      !(sc.filiere === filterMajor && sc.annee === filterYear)
+    );
+  }, [filterModule, filterMajor, filterYear, dayOfWeek, schedules]);
+
+  useEffect(() => {
+    if (otherTeacherSessions.length > 0 && selectedDate) {
+      otherTeacherSessions.forEach(session => {
+        loadAttendanceForSession(session.module, selectedDate);
+      });
+    }
+  }, [otherTeacherSessions, selectedDate, loadAttendanceForSession]);
+
   useEffect(() => {
     if (selectedDate) loadTeacherAttendanceForDate(selectedDate);
   }, [selectedDate, loadTeacherAttendanceForDate]);

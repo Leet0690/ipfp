@@ -215,7 +215,7 @@ const TeacherPortal = () => {
     return relevantStudents.every(s => {
       const docId = `${s.id}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
       const record = studentAttendance.find(a => a.id === docId);
-      return record && ['present', 'absent', 'retard'].includes(record.status);
+      return record && ['present', 'absent'].includes(record.status);
     });
   }, [relevantStudents, selectedSubject, selectedDate, studentAttendance]);
 
@@ -289,9 +289,24 @@ const TeacherPortal = () => {
 
   const handleAttendanceChange = async (studentId, status) => {
     if (!selectedSubject) return;
-    const docId = `${studentId}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedDate}`;
+    const safeModule = selectedSubject.replace(/[^a-zA-Z0-9]/g, '_');
+    const docId = `${studentId}_${safeModule}_${selectedDate}`;
     const record = studentAttendance.find(a => a.id === docId);
     await updateStudentAttendance(studentId, selectedSubject, selectedDate, status, record?.comment || '', teacher.id);
+
+    const unmarkedStudents = relevantStudents.filter(s => {
+      if (s.id === studentId) return false;
+      const sDocId = `${s.id}_${safeModule}_${selectedDate}`;
+      const sRecord = studentAttendance.find(a => a.id === sDocId);
+      return !sRecord?.status;
+    });
+    if (unmarkedStudents.length > 0) {
+      await Promise.all(
+        unmarkedStudents.map(s =>
+          updateStudentAttendance(s.id, selectedSubject, selectedDate, 'absent', '', teacher.id)
+        )
+      );
+    }
   };
 
   const handleAttendanceComment = async (studentId, comment) => {
@@ -481,7 +496,6 @@ const TeacherPortal = () => {
                         <div style={{ display: 'inline-flex', background: 'var(--bg-page)', borderRadius: 'var(--radius-xl)', padding: '4px' }}>
                           <StatusBtn active={status === 'present'} color="var(--success)" onClick={() => handleAttendanceChange(s.id, 'present')}>Présent</StatusBtn>
                           <StatusBtn active={status === 'absent'} color="var(--danger)" onClick={() => handleAttendanceChange(s.id, 'absent')}>Absent</StatusBtn>
-                          <StatusBtn active={status === 'retard'} color="var(--warning)" onClick={() => handleAttendanceChange(s.id, 'retard')}>Retard</StatusBtn>
                         </div>
                       </td>
                       <td style={td}>
