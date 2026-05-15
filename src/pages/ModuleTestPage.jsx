@@ -15,6 +15,7 @@ import {
   BookOpen,
   User,
   Users,
+  Copy,
 } from 'lucide-react';
 
 const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' };
@@ -238,84 +239,50 @@ const ModuleTestPage = () => {
 
       {loading ? (
         <div className="glass-card" style={{ padding: 'var(--space-4)' }}><TableSkeleton rows={10} /></div>
-      ) : viewMode === 'module' ? (
-        groupedModules.length === 0 ? (
-          <EmptyState title="Aucun module" message="Commencez par ajouter un module et l'assigner à des groupes." icon="book" />
-        ) : (
-          <div className="glass-card" style={{ overflow: 'hidden' }}>
-            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-light)' }}>
-                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Module</th>
-                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Sem.</th>
-                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Coeff.</th>
-                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Groupes Assignés</th>
-                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Formateurs</th>
-                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupedModules.map((m, idx) => {
-                  const assignedTeachers = (teachers || []).filter(t => 
-                    t.subjects.includes(m.name) && 
-                    m.assignedGroups.some(g => t.diplomas.includes(g.diploma) && t.groups.includes(g.major) && t.years.includes(g.year))
-                  );
-
-                  return (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={{ padding: '16px' }}>
-                        <p style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>{m.name}</p>
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'center' }}>
-                        <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '12px', background: 'var(--primary-ultra-light)', padding: '4px 8px', borderRadius: '6px' }}>{m.semester}</span>
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'center' }}>
-                        <span style={{ padding: '4px 10px', background: 'rgba(0,0,0,0.03)', color: 'var(--text-primary)', borderRadius: '8px', fontWeight: '800', fontSize: '12px' }}>{m.coefficient}</span>
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {m.assignedGroups.map((g, i) => (
-                            <span key={i} title={`${g.major} - ${g.year}`} style={{ padding: '2px 8px', background: 'var(--bg-subtle)', borderRadius: '6px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
-                              {g.code}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {assignedTeachers.length > 0 ? assignedTeachers.map((t, i) => (
-                            <span key={i} style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: 'rgba(22,163,74,0.1)', padding: '2px 8px', borderRadius: '6px' }}>
-                              {t.name.split(' ').pop()}
-                            </span>
-                          )) : <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>Non assigné</span>}
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
-                          <ActionBtn icon={Edit3} title="Modifier l'assignation" onClick={() => handleEdit(m)} />
-                          <ActionBtn icon={Trash2} title="Tout supprimer" color="#dc2626" onClick={() => handleDelete(m)} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
+                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button onClick={() => handleEdit(m)} className="btn-modern" style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '800' }}>
+                          <Edit3 size={12} style={{ marginRight: '4px' }} /> Modifier
+                        </button>
+                        <button onClick={() => {
+                          setFormData({ name: m.name, coefficient: m.coefficient.toString(), semester: m.semester, targets: m.assignedGroups });
+                          setIsEditing(false);
+                          setIsModalOpen(true);
+                        }} className="btn-modern" style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '800', background: 'var(--bg-subtle)' }}>
+                          <Copy size={12} style={{ marginRight: '4px' }} /> Dupliquer
+                        </button>
+                        <button onClick={() => handleDelete(m)} className="btn-modern" style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '800', color: '#dc2626', borderColor: 'rgba(220,38,38,0.2)' }}>
+                          <Trash2 size={12} style={{ marginRight: '4px' }} /> Supprimer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         /* Vue par Formateur */
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 'var(--space-6)' }}>
           {teacherModules.map((t, idx) => (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} key={t.id} className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border-light)' }}>
-                <div style={{ width: '40px', height: '40px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <User size={20} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <User size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '14px', fontWeight: '900', color: 'var(--text-primary)' }}>{t.name}</h3>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.assignedModules.length} module(s) assignés</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: '900', color: 'var(--text-primary)' }}>{t.name}</h3>
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.assignedModules.length} module(s) assignés</p>
-                </div>
+                <button onClick={() => {
+                  showToast('Veuillez utiliser le profil du formateur pour modifier ses habilitations.', 'info');
+                  // For a real test page, we could add direct assignment logic here if requested.
+                }} title="Affecter un Module" className="btn-modern" style={{ padding: '6px', borderRadius: '50%' }}>
+                  <Plus size={14} />
+                </button>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -336,13 +303,13 @@ const ModuleTestPage = () => {
         </div>
       )}
 
-      {/* Modal logic remains same */}
+      {/* Modal logic */}
       <AnimatePresence>
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(4px)' }} />
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-premium"
-              style={{ position: 'relative', width: '100%', maxWidth: '600px', padding: '32px', borderRadius: 'var(--radius-3xl)', boxShadow: 'var(--shadow-xl)', maxHeight: '90vh', overflowY: 'auto' }}>
+              style={{ position: 'relative', width: '100%', maxWidth: '700px', padding: '32px', borderRadius: 'var(--radius-3xl)', boxShadow: 'var(--shadow-xl)', maxHeight: '90vh', overflowY: 'auto' }}>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>{isEditing ? 'Modifier l\'Assignation' : 'Créer & Assigner Module'}</h2>
@@ -369,7 +336,13 @@ const ModuleTestPage = () => {
                 </div>
 
                 <div>
-                  <label style={{ ...labelStyle, display: 'block', marginBottom: '12px' }}>Assigner aux groupes ({formData.targets.length} sélectionnés)</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <label style={labelStyle}>Assigner aux groupes ({formData.targets.length} sélectionnés)</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button type="button" onClick={() => setFormData({ ...formData, targets: allPossibleGroups.map(g => ({ diploma: g.diploma, major: g.major, year: g.year })) })} style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontSize: '10px', fontWeight: '800', cursor: 'pointer' }}>Tout sélectionner</button>
+                      <button type="button" onClick={() => setFormData({ ...formData, targets: [] })} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '10px', fontWeight: '800', cursor: 'pointer' }}>Rien sélectionner</button>
+                    </div>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
                     {allPossibleGroups.map(group => {
                       const key = `${group.diploma}||${group.major}||${group.year}`;
