@@ -7,6 +7,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import { logoBase64 } from '../utils/logoBase64';
 import { generateBulletinGlobal } from '../utils/pdfGenerator';
 import { FILIERES, MODULES_DATA, getModulesForStudent } from '../data/modules';
 import { TableSkeleton } from '../components/Skeleton';
@@ -798,6 +799,28 @@ const AdminDashboard = () => {
 
       {isDashboard && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', marginBottom: 'var(--space-12)' }}>
+          {/* Logo Section */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            background: 'white',
+            padding: '24px',
+            borderRadius: 'var(--radius-3xl)',
+            boxShadow: 'var(--shadow-sm)',
+            border: '1px solid var(--border-light)',
+            marginBottom: 'var(--space-2)'
+          }}>
+            <img 
+              src={logoBase64} 
+              alt="IPFP Logo" 
+              style={{ 
+                height: '110px', 
+                width: 'auto', 
+                objectFit: 'contain'
+              }} 
+            />
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
             <StatCard delay={0.05} icon={GraduationCap} iconColor="var(--primary)" iconBg="var(--primary-ultra-light)" value={(students || []).length} label="Total Stagiaires" />
             <StatCard delay={0.1} icon={UserPlus} iconColor="#a06208" iconBg="rgba(254, 205, 8, 0.12)" value={(teachers || []).length} label="Total Formateurs" />
