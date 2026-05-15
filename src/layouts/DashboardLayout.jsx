@@ -51,7 +51,6 @@ const NAV_CATEGORIES = [
     icon: GraduationCap,
     items: [
       { to: "/admin/modules", icon: Boxes, label: "Modules" },
-      { to: "/admin/module-test", icon: Boxes, label: "Modules (Test)" },
       { to: "/admin/grades", icon: PenTool, label: "Notes" },
       { to: "/admin/reports", icon: LineChart, label: "Rapports" },
       { to: "/admin/schedules", icon: CalendarDays, label: "Emplois du Temps" },
