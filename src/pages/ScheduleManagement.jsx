@@ -197,9 +197,9 @@ const ScheduleManagement = () => {
 
             {/* Time Axis */}
             <div style={{
-              width: '64px', flexShrink: 0,
+              width: '72px', flexShrink: 0,
               borderRight: '1px solid var(--border-light)',
-              background: 'rgba(248,249,251,0.8)',
+              background: '#fcfdfe',
               position: 'sticky', left: 0, zIndex: 20
             }}>
               {/* Corner spacer */}
@@ -207,8 +207,14 @@ const ScheduleManagement = () => {
               {/* Hour labels */}
               <div style={{ position: 'relative', height: `${totalGridHeight}px` }}>
                 {HOURS.map(hour => (
-                  <div key={hour} style={{ position: 'absolute', top: `${(hour - START_HOUR) * PX_PER_HOUR - 9}px`, right: '10px', width: '100%' }}>
-                    <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>
+                  <div key={hour} style={{ position: 'absolute', top: `${(hour - START_HOUR) * PX_PER_HOUR - 9}px`, right: '12px' }}>
+                    <span style={{ 
+                      fontSize: '11px', 
+                      fontWeight: '800', 
+                      color: 'var(--text-secondary)', 
+                      fontVariantNumeric: 'tabular-nums',
+                      letterSpacing: '-0.02em'
+                    }}>
                       {hour.toString().padStart(2, '0')}:00
                     </span>
                   </div>
