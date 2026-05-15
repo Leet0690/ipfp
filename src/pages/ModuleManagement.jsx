@@ -103,12 +103,13 @@ const ModuleManagement = () => {
 
     const groups = {};
     f.forEach(m => {
-      const key = `${m.name}_${m.diploma}_${m.coefficient}_${m.semester || 'S1'}`;
+      const key = `${m.name}_${m.coefficient}_${m.semester || 'S1'}`;
       if (!groups[key]) {
-        groups[key] = { ...m, allClasses: [], ids: [] };
+        groups[key] = { ...m, allClasses: [], allDiplomas: [], ids: [] };
       }
       const classCode = getClassCode(m.diploma, m.major, m.year);
       if (!groups[key].allClasses.includes(classCode)) groups[key].allClasses.push(classCode);
+      if (!groups[key].allDiplomas.includes(m.diploma)) groups[key].allDiplomas.push(m.diploma);
       groups[key].ids.push(m.id);
     });
     return Object.values(groups);
@@ -353,7 +354,17 @@ const ModuleManagement = () => {
                         <p style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>{m.name}</p>
                       </td>
                       <td style={{ padding: '16px' }}>
-                        <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>{m.diploma}</p>
+                        {m.allDiplomas && m.allDiplomas.length > 1 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                            {m.allDiplomas.map((d, i) => (
+                              <span key={i} style={{ fontSize: '10px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '2px 6px', borderRadius: '5px' }}>
+                                {d === 'Technicien Spécialisé' ? 'TS' : d === 'Technicien' ? 'T' : d}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>{m.diploma}</p>
+                        )}
                       </td>
                       <td style={{ padding: '16px', textAlign: 'center' }}>
                         <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '12px', background: 'var(--primary-ultra-light)', padding: '4px 8px', borderRadius: '6px' }}>{m.semester || 'S1'}</span>
