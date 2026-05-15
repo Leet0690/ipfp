@@ -127,7 +127,7 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
       const normalizedModule = (s.module || '').trim().toLowerCase();
       const normalizedTime = (s.time || '').replace(/\s+/g, '');
       const normalizedTeacher = (s.teacherId || '').trim();
-      const key = `${normalizedTeacher}_${normalizedTime}_${normalizedModule}`;
+      const key = `${normalizedTeacher}_${s.start}_${s.end}_${normalizedModule}`;
       const abbr = getGroupAbbreviation(s.filiere, s.annee || '');
       if (!groups[key]) {
         groups[key] = { ...s, groupCodes: abbr ? [abbr] : [] };
