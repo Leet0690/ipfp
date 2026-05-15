@@ -180,7 +180,7 @@ const StudentResults = () => {
               <span style={{ fontSize: '11px', fontWeight: '800' }}>{student.major}</span>
             </div>
             <h1 style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', fontWeight: '900', letterSpacing: '-0.04em', lineHeight: 1.1, textTransform: 'uppercase' }}>
-              {student.lastName} <span style={{ color: 'var(--primary-light)' }}>{student.firstName}</span>
+              <span style={{ color: 'var(--primary-light)' }}>{student.lastName}</span> <span style={{ color: '#e4b8ed' }}>{student.firstName}</span>
             </h1>
             <p style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '12px' }}>
               Matricule: {student.regNo} · {student.diploma} · {student.year}
