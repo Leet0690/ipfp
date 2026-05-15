@@ -121,12 +121,14 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
     const groups = {};
     filtered.forEach(s => {
       const normalizedModule = (s.module || '').trim().toLowerCase();
-      const key = `${s.teacherId}_${s.time}_${normalizedModule}`;
+      const normalizedTime = (s.time || '').replace(/\s+/g, '');
+      const normalizedTeacher = (s.teacherId || '').trim();
+      const key = `${normalizedTeacher}_${normalizedTime}_${normalizedModule}`;
+      const abbr = getGroupAbbreviation(s.filiere, s.annee || '');
       if (!groups[key]) {
-        groups[key] = { ...s, groupCodes: [getGroupAbbreviation(s.filiere, s.annee || '')] };
+        groups[key] = { ...s, groupCodes: abbr ? [abbr] : [] };
       } else {
-        const abbr = getGroupAbbreviation(s.filiere, s.annee || '');
-        if (!groups[key].groupCodes.includes(abbr)) {
+        if (abbr && !groups[key].groupCodes.includes(abbr)) {
           groups[key].groupCodes.push(abbr);
         }
       }
@@ -205,17 +207,24 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
                   </span>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: '12px', fontWeight: '700', color: isTP ? '#7a3d82' : '#8a6a00', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' }}>
+                  <p style={{ fontSize: '12px', fontWeight: '700', color: isTP ? '#7a3d82' : '#8a6a00', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>
                     {session.module}
                   </p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                     {teacher && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '2px' }}>
                         {teacher.name}
                       </span>
                     )}
                     {(session.groupCodes || []).map(abbr => (
-                      <span key={abbr} style={{ fontSize: '9px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0 }}>
+                      <span key={abbr} style={{
+                        fontSize: '10px', fontWeight: '800',
+                        color: isTP ? 'var(--primary)' : '#a06208',
+                        background: isTP ? 'rgba(176,104,185,0.12)' : 'rgba(254,205,8,0.2)',
+                        border: `1px solid ${isTP ? 'rgba(176,104,185,0.3)' : 'rgba(254,205,8,0.5)'}`,
+                        borderRadius: '5px', padding: '1px 7px', flexShrink: 0,
+                        fontFamily: 'monospace',
+                      }}>
                         {abbr}
                       </span>
                     ))}
