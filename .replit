@@ -42,6 +42,3 @@ publicDir = "dist"
 [userenv]
 
 [userenv.shared]
-VITE_ADMIN_EMAIL = "admin@ipfp.com"
-VITE_ADMIN_PASSWORD = "admin123"
-VITE_DIRECTOR_PASSWORD = "ipfp123456"
