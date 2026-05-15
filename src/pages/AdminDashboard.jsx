@@ -1007,14 +1007,18 @@ const AdminDashboard = () => {
             <StatCard delay={0.15} icon={UserPlus} iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={studentAttendanceRate === null ? '—' : `${studentAttendanceRate}%`} label={`Présence Stagiaires — ${currentMonthName}`} />
             <StatCard delay={0.2} icon={User} iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={teacherAttendanceRate === null ? '—' : `${teacherAttendanceRate}%`} label={`Présence Formateurs — ${currentMonthName}`} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
-            <PendingTasksWidget students={students || []} teachers={teachers || []} grades={grades || {}} teacherAttendance={teacherAttendance || []} />
-            <GradesBreakdownWidget students={students || []} grades={grades || {}} />
-          </div>
+
+          {/* New Requested Order in Grid format to keep dimensions */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
             <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} />
+            <GradesBreakdownWidget students={students || []} grades={grades || {}} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
+            <PendingTasksWidget students={students || []} teachers={teachers || []} grades={grades || {}} teacherAttendance={teacherAttendance || []} />
             <ActivityFeedWidget notifications={notifications || []} onClear={clearNotifications} />
           </div>
+
           <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} />
         </div>
       )}
