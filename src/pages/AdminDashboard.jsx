@@ -9,7 +9,7 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { logoBase64 } from '../utils/logoBase64';
 import { generateBulletinGlobal } from '../utils/pdfGenerator';
-import { FILIERES, MODULES_DATA, getModulesForStudent } from '../data/modules';
+import { FILIERES, MODULES_DATA, getModulesForStudent, getModulesForFiliere } from '../data/modules';
 import { TableSkeleton } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import { 
@@ -45,7 +45,12 @@ import {
   Activity,
   Bell,
   BookOpen,
-  Layers
+  Layers,
+  AlertTriangle,
+  AlertCircle,
+  CheckCircle,
+  ArrowRight,
+  TrendingUp
 } from 'lucide-react';
 
 const labelStyle = { fontSize: 'var(--text-xs)', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '2px' };
@@ -280,6 +285,203 @@ const ActivityFeedWidget = ({ notifications, onClear }) => {
     </motion.div>
   );
 };
+
+const SEVERITY_CONFIG = {
+  urgent: { color: '#dc2626', bg: 'rgba(220,38,38,0.07)', border: 'rgba(220,38,38,0.18)', icon: AlertCircle },
+  warning: { color: '#d97706', bg: 'rgba(217,119,6,0.07)', border: 'rgba(217,119,6,0.2)', icon: AlertTriangle },
+  info: { color: '#0ea5e9', bg: 'rgba(14,165,233,0.07)', border: 'rgba(14,165,233,0.18)', icon: Info },
+};
+
+const PendingTasksWidget = ({ students, teachers, grades, teacherAttendance }) => {
+  const tasks = useMemo(() => {
+    const items = [];
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const groupMap = {};
+    (students || []).forEach(s => {
+      if (!s.diploma || !s.major || !s.year) return;
+      const key = `${s.diploma}||${s.major}||${s.year}`;
+      if (!groupMap[key]) groupMap[key] = { diploma: s.diploma, major: s.major, year: s.year, students: [] };
+      groupMap[key].students.push(s);
+    });
+
+    Object.values(groupMap).forEach(({ diploma, major, year, students: gs }) => {
+      const label = getGroupAbbreviation(major, year);
+      const mods = getModulesForFiliere(diploma, major, year);
+      if (mods.length === 0) return;
+      let entered = 0;
+      const total = gs.length * mods.length;
+      gs.forEach(s => {
+        mods.forEach(m => {
+          const g = grades[s.id]?.[m];
+          if (g && (g.c1 || g.c2 || g.c3 || g.efcfp || g.efcft)) entered++;
+        });
+      });
+      const pct = total > 0 ? Math.round((entered / total) * 100) : 0;
+      if (pct === 0) {
+        items.push({ severity: 'urgent', text: `Aucune note saisie — groupe ${label}`, sub: `${gs.length} stagiaire${gs.length > 1 ? 's' : ''} concerné${gs.length > 1 ? 's' : ''}`, link: '/admin/grades' });
+      } else if (pct < 50) {
+        items.push({ severity: 'warning', text: `Notes incomplètes — groupe ${label}`, sub: `Seulement ${pct}% des notes saisies`, link: '/admin/grades' });
+      }
+    });
+
+    const teachersWithAttendance = new Set(
+      (teacherAttendance || []).filter(a => a.date?.startsWith(currentMonth)).map(a => a.teacherId)
+    );
+    const missingTeachers = (teachers || []).filter(t => !teachersWithAttendance.has(t.id));
+    if (missingTeachers.length > 0) {
+      const names = missingTeachers.slice(0, 2).map(t => t.name || 'Formateur').join(', ');
+      items.push({
+        severity: 'warning',
+        text: `${missingTeachers.length} formateur${missingTeachers.length > 1 ? 's' : ''} sans présence ce mois`,
+        sub: names + (missingTeachers.length > 2 ? ` +${missingTeachers.length - 2} autre${missingTeachers.length - 2 > 1 ? 's' : ''}` : ''),
+        link: '/admin/attendance',
+      });
+    }
+
+    const incompleteStudents = (students || []).filter(s => !s.diploma || !s.major || !s.year);
+    if (incompleteStudents.length > 0) {
+      items.push({ severity: 'info', text: `${incompleteStudents.length} profil${incompleteStudents.length > 1 ? 's' : ''} stagiaire incomplet${incompleteStudents.length > 1 ? 's' : ''}`, sub: 'Niveau, filière ou année manquant', link: '/admin' });
+    }
+
+    return items;
+  }, [students, teachers, grades, teacherAttendance]);
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+      className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(220,38,38,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <CheckCircle size={14} style={{ color: '#dc2626' }} />
+        </div>
+        <div>
+          <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            À faire
+          </span>
+          <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '500', marginTop: '1px' }}>Tâches en attente</p>
+        </div>
+        <span style={{ marginLeft: 'auto', fontSize: '11px', fontWeight: '700', color: tasks.length > 0 ? '#dc2626' : '#16a34a', background: tasks.length > 0 ? 'rgba(220,38,38,0.08)' : 'rgba(22,163,74,0.08)', borderRadius: '20px', padding: '3px 10px' }}>
+          {tasks.length > 0 ? `${tasks.length} tâche${tasks.length > 1 ? 's' : ''}` : 'Tout est à jour'}
+        </span>
+      </div>
+
+      {tasks.length === 0 ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '24px 0', color: 'var(--text-faint)' }}>
+          <CheckCircle size={32} style={{ color: '#16a34a', opacity: 0.6 }} />
+          <p style={{ fontSize: '13px', fontWeight: '600', color: '#16a34a' }}>Tout est à jour !</p>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Aucune action requise pour le moment</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '320px' }}>
+          {tasks.map((task, i) => {
+            const { color, bg, border, icon: Icon } = SEVERITY_CONFIG[task.severity];
+            return (
+              <Link key={i} to={task.link} style={{ textDecoration: 'none' }}>
+                <motion.div whileHover={{ x: 3 }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', background: bg, border: `1px solid ${border}`, cursor: 'pointer' }}>
+                  <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <Icon size={14} style={{ color }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.text}</p>
+                    <p style={{ fontSize: '10px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.sub}</p>
+                  </div>
+                  <ArrowRight size={12} style={{ color, flexShrink: 0 }} />
+                </motion.div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const GradesBreakdownWidget = ({ students, grades }) => {
+  const groups = useMemo(() => {
+    const map = {};
+    (students || []).forEach(s => {
+      if (!s.diploma || !s.major || !s.year) return;
+      const key = `${s.diploma}||${s.major}||${s.year}`;
+      if (!map[key]) map[key] = { diploma: s.diploma, major: s.major, year: s.year, count: 0, total: 0, entered: 0 };
+      const g = map[key];
+      g.count++;
+      const mods = getModulesForStudent(s);
+      g.total += mods.length;
+      mods.forEach(m => {
+        const gr = grades[s.id]?.[m];
+        if (gr && (gr.c1 || gr.c2 || gr.c3 || gr.efcfp || gr.efcft)) g.entered++;
+      });
+    });
+    return Object.values(map).map(g => ({
+      ...g,
+      label: getGroupAbbreviation(g.major, g.year),
+      pct: g.total > 0 ? Math.round((g.entered / g.total) * 100) : 0,
+    })).sort((a, b) => a.pct - b.pct);
+  }, [students, grades]);
+
+  const overall = useMemo(() => {
+    if (groups.length === 0) return 0;
+    const t = groups.reduce((s, g) => s + g.total, 0);
+    const e = groups.reduce((s, g) => s + g.entered, 0);
+    return t > 0 ? Math.round((e / t) * 100) : 0;
+  }, [groups]);
+
+  const pctColor = (p) => p >= 75 ? '#16a34a' : p >= 50 ? '#d97706' : '#dc2626';
+  const pctBg = (p) => p >= 75 ? 'rgba(22,163,74,0.12)' : p >= 50 ? 'rgba(217,119,6,0.12)' : 'rgba(220,38,38,0.1)';
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+      className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(254,205,8,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <TrendingUp size={14} style={{ color: '#a06208' }} />
+          </div>
+          <div>
+            <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Saisie des Notes
+            </span>
+            <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '500', marginTop: '1px' }}>Par groupe</p>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <span style={{ fontSize: '20px', fontWeight: '900', color: pctColor(overall) }}>{overall}%</span>
+          <p style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>global</p>
+        </div>
+      </div>
+
+      {groups.length === 0 ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: '12px' }}>
+          Aucun stagiaire enregistré
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '320px' }}>
+          {groups.map((g) => (
+            <div key={g.label}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-primary)', fontFamily: 'monospace', background: 'var(--bg-subtle)', padding: '2px 7px', borderRadius: '5px' }}>{g.label}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{g.count} stagiaire{g.count > 1 ? 's' : ''}</span>
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: '800', color: pctColor(g.pct), background: pctBg(g.pct), padding: '2px 8px', borderRadius: '20px' }}>{g.pct}%</span>
+              </div>
+              <div style={{ height: '6px', borderRadius: '99px', background: 'var(--border-light)', overflow: 'hidden' }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${g.pct}%` }}
+                  transition={{ duration: 0.8, ease: 'easeOut', delay: 0.4 }}
+                  style={{ height: '100%', borderRadius: '99px', background: pctColor(g.pct) }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
 const DAY_ABBREVIATIONS = {
   Lundi: 'LUN',
   Mardi: 'MAR',
@@ -762,20 +964,6 @@ const AdminDashboard = () => {
     return Math.round((presents / teacherAttendance.length) * 100);
   }, [teacherAttendance]);
 
-  const gradesProgress = useMemo(() => {
-    if (!students || students.length === 0) return 0;
-    let totalModules = 0; let enteredModules = 0;
-    students.forEach(s => {
-      const studentModules = getModulesForStudent(s);
-      totalModules += studentModules.length;
-      studentModules.forEach(m => {
-        const g = grades[s.id]?.[m];
-        if (g && (g.c1 || g.c2 || g.c3 || g.efcfp || g.efcft)) enteredModules++;
-      });
-    });
-    return totalModules > 0 ? Math.round((enteredModules / totalModules) * 100) : 0;
-  }, [students, grades]);
-
   return (
     <div className="max-w-container section-padding" style={{ paddingTop: '24px' }}>
       
@@ -818,7 +1006,10 @@ const AdminDashboard = () => {
             <StatCard delay={0.1} icon={UserPlus} iconColor="#a06208" iconBg="rgba(254, 205, 8, 0.12)" value={(teachers || []).length} label="Total Formateurs" />
             <StatCard delay={0.15} icon={UserPlus} iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={studentAttendanceRate === null ? '—' : `${studentAttendanceRate}%`} label={`Présence Stagiaires — ${currentMonthName}`} />
             <StatCard delay={0.2} icon={User} iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={teacherAttendanceRate === null ? '—' : `${teacherAttendanceRate}%`} label={`Présence Formateurs — ${currentMonthName}`} />
-            <StatCard delay={0.25} icon={FileText} iconColor="var(--accent)" iconBg="rgba(254, 205, 8, 0.1)" value={`${gradesProgress}%`} label="Saisie des Notes" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
+            <PendingTasksWidget students={students || []} teachers={teachers || []} grades={grades || {}} teacherAttendance={teacherAttendance || []} />
+            <GradesBreakdownWidget students={students || []} grades={grades || {}} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
             <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} />
