@@ -1,18 +1,20 @@
-import { logoBase64 } from '../utils/logoBase64';
+import React from 'react';
 
 const Logo = ({ size = 40, showText = true, color = 'var(--primary)' }) => {
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '12px' }}>
-      <img 
-        src={logoBase64} 
-        alt="IPFP Logo" 
-        style={{ 
-          width: size * 1.5, 
-          height: 'auto',
-          objectFit: 'contain',
-          filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1))'
-        }} 
-      />
+      <svg 
+        width={size} 
+        height={size} 
+        viewBox="0 0 40 40" 
+        fill="none" 
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ filter: 'drop-shadow(0 4px 8px rgba(176, 104, 185, 0.2))' }}
+      >
+        <rect width="40" height="40" rx="12" fill={color} />
+        <path d="M10 28V12H15L20 20L25 12H30V28H26V18L21 26H19L14 18V28H10Z" fill="white" />
+        <circle cx="32" cy="8" r="4" fill="var(--secondary)" />
+      </svg>
       
       {showText && (
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
