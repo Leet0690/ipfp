@@ -117,10 +117,18 @@ const ScheduleManagement = () => {
     e.preventDefault();
     if (!formData.module || !formData.teacherId) return showToast('Veuillez remplir tous les champs', 'warning');
     
+    // Normalize time format to HH:mm-HH:mm
+    const parts = formData.time.split('-');
+    const startTime = formatTimeDash(parts[0]);
+    const endTime = parts[1] ? formatTimeDash(parts[1]) : '';
+    const normalizedTime = startTime + (endTime ? `-${endTime}` : '');
+    
+    const finalData = { ...formData, time: normalizedTime, filiere, annee };
+    
     if (editingSession) {
-      updateSchedule(editingSession.id, { ...formData, filiere, annee });
+      updateSchedule(editingSession.id, finalData);
     } else {
-      addSchedule({ ...formData, filiere, annee });
+      addSchedule(finalData);
     }
     
     setShowAddModal(false);
