@@ -56,7 +56,11 @@ const PWAUpdatePrompt = () => {
           </div>
 
           <button
-            onClick={() => updateServiceWorker(true)}
+            onClick={() => {
+              updateServiceWorker(true);
+              // Fallback reload for certain browsers/states
+              setTimeout(() => window.location.reload(), 500);
+            }}
             style={{
               flexShrink: 0,
               display: 'inline-flex', alignItems: 'center', gap: '6px',
