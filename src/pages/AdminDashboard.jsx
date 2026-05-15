@@ -154,9 +154,20 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
             <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '500', marginTop: '1px' }}>{today}</p>
           </div>
         </div>
-        <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', borderRadius: '20px', padding: '3px 10px' }}>
-          {todaySessions.length} séance{todaySessions.length !== 1 ? 's' : ''}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', borderRadius: '20px', padding: '3px 10px' }}>
+            {todaySessions.length} séance{todaySessions.length !== 1 ? 's' : ''}
+          </span>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderRadius: '50%' }}
+            title="Recharger"
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-faint)'}
+          >
+            <RotateCw size={12} />
+          </button>
+        </div>
       </div>
 
       {todaySessions.length === 0 ? (
