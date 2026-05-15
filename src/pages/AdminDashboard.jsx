@@ -40,7 +40,11 @@ import {
   Copy,
   Info,
   UserCheck,
-  User
+  User,
+  Activity,
+  Bell,
+  BookOpen,
+  Layers
 } from 'lucide-react';
 import { logoBase64 } from '../utils/logoBase64';
 
@@ -70,6 +74,198 @@ const getGroupAbbreviation = (filiere, annee) => {
 };
 
 const DASH_DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+const getTodayFrench = () => {
+  const jsDay = new Date().getDay();
+  return DASH_DAYS[jsDay === 0 ? 6 : jsDay - 1];
+};
+
+const formatRelativeTime = (timestamp) => {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'À l\'instant';
+  if (minutes < 60) return `Il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `Il y a ${days}j`;
+};
+
+const getActivityIcon = (message) => {
+  if (message.includes('stagiaire') && message.includes('ajouté')) return { icon: UserPlus, color: '#16a34a', bg: 'rgba(22,163,74,0.1)' };
+  if (message.includes('formateur') && message.includes('ajouté')) return { icon: UserPlus, color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)' };
+  if (message.includes('supprimé') || message.includes('supprimée')) return { icon: Trash2, color: '#dc2626', bg: 'rgba(220,38,38,0.08)' };
+  if (message.includes('mis à jour') || message.includes('mise à jour')) return { icon: Edit3, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' };
+  if (message.includes('Notes') || message.includes('notes')) return { icon: FileText, color: 'var(--primary)', bg: 'var(--primary-ultra-light)' };
+  if (message.includes('Séance') || message.includes('séance')) return { icon: Calendar, color: '#7c3aed', bg: 'rgba(124,58,237,0.08)' };
+  if (message.includes('Présence') || message.includes('présence') || message.includes('Absence')) return { icon: UserCheck, color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)' };
+  if (message.includes('Salaire') || message.includes('salaire') || message.includes('Paiement') || message.includes('Charge')) return { icon: LineChart, color: '#16a34a', bg: 'rgba(22,163,74,0.1)' };
+  return { icon: Activity, color: 'var(--text-muted)', bg: 'var(--bg-subtle)' };
+};
+
+const TodaySessionsWidget = ({ schedules, teachers }) => {
+  const today = getTodayFrench();
+  const todaySessions = useMemo(() => {
+    return schedules
+      .filter(s => s.day === today)
+      .map(s => {
+        const parts = (s.time || '').split('-');
+        return { ...s, start: (parts[0] || '').trim(), end: (parts[1] || '').trim() };
+      })
+      .sort((a, b) => a.start.localeCompare(b.start));
+  }, [schedules, today]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.45 }}
+      className="glass-card"
+      style={{ padding: '20px', display: 'flex', flexDirection: 'column', minHeight: '260px' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--primary-ultra-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BookOpen size={14} style={{ color: 'var(--primary)' }} />
+          </div>
+          <div>
+            <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Séances d'aujourd'hui
+            </span>
+            <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '500', marginTop: '1px' }}>{today}</p>
+          </div>
+        </div>
+        <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', borderRadius: '20px', padding: '3px 10px' }}>
+          {todaySessions.length} séance{todaySessions.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {todaySessions.length === 0 ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-faint)' }}>
+          <Calendar size={28} style={{ opacity: 0.35 }} />
+          <p style={{ fontSize: '12px', fontWeight: '500' }}>Aucune séance prévue aujourd'hui</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', overflowY: 'auto', maxHeight: '280px' }}>
+          {todaySessions.map((session) => {
+            const isTP = session.type === 'TP';
+            const teacher = teachers.find(t => t.id === session.teacherId);
+            return (
+              <div
+                key={session.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '9px 12px', borderRadius: '10px',
+                  background: isTP ? '#fdf4fe' : '#fffdf0',
+                  border: `1px solid ${isTP ? 'rgba(176,104,185,0.25)' : 'rgba(254,205,8,0.35)'}`,
+                  borderLeft: `3px solid ${isTP ? 'var(--primary)' : '#fecd08'}`,
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '44px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: '800', color: isTP ? 'var(--primary)' : '#a06208', fontVariantNumeric: 'tabular-nums' }}>
+                    {session.start}
+                  </span>
+                  <div style={{ width: '1px', height: '6px', background: isTP ? 'rgba(176,104,185,0.4)' : 'rgba(254,205,8,0.6)', margin: '2px 0' }} />
+                  <span style={{ fontSize: '9px', fontWeight: '600', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                    {session.end}
+                  </span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '12px', fontWeight: '700', color: isTP ? '#7a3d82' : '#8a6a00', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' }}>
+                    {session.module}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {teacher && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {teacher.name}
+                      </span>
+                    )}
+                    {session.filiere && (
+                      <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-faint)', background: 'rgba(0,0,0,0.04)', borderRadius: '4px', padding: '1px 5px', flexShrink: 0 }}>
+                        {session.filiere.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 4)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span style={{ fontSize: '9px', fontWeight: '800', color: isTP ? 'var(--primary)' : '#a06208', background: isTP ? 'rgba(176,104,185,0.12)' : 'rgba(254,205,8,0.2)', borderRadius: '5px', padding: '2px 7px', flexShrink: 0 }}>
+                  {session.type || 'Cours'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const ActivityFeedWidget = ({ notifications, onClear }) => {
+  const recent = useMemo(() => (notifications || []).slice(0, 10), [notifications]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5 }}
+      className="glass-card"
+      style={{ padding: '20px', display: 'flex', flexDirection: 'column', minHeight: '260px' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Activity size={14} style={{ color: '#6366f1' }} />
+          </div>
+          <div>
+            <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Activité récente
+            </span>
+            <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '500', marginTop: '1px' }}>Dernières actions</p>
+          </div>
+        </div>
+        {recent.length > 0 && (
+          <button
+            onClick={onClear}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', padding: '3px 8px', borderRadius: '6px' }}
+            title="Effacer l'historique"
+          >
+            Effacer
+          </button>
+        )}
+      </div>
+
+      {recent.length === 0 ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-faint)' }}>
+          <Bell size={28} style={{ opacity: 0.35 }} />
+          <p style={{ fontSize: '12px', fontWeight: '500' }}>Aucune activité récente</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', maxHeight: '280px' }}>
+          {recent.map((notif) => {
+            const { icon: Icon, color, bg } = getActivityIcon(notif.message);
+            return (
+              <div
+                key={notif.id}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '9px', background: notif.read ? 'transparent' : 'rgba(99,102,241,0.03)', border: '1px solid var(--border-light)' }}
+              >
+                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon size={13} style={{ color }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {notif.message}
+                  </p>
+                </div>
+                <span style={{ fontSize: '9px', fontWeight: '600', color: 'var(--text-faint)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  {formatRelativeTime(notif.timestamp)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
+  );
+};
 const DAY_ABBREVIATIONS = {
   Lundi: 'LUN',
   Mardi: 'MAR',
@@ -257,7 +453,7 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
 };
 
 const AdminDashboard = () => {
-  const { students, teachers, grades, schedules, modules: allModules, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance, loadStudentAttendanceForMonth, loadTeacherAttendanceForMonth, migrateTeacherTokens, loading, confirmAction } = useApp();
+  const { students, teachers, grades, schedules, modules: allModules, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance, loadStudentAttendanceForMonth, loadTeacherAttendanceForMonth, migrateTeacherTokens, loading, confirmAction, notifications, clearNotifications } = useApp();
   const { showToast } = useToast();
   const location = useLocation();
   const isDashboard = location.pathname === '/';
@@ -634,6 +830,10 @@ const AdminDashboard = () => {
             <StatCard delay={0.25} icon={FileText} iconColor="var(--accent)" iconBg="rgba(254, 205, 8, 0.1)" value={`${gradesProgress}%`} label="Saisie des Notes" />
           </div>
           <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
+            <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} />
+            <ActivityFeedWidget notifications={notifications || []} onClear={clearNotifications} />
+          </div>
         </div>
       )}
 
