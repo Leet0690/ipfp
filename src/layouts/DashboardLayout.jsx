@@ -358,65 +358,6 @@ export default function DashboardLayout({ children }) {
               )}
             </AnimatePresence>
 
-            {/* Notifications */}
-            <div style={{ position: 'relative' }}>
-              <button 
-                onClick={() => setShowNotifs(!showNotifs)} 
-                aria-label={`Notifications (${unreadCount} non lues)`}
-                style={{ 
-                  width: '38px', height: '38px', borderRadius: '50%', background: 'var(--white)', border: '1px solid var(--border)', 
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', cursor: 'pointer',
-                  position: 'relative', transition: 'all 0.2s', boxShadow: 'var(--shadow-xs)'
-                }}
-              >
-                <Bell size={20} strokeWidth={1.5} />
-                {unreadCount > 0 && (
-                  <span style={{ 
-                    position: 'absolute', top: '-2px', right: '-2px', background: '#ef4444', color: 'white', 
-                    fontSize: '10px', fontWeight: '800', width: '16px', height: '16px', borderRadius: '50%', 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--white)'
-                  }}>
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-              
-              <AnimatePresence>
-                {showNotifs && (
-                  <>
-                    <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowNotifs(false)}></div>
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95, y: 10 }} 
-                      animate={{ opacity: 1, scale: 1, y: 0 }} 
-                      exit={{ opacity: 0, scale: 0.95, y: 10 }} 
-                      transition={{ duration: 0.2 }} 
-                      className="glass-premium" 
-                      style={{ position: 'absolute', right: 0, marginTop: '12px', width: '320px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xl)', padding: '16px', zIndex: 50 }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h4 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Notifications</h4>
-                        {unreadCount > 0 && (
-                          <button onClick={() => { clearNotifications(); setShowNotifs(false); }}
-                            style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
-                            Tout vider
-                          </button>
-                        )}
-                      </div>
-                      <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }} className="no-scrollbar">
-                        {(notifications || []).length === 0 ? (
-                          <p style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '32px 0' }}>Aucune notification.</p>
-                        ) : (notifications || []).slice(0, 5).map(n => (
-                          <div key={n.id} onClick={() => markNotificationAsRead(n.id)} style={{ padding: '12px 14px', borderRadius: 'var(--radius-lg)', cursor: 'pointer', background: n.read ? 'var(--bg-page)' : 'var(--primary-ultra-light)', border: `1px solid ${n.read ? 'var(--border-light)' : 'rgba(176,104,185,0.1)'}`, transition: 'all 0.2s' }}>
-                            <p style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', lineHeight: '1.4' }}>{n.message}</p>
-                            <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '600' }}>{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
 
             {/* User Profile Mini */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '16px', borderLeft: '1px solid var(--border)' }}>

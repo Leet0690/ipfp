@@ -828,11 +828,11 @@ const AdminDashboard = () => {
             <StatCard delay={0.2} icon={User} iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={teacherAttendanceRate === null ? '—' : `${teacherAttendanceRate}%`} label={`Présence Formateurs — ${currentMonthName}`} />
             <StatCard delay={0.25} icon={FileText} iconColor="var(--accent)" iconBg="rgba(254, 205, 8, 0.1)" value={`${gradesProgress}%`} label="Saisie des Notes" />
           </div>
-          <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
             <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} />
             <ActivityFeedWidget notifications={notifications || []} onClear={clearNotifications} />
           </div>
+          <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} />
         </div>
       )}
 
