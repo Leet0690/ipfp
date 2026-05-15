@@ -3,7 +3,6 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { AdminAuthProvider } from './context/AdminAuthContext';
 import DashboardLayout from './layouts/DashboardLayout';
-import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 import { School, Link as LinkIcon, Loader2 } from 'lucide-react';
 
 const Login                    = lazy(() => import('./pages/Login'));
@@ -116,7 +115,6 @@ const App = () => (
   <AdminAuthProvider>
     <ScrollToTop />
     <AppContent />
-    <PWAUpdatePrompt />
   </AdminAuthProvider>
 );
 

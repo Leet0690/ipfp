@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'logo.jpg', 'pwa-192.png', 'pwa-512.png'],
       manifest: {
         name: 'IPFP Manager',
