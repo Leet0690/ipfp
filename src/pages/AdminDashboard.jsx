@@ -106,13 +106,27 @@ const getActivityIcon = (message) => {
 const TodaySessionsWidget = ({ schedules, teachers }) => {
   const today = getTodayFrench();
   const todaySessions = useMemo(() => {
-    return schedules
+    const filtered = schedules
       .filter(s => s.day === today)
       .map(s => {
         const parts = (s.time || '').split('-');
         return { ...s, start: (parts[0] || '').trim(), end: (parts[1] || '').trim() };
-      })
-      .sort((a, b) => a.start.localeCompare(b.start));
+      });
+
+    const groups = {};
+    filtered.forEach(s => {
+      const key = `${s.teacherId}_${s.time}_${s.module}`;
+      if (!groups[key]) {
+        groups[key] = { ...s, groupCodes: [getGroupAbbreviation(s.filiere, s.annee || '')] };
+      } else {
+        const abbr = getGroupAbbreviation(s.filiere, s.annee || '');
+        if (!groups[key].groupCodes.includes(abbr)) {
+          groups[key].groupCodes.push(abbr);
+        }
+      }
+    });
+
+    return Object.values(groups).sort((a, b) => a.start.localeCompare(b.start));
   }, [schedules, today]);
 
   return (
@@ -180,11 +194,11 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
                         {teacher.name}
                       </span>
                     )}
-                    {session.filiere && (
-                      <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0 }}>
-                        {getGroupAbbreviation(session.filiere, session.annee || '')}
+                    {(session.groupCodes || []).map(abbr => (
+                      <span key={abbr} style={{ fontSize: '9px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0 }}>
+                        {abbr}
                       </span>
-                    )}
+                    ))}
                   </div>
                 </div>
                 <span style={{ fontSize: '9px', fontWeight: '800', color: isTP ? 'var(--primary)' : '#a06208', background: isTP ? 'rgba(176,104,185,0.12)' : 'rgba(254,205,8,0.2)', borderRadius: '5px', padding: '2px 7px', flexShrink: 0 }}>
