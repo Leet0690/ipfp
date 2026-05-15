@@ -120,7 +120,8 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
 
     const groups = {};
     filtered.forEach(s => {
-      const key = `${s.teacherId}_${s.time}_${s.module}`;
+      const normalizedModule = (s.module || '').trim().toLowerCase();
+      const key = `${s.teacherId}_${s.time}_${normalizedModule}`;
       if (!groups[key]) {
         groups[key] = { ...s, groupCodes: [getGroupAbbreviation(s.filiere, s.annee || '')] };
       } else {
