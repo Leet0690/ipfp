@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
@@ -75,6 +75,12 @@ const StudentResults = () => {
     const clean = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
     return clean(s.token) === clean(studentId) || clean(s.id) === clean(studentId);
   });
+
+  useEffect(() => {
+    if (student) {
+      document.title = `${student.lastName || ''} ${student.firstName || ''} - Résultats IPFP`.trim() || 'Résultats Stagiaire';
+    }
+  }, [student]);
 
   if (loading && students.length === 0) {
     return <div className="max-w-container section-padding"><TableSkeleton rows={10} /></div>;
@@ -173,7 +179,7 @@ const StudentResults = () => {
             <div className="badge-status primary" style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--primary-light)', padding: '6px 16px', marginBottom: '20px' }}>
               <span style={{ fontSize: '11px', fontWeight: '800' }}>{student.major}</span>
             </div>
-            <h1 style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', fontWeight: '900', letterSpacing: '-0.04em', lineHeight: 1 }}>
+            <h1 style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', fontWeight: '900', letterSpacing: '-0.04em', lineHeight: 1.1, textTransform: 'uppercase' }}>
               {student.lastName} <span style={{ color: 'var(--primary-light)' }}>{student.firstName}</span>
             </h1>
             <p style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '12px' }}>
