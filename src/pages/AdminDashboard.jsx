@@ -42,7 +42,6 @@ import {
   UserCheck,
   User
 } from 'lucide-react';
-import { logoBase64 } from '../utils/logoBase64';
 
 const labelStyle = { fontSize: 'var(--text-xs)', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '2px' };
 const selectStyle = { cursor: 'pointer', appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2394a3b8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px', paddingRight: '36px' };
@@ -603,29 +602,6 @@ const AdminDashboard = () => {
 
       {isDashboard && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', marginBottom: 'var(--space-12)' }}>
-          {/* Logo Section */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            background: 'white',
-            padding: '20px',
-            borderRadius: 'var(--radius-2xl)',
-            boxShadow: 'var(--shadow-sm)',
-            border: '1px solid var(--border-light)',
-            marginBottom: 'var(--space-2)'
-          }}>
-            <img 
-              src={logoBase64} 
-              alt="IPFP Logo" 
-              style={{ 
-                height: '100px', 
-                width: 'auto', 
-                objectFit: 'contain'
-              }} 
-            />
-          </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
             <StatCard delay={0.05} icon={GraduationCap} iconColor="var(--primary)" iconBg="var(--primary-ultra-light)" value={(students || []).length} label="Total Stagiaires" />
             <StatCard delay={0.1} icon={UserPlus} iconColor="#a06208" iconBg="rgba(254, 205, 8, 0.12)" value={(teachers || []).length} label="Total Formateurs" />
