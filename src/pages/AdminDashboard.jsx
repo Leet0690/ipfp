@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -256,10 +256,19 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
 };
 
 const AdminDashboard = () => {
-  const { students, teachers, grades, schedules, modules: allModules, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance, migrateTeacherTokens, loading, confirmAction } = useApp();
+  const { students, teachers, grades, schedules, modules: allModules, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance, loadStudentAttendanceForMonth, loadTeacherAttendanceForMonth, migrateTeacherTokens, loading, confirmAction } = useApp();
   const { showToast } = useToast();
   const location = useLocation();
   const isDashboard = location.pathname === '/';
+
+  // Load attendance data for the current month on dashboard mount
+  useEffect(() => {
+    if (isDashboard) {
+      const now = new Date();
+      loadStudentAttendanceForMonth(now.getMonth(), now.getFullYear());
+      loadTeacherAttendanceForMonth(now.getMonth(), now.getFullYear());
+    }
+  }, [isDashboard, loadStudentAttendanceForMonth, loadTeacherAttendanceForMonth]);
   const [localActiveTab, setLocalActiveTab] = useState('students');
   const activeTab = location.pathname.includes('teacher') ? 'teachers' 
                  : location.pathname.includes('student') ? 'students' 
