@@ -13,6 +13,8 @@ import {
   Check,
   Layers,
   BookOpen,
+  User,
+  Users,
 } from 'lucide-react';
 
 const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' };
@@ -37,9 +39,10 @@ const getClassCode = (diploma, major, year) => {
 };
 
 const ModuleTestPage = () => {
-  const { modules, addModule, updateModule, deleteModule, loading, confirmAction } = useApp();
+  const { modules, addModule, updateModule, deleteModule, loading, confirmAction, teachers } = useApp();
   const { showToast } = useToast();
 
+  const [viewMode, setViewMode] = useState('module'); // 'module' or 'teacher'
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingKey, setEditingKey] = useState(null);
@@ -84,6 +87,24 @@ const ModuleTestPage = () => {
     });
     return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
   }, [modules]);
+
+  // Data for "View by Teacher"
+  const teacherModules = useMemo(() => {
+    return (teachers || []).map(t => {
+      // Find modules where name matches and group is within teacher's habilitations
+      const assigned = modules.filter(m => 
+        t.subjects.includes(m.name) && 
+        t.diplomas.includes(m.diploma) && 
+        t.groups.includes(m.major) && 
+        t.years.includes(m.year)
+      ).map(m => ({ ...m, code: getClassCode(m.diploma, m.major, m.year) }));
+
+      return {
+        ...t,
+        assignedModules: assigned
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [teachers, modules]);
 
   const resetForm = () => {
     setFormData({
@@ -191,65 +212,131 @@ const ModuleTestPage = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)' }}>Test : Gestion Multi-Groupes</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Gérez les modules et assignez-les à plusieurs groupes en une fois.</p>
+          <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: '900', color: 'var(--text-primary)' }}>Gestion des Modules & Formateurs</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Gérez les modules, leurs assignations de groupes et les formateurs responsables.</p>
         </div>
-        <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="btn-modern primary">
-          <Plus size={16} style={{ marginRight: 'var(--space-2)' }} /> Créer & Assigner
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-subtle)', padding: '4px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
+            <button 
+              onClick={() => setViewMode('module')}
+              style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', fontSize: '12px', fontWeight: '800', border: 'none', cursor: 'pointer', background: viewMode === 'module' ? 'white' : 'transparent', color: viewMode === 'module' ? 'var(--primary)' : 'var(--text-muted)', boxShadow: viewMode === 'module' ? 'var(--shadow-xs)' : 'none' }}
+            >
+              <Layers size={14} style={{ marginRight: '6px' }} /> Par Module
+            </button>
+            <button 
+              onClick={() => setViewMode('teacher')}
+              style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', fontSize: '12px', fontWeight: '800', border: 'none', cursor: 'pointer', background: viewMode === 'teacher' ? 'white' : 'transparent', color: viewMode === 'teacher' ? 'var(--primary)' : 'var(--text-muted)', boxShadow: viewMode === 'teacher' ? 'var(--shadow-xs)' : 'none' }}
+            >
+              <User size={14} style={{ marginRight: '6px' }} /> Par Formateur
+            </button>
+          </div>
+          <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="btn-modern primary">
+            <Plus size={16} style={{ marginRight: 'var(--space-2)' }} /> Créer & Assigner
+          </button>
+        </div>
       </header>
 
       {loading ? (
         <div className="glass-card" style={{ padding: 'var(--space-4)' }}><TableSkeleton rows={10} /></div>
-      ) : groupedModules.length === 0 ? (
-        <EmptyState title="Aucun module" message="Commencez par ajouter un module et l'assigner à des groupes." icon="book" />
-      ) : (
-        <div className="glass-card" style={{ overflow: 'hidden' }}>
-          <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-light)' }}>
-                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Module</th>
-                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Sem.</th>
-                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Coeff.</th>
-                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Groupes Assignés</th>
-                <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupedModules.map((m, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                  <td style={{ padding: '16px' }}>
-                    <p style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>{m.name}</p>
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
-                    <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '12px', background: 'var(--primary-ultra-light)', padding: '4px 8px', borderRadius: '6px' }}>{m.semester}</span>
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
-                    <span style={{ padding: '4px 10px', background: 'rgba(0,0,0,0.03)', color: 'var(--text-primary)', borderRadius: '8px', fontWeight: '800', fontSize: '12px' }}>{m.coefficient}</span>
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                      {m.assignedGroups.map((g, i) => (
-                        <span key={i} title={`${g.major} - ${g.year}`} style={{ padding: '2px 8px', background: 'var(--bg-subtle)', borderRadius: '6px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
-                          {g.code}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
-                      <ActionBtn icon={Edit3} title="Modifier l'assignation" onClick={() => handleEdit(m)} />
-                      <ActionBtn icon={Trash2} title="Tout supprimer" color="#dc2626" onClick={() => handleDelete(m)} />
-                    </div>
-                  </td>
+      ) : viewMode === 'module' ? (
+        groupedModules.length === 0 ? (
+          <EmptyState title="Aucun module" message="Commencez par ajouter un module et l'assigner à des groupes." icon="book" />
+        ) : (
+          <div className="glass-card" style={{ overflow: 'hidden' }}>
+            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-light)' }}>
+                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Module</th>
+                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Sem.</th>
+                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Coeff.</th>
+                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Groupes Assignés</th>
+                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Formateurs</th>
+                  <th style={{ padding: '16px', fontSize: 'var(--text-xs)', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {groupedModules.map((m, idx) => {
+                  const assignedTeachers = (teachers || []).filter(t => 
+                    t.subjects.includes(m.name) && 
+                    m.assignedGroups.some(g => t.diplomas.includes(g.diploma) && t.groups.includes(g.major) && t.years.includes(g.year))
+                  );
+
+                  return (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ padding: '16px' }}>
+                        <p style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>{m.name}</p>
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '12px', background: 'var(--primary-ultra-light)', padding: '4px 8px', borderRadius: '6px' }}>{m.semester}</span>
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <span style={{ padding: '4px 10px', background: 'rgba(0,0,0,0.03)', color: 'var(--text-primary)', borderRadius: '8px', fontWeight: '800', fontSize: '12px' }}>{m.coefficient}</span>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {m.assignedGroups.map((g, i) => (
+                            <span key={i} title={`${g.major} - ${g.year}`} style={{ padding: '2px 8px', background: 'var(--bg-subtle)', borderRadius: '6px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>
+                              {g.code}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {assignedTeachers.length > 0 ? assignedTeachers.map((t, i) => (
+                            <span key={i} style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: 'rgba(22,163,74,0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                              {t.name.split(' ').pop()}
+                            </span>
+                          )) : <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>Non assigné</span>}
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
+                          <ActionBtn icon={Edit3} title="Modifier l'assignation" onClick={() => handleEdit(m)} />
+                          <ActionBtn icon={Trash2} title="Tout supprimer" color="#dc2626" onClick={() => handleDelete(m)} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : (
+        /* Vue par Formateur */
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 'var(--space-6)' }}>
+          {teacherModules.map((t, idx) => (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} key={t.id} className="glass-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border-light)' }}>
+                <div style={{ width: '40px', height: '40px', background: 'var(--primary-ultra-light)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <User size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '14px', fontWeight: '900', color: 'var(--text-primary)' }}>{t.name}</h3>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.assignedModules.length} module(s) assignés</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {t.assignedModules.length === 0 ? (
+                  <p style={{ fontSize: '12px', fontStyle: 'italic', color: 'var(--text-faint)', textAlign: 'center', padding: '10px' }}>Aucun module correspondant aux habilitations.</p>
+                ) : t.assignedModules.map((mod, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
+                    <div>
+                      <p style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-primary)' }}>{mod.name}</p>
+                      <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{mod.code} · Coeff. {mod.coefficient}</p>
+                    </div>
+                    <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)', background: 'white', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>{mod.semester}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          ))}
         </div>
       )}
 
-      {/* Modal logic */}
+      {/* Modal logic remains same */}
       <AnimatePresence>
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
