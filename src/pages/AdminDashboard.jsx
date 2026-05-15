@@ -160,9 +160,12 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
             {todaySessions.length} séance{todaySessions.length !== 1 ? 's' : ''}
           </span>
           <button 
-            onClick={() => window.location.reload()} 
+            onClick={() => {
+              localStorage.removeItem('ipfp_v2_core_cache');
+              window.location.reload();
+            }} 
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderRadius: '50%' }}
-            title="Recharger"
+            title="Rafraîchir les données (Vider le cache)"
             onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
             onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-faint)'}
           >
