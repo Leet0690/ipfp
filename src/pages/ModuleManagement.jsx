@@ -47,7 +47,6 @@ const ModuleManagement = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -115,17 +114,6 @@ const ModuleManagement = () => {
     return Object.values(groups);
   }, [modules, filterDiploma, filterMajor, filterYear, filterSemester]);
 
-  // Feature 2: modules present in MODULES_DATA but missing from Firestore for current selection
-  const missingModuleNames = useMemo(() => {
-    if (!isFiltersSelected) return [];
-    const template = MODULES_DATA[filterDiploma]?.[filterMajor]?.[filterYear] || [];
-    const existingNames = new Set(
-      modules
-        .filter(m => m.diploma === filterDiploma && m.major === filterMajor && m.year === filterYear && (m.semester || 'S1') === filterSemester)
-        .map(m => m.name)
-    );
-    return template.filter(name => !existingNames.has(name));
-  }, [modules, filterDiploma, filterMajor, filterYear, filterSemester, isFiltersSelected]);
 
   const paginatedModules = useMemo(
     () => groupedModules.slice((page - 1) * itemsPerPage, page * itemsPerPage),
@@ -189,30 +177,6 @@ const ModuleManagement = () => {
     }
   };
 
-  // Feature 1: Sync all missing modules from MODULES_DATA
-  const handleSync = async () => {
-    if (missingModuleNames.length === 0) {
-      showToast('Tous les modules sont déjà synchronisés !', 'success');
-      return;
-    }
-    const confirmed = await confirmAction({
-      title: `Synchroniser ${missingModuleNames.length} module${missingModuleNames.length > 1 ? 's' : ''} ?`,
-      message: `Cela va créer ${missingModuleNames.length} module${missingModuleNames.length > 1 ? 's' : ''} manquant${missingModuleNames.length > 1 ? 's' : ''} avec un coefficient de 1. Vous pourrez les modifier ensuite.`,
-      type: 'warning'
-    });
-    if (!confirmed) return;
-    setIsSyncing(true);
-    try {
-      for (const name of missingModuleNames) {
-        await addModule({ name, coefficient: 1, diploma: filterDiploma, major: filterMajor, year: filterYear, semester: filterSemester });
-      }
-      showToast(`${missingModuleNames.length} module${missingModuleNames.length > 1 ? 's' : ''} synchronisé${missingModuleNames.length > 1 ? 's' : ''} !`, 'success');
-    } catch {
-      showToast('Erreur lors de la synchronisation', 'error');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   // Feature 2: Quick-add a single missing module
   const handleQuickAdd = async (name) => {
@@ -274,25 +238,6 @@ const ModuleManagement = () => {
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Configurez les matières et leurs coefficients pour chaque filière.</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-          {isFiltersSelected && missingModuleNames.length > 0 && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="btn-modern"
-              style={{ background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.3)', color: '#d97706', gap: '6px' }}
-            >
-              <Zap size={14} />
-              {isSyncing ? 'Synchronisation…' : `Synchroniser (${missingModuleNames.length} manquant${missingModuleNames.length > 1 ? 's' : ''})`}
-            </motion.button>
-          )}
-          {isFiltersSelected && missingModuleNames.length === 0 && groupedModules.length > 0 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: 'var(--radius-xl)', background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.2)', color: '#16a34a', fontSize: '12px', fontWeight: '700' }}>
-              <CheckCircle size={13} /> Référentiel complet
-            </motion.div>
-          )}
           <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="btn-modern primary">
             <Plus size={16} style={{ marginRight: 'var(--space-2)' }} /> Ajouter Module
           </button>
@@ -340,110 +285,53 @@ const ModuleManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {paginatedModules.length === 0 && missingModuleNames.length === 0 ? (
+              {paginatedModules.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ padding: 0 }}>
                     <EmptyState title="Aucun module" message="Aucun module n'est configuré pour cette sélection." icon="book" />
                   </td>
                 </tr>
               ) : (
-                <>
-                  {paginatedModules.map((m, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={{ padding: '16px' }}>
-                        <p style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>{m.name}</p>
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        {m.allDiplomas && m.allDiplomas.length > 1 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
-                            {m.allDiplomas.map((d, i) => (
-                              <span key={i} style={{ fontSize: '10px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '2px 6px', borderRadius: '5px' }}>
-                                {d === 'Technicien Spécialisé' ? 'TS' : d === 'Technicien' ? 'T' : d}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>{m.diploma}</p>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'center' }}>
-                        <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '12px', background: 'var(--primary-ultra-light)', padding: '4px 8px', borderRadius: '6px' }}>{m.semester || 'S1'}</span>
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {m.allClasses.map((c, i) => (
-                            <span key={i} style={{ padding: '2px 8px', background: 'var(--bg-subtle)', borderRadius: '6px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>{c}</span>
+                paginatedModules.map((m, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <td style={{ padding: '16px' }}>
+                      <p style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>{m.name}</p>
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      {m.allDiplomas && m.allDiplomas.length > 1 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                          {m.allDiplomas.map((d, i) => (
+                            <span key={i} style={{ fontSize: '10px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', padding: '2px 6px', borderRadius: '5px' }}>
+                              {d === 'Technicien Spécialisé' ? 'TS' : d === 'Technicien' ? 'T' : d}
+                            </span>
                           ))}
                         </div>
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'center' }}>
-                        <span style={{ padding: '4px 10px', background: 'rgba(0,0,0,0.03)', color: 'var(--text-primary)', borderRadius: '8px', fontWeight: '800', fontSize: '12px' }}>{m.coefficient}</span>
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
-                          <ActionBtn icon={Copy} title="Copier vers d'autres groupes" color="#6366f1" onClick={() => openCopyModal(m)} />
-                          <ActionBtn icon={Edit3} title="Modifier" onClick={() => handleEdit(m)} />
-                          <ActionBtn icon={Trash2} title="Supprimer" color="#dc2626" onClick={() => handleDelete(m)} />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {/* Feature 2: missing module rows — shown on first page only */}
-                  {page === 1 && missingModuleNames.length > 0 && (
-                    <>
-                      <tr>
-                        <td colSpan="6" style={{ padding: '8px 16px', background: 'rgba(217,119,6,0.04)', borderTop: '1px dashed rgba(217,119,6,0.3)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <AlertTriangle size={11} style={{ color: '#d97706' }} />
-                            <span style={{ fontSize: '10px', fontWeight: '800', color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                              {missingModuleNames.length} module{missingModuleNames.length > 1 ? 's' : ''} du référentiel non configuré{missingModuleNames.length > 1 ? 's' : ''}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                      {missingModuleNames.map((name, idx) => (
-                        <motion.tr
-                          key={`missing-${idx}`}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: idx * 0.04 }}
-                          style={{ borderBottom: '1px dashed rgba(217,119,6,0.15)', background: 'rgba(254,243,199,0.3)' }}
-                        >
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(217,119,6,0.5)', flexShrink: 0 }} />
-                              <p style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', fontStyle: 'italic' }}>{name}</p>
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-faint)' }}>{filterDiploma}</p>
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <span style={{ fontWeight: '700', color: '#d97706', fontSize: '12px', background: 'rgba(217,119,6,0.1)', padding: '3px 8px', borderRadius: '6px' }}>{filterSemester}</span>
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <span style={{ padding: '2px 8px', background: 'rgba(217,119,6,0.08)', borderRadius: '6px', fontSize: '10px', fontWeight: '800', color: '#d97706', border: '1px dashed rgba(217,119,6,0.3)' }}>
-                              {getClassCode(filterDiploma, filterMajor, filterYear)}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>—</span>
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                            <button
-                              onClick={() => handleQuickAdd(name)}
-                              className="btn-modern"
-                              style={{ padding: '5px 12px', fontSize: '11px', fontWeight: '700', color: '#d97706', background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.25)', borderRadius: 'var(--radius-lg)' }}
-                            >
-                              <Plus size={11} style={{ marginRight: '4px' }} /> Ajouter
-                            </button>
-                          </td>
-                        </motion.tr>
-                      ))}
-                    </>
-                  )}
-                </>
+                      ) : (
+                        <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>{m.diploma}</p>
+                      )}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '12px', background: 'var(--primary-ultra-light)', padding: '4px 8px', borderRadius: '6px' }}>{m.semester || 'S1'}</span>
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {m.allClasses.map((c, i) => (
+                          <span key={i} style={{ padding: '2px 8px', background: 'var(--bg-subtle)', borderRadius: '6px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}>{c}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <span style={{ padding: '4px 10px', background: 'rgba(0,0,0,0.03)', color: 'var(--text-primary)', borderRadius: '8px', fontWeight: '800', fontSize: '12px' }}>{m.coefficient}</span>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
+                        <ActionBtn icon={Copy} title="Copier vers d'autres groupes" color="#6366f1" onClick={() => openCopyModal(m)} />
+                        <ActionBtn icon={Edit3} title="Modifier" onClick={() => handleEdit(m)} />
+                        <ActionBtn icon={Trash2} title="Supprimer" color="#dc2626" onClick={() => handleDelete(m)} />
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
