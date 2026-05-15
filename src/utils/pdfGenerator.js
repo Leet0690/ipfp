@@ -23,7 +23,7 @@ const drawHeader = (doc, title, withLine = true) => {
 
   // Logo
   try {
-    doc.addImage(logoBase64, 'JPEG', margin, 8, 50, 22);
+    doc.addImage(logoBase64, 'PNG', margin, 8, 50, 22);
   } catch (e) {
     console.error("Logo not found", e);
   }
