@@ -202,8 +202,16 @@ const Reports = () => {
     const copy = [...(analytics.studentRankings || [])];
     if (rankSort === 'avg_desc') return copy.sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
     if (rankSort === 'avg_asc') return copy.sort((a, b) => (a.avg ?? -1) - (b.avg ?? -1));
-    if (rankSort === 'name_asc') return copy.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    if (rankSort === 'name_desc') return copy.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    if (rankSort === 'name_asc') return copy.sort((a, b) => {
+      const nameA = a.lastName ? `${a.lastName} ${a.firstName}` : (a.name || '');
+      const nameB = b.lastName ? `${b.lastName} ${b.firstName}` : (b.name || '');
+      return nameA.localeCompare(nameB);
+    });
+    if (rankSort === 'name_desc') return copy.sort((a, b) => {
+      const nameA = a.lastName ? `${a.lastName} ${a.firstName}` : (a.name || '');
+      const nameB = b.lastName ? `${b.lastName} ${b.firstName}` : (b.name || '');
+      return nameB.localeCompare(nameA);
+    });
     if (rankSort === 'abs_desc') return copy.sort((a, b) => (b.absenceRate ?? -1) - (a.absenceRate ?? -1));
     if (rankSort === 'abs_asc') return copy.sort((a, b) => (a.absenceRate ?? -1) - (b.absenceRate ?? -1));
     return copy;
@@ -329,7 +337,8 @@ const Reports = () => {
           doc.text(String(idx + 1), colRank, y + 4.5);
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(30, 30, 30);
-          const nameStr = (s.name || '').length > 28 ? (s.name || '').substring(0, 28) + '…' : (s.name || '');
+          const fullSName = s.lastName ? `${s.lastName} ${s.firstName}` : (s.name || '');
+          const nameStr = fullSName.length > 28 ? fullSName.substring(0, 28) + '…' : fullSName;
           doc.text(nameStr, colName, y + 4.5);
           if (s.avg !== null) {
             doc.setFont('helvetica', 'bold');
@@ -643,7 +652,9 @@ const Reports = () => {
                       )}
                     </td>
                     <td style={{ padding: '11px 16px' }}>
-                      <p style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>{s.name || '—'}</p>
+                      <p style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>
+                        {s.lastName ? `${s.lastName} ${s.firstName}` : (s.name || '—')}
+                      </p>
                       {s.cin && <p style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '1px' }}>{s.cin}</p>}
                     </td>
                     <td style={{ padding: '11px 16px', textAlign: 'center' }}>
