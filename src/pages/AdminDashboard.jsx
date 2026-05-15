@@ -336,13 +336,13 @@ const PendingTasksWidget = ({ students, teachers, grades, teacherAttendance }) =
         severity: 'warning',
         text: `${missingTeachers.length} formateur${missingTeachers.length > 1 ? 's' : ''} sans présence ce mois`,
         sub: names + (missingTeachers.length > 2 ? ` +${missingTeachers.length - 2} autre${missingTeachers.length - 2 > 1 ? 's' : ''}` : ''),
-        link: '/admin/attendance',
+        link: '/admin/monthly-attendance-teachers',
       });
     }
 
     const incompleteStudents = (students || []).filter(s => !s.diploma || !s.major || !s.year);
     if (incompleteStudents.length > 0) {
-      items.push({ severity: 'info', text: `${incompleteStudents.length} profil${incompleteStudents.length > 1 ? 's' : ''} stagiaire incomplet${incompleteStudents.length > 1 ? 's' : ''}`, sub: 'Niveau, filière ou année manquant', link: '/admin' });
+      items.push({ severity: 'info', text: `${incompleteStudents.length} profil${incompleteStudents.length > 1 ? 's' : ''} stagiaire incomplet${incompleteStudents.length > 1 ? 's' : ''}`, sub: 'Niveau, filière ou année manquant', link: '/admin/students' });
     }
 
     return items;
