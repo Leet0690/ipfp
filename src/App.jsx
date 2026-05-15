@@ -19,6 +19,7 @@ const Reports                  = lazy(() => import('./pages/Reports'));
 const ScheduleManagement       = lazy(() => import('./pages/ScheduleManagement'));
 const FinanceDashboard         = lazy(() => import('./pages/FinanceDashboard'));
 const ModuleManagement         = lazy(() => import('./pages/ModuleManagement'));
+const ModuleTestPage           = lazy(() => import('./pages/ModuleTestPage'));
 const MonthlyAttendance        = lazy(() => import('./pages/MonthlyAttendance'));
 const MonthlyAttendanceTeachers = lazy(() => import('./pages/MonthlyAttendanceTeachers'));
 
@@ -97,6 +98,7 @@ const AppContent = () => {
         <Route path="/admin/monthly-attendance" element={<MonthlyAttendance />} />
         <Route path="/admin/monthly-attendance-teachers" element={<MonthlyAttendanceTeachers />} />
         <Route path="/admin/modules" element={<ModuleManagement />} />
+        <Route path="/admin/module-test" element={<ModuleTestPage />} />
         <Route path="/admin/reports" element={<Reports />} />
         <Route path="/admin/attendance-teachers" element={<TeacherAttendance />} />
         <Route path="/admin/finance" element={<FinanceDashboard />} />
