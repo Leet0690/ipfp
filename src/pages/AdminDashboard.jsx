@@ -181,8 +181,8 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
                       </span>
                     )}
                     {session.filiere && (
-                      <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-faint)', background: 'rgba(0,0,0,0.04)', borderRadius: '4px', padding: '1px 5px', flexShrink: 0 }}>
-                        {session.filiere.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 4)}
+                      <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0 }}>
+                        {getGroupAbbreviation(session.filiere, session.annee || '')}
                       </span>
                     )}
                   </div>
