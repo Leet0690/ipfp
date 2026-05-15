@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { FILIERES, MODULES_DATA } from '../data/modules';
 import {
   CalendarDays, Plus, Trash2, Clock, User, MapPin, Filter,
-  X, Layers, Users, Calendar
+  X, Layers, Users, Calendar, Edit
 } from 'lucide-react';
 
 const START_HOUR = 8;
@@ -59,7 +59,10 @@ const labelStyle = {
 };
 
 const ScheduleManagement = () => {
-  const { teachers, schedules, addSchedule, deleteSchedule, modules: allModules, confirmAction } = useApp();
+  const { 
+    teachers, schedules, addSchedule, updateSchedule, 
+    deleteSchedule, modules: allModules, confirmAction 
+  } = useApp();
   const { showToast } = useToast();
 
   const allFilieres = useMemo(() => Array.from(new Set(Object.values(FILIERES).flat())), []);
@@ -81,6 +84,7 @@ const ScheduleManagement = () => {
   );
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingSession, setEditingSession] = useState(null);
   const [formData, setFormData] = useState({
     day: 'Lundi', time: '08:30-10:30', module: '', teacherId: '', room: '', type: 'Cours'
   });
@@ -90,10 +94,35 @@ const ScheduleManagement = () => {
     [filiere, annee, allModules]
   );
 
+  const openAdd = () => {
+    setEditingSession(null);
+    setFormData({ day: 'Lundi', time: '08:30-10:30', module: '', teacherId: '', room: '', type: 'Cours' });
+    setShowAddModal(true);
+  };
+
+  const openEdit = (session) => {
+    setEditingSession(session);
+    setFormData({
+      day: session.day,
+      time: session.time,
+      module: session.module,
+      teacherId: session.teacherId,
+      room: session.room || '',
+      type: session.type || 'Cours'
+    });
+    setShowAddModal(true);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.module || !formData.teacherId) return showToast('Veuillez remplir tous les champs', 'warning');
-    addSchedule({ ...formData, filiere, annee });
+    
+    if (editingSession) {
+      updateSchedule(editingSession.id, { ...formData, filiere, annee });
+    } else {
+      addSchedule({ ...formData, filiere, annee });
+    }
+    
     setShowAddModal(false);
     setFormData(prev => ({ ...prev, module: '', room: '' }));
   };
@@ -118,7 +147,7 @@ const ScheduleManagement = () => {
             Plannings hebdomadaires par filière et groupe.
           </p>
         </div>
-        <button onClick={() => setShowAddModal(true)} className="btn-modern primary">
+        <button onClick={openAdd} className="btn-modern primary">
           <Plus size={18} style={{ marginRight: '8px' }} /> Ajouter une séance
         </button>
       </div>
@@ -290,21 +319,35 @@ const ScheduleManagement = () => {
                               backgroundColor: isTP ? 'var(--primary)' : '#fecd08'
                             }} />
 
-                            {/* Delete button */}
-                            <button
-                              onClick={() => handleDelete(session.id)}
-                              style={{
-                                position: 'absolute', top: '5px', right: '5px',
-                                background: 'transparent', border: 'none', cursor: 'pointer',
-                                color: 'var(--text-faint)', padding: '2px', borderRadius: '4px',
-                                lineHeight: 1, opacity: 0.6,
-                                transition: 'opacity 0.15s, color 0.15s'
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.opacity = '1'; }}
-                              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.opacity = '0.6'; }}
-                            >
-                              <Trash2 size={11} />
-                            </button>
+                            {/* Action buttons */}
+                            <div style={{ position: 'absolute', top: '5px', right: '5px', display: 'flex', gap: '4px' }}>
+                              <button
+                                onClick={() => openEdit(session)}
+                                style={{
+                                  background: 'transparent', border: 'none', cursor: 'pointer',
+                                  color: 'var(--text-faint)', padding: '2px', borderRadius: '4px',
+                                  lineHeight: 1, opacity: 0.6,
+                                  transition: 'opacity 0.15s, color 0.15s'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.opacity = '1'; }}
+                                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.opacity = '0.6'; }}
+                              >
+                                <Edit size={11} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(session.id)}
+                                style={{
+                                  background: 'transparent', border: 'none', cursor: 'pointer',
+                                  color: 'var(--text-faint)', padding: '2px', borderRadius: '4px',
+                                  lineHeight: 1, opacity: 0.6,
+                                  transition: 'opacity 0.15s, color 0.15s'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.opacity = '1'; }}
+                                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.opacity = '0.6'; }}
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
 
                             {/* Time range */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '5px' }}>
@@ -383,7 +426,9 @@ const ScheduleManagement = () => {
               style={{ width: '100%', maxWidth: '500px', padding: '32px', position: 'relative', zIndex: 101, borderRadius: 'var(--radius-3xl)' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: '900' }}>Ajouter une séance</h3>
+                <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: '900' }}>
+                  {editingSession ? 'Modifier la séance' : 'Ajouter une séance'}
+                </h3>
                 <button onClick={() => setShowAddModal(false)} className="action-btn"><X size={20} /></button>
               </div>
 

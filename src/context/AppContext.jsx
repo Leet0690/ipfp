@@ -257,7 +257,6 @@ export const AppProvider = ({ children }) => {
             const groups = teacherData.groups || [];
             let allStudents = [];
             if (groups.length > 0) {
-              // Firestore 'in' supports max 10 values, batch if needed
               for (let i = 0; i < groups.length; i += 10) {
                 const batch = groups.slice(i, i + 10);
                 const stuSnap = await getDocs(query(collection(db, 'students'), where('major', 'in', batch)));
@@ -283,7 +282,6 @@ export const AppProvider = ({ children }) => {
             setModules(modSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           }
         } else {
-          // Déconnecté (Page de login)
           setTeacherAttendance([]);
           setPayments([]);
           setSalaries([]);
@@ -309,7 +307,6 @@ export const AppProvider = ({ children }) => {
     });
   }, [students, teachers, grades, schedules, modules, loading, isAuthenticated, isDirectorAuth]);
 
-  // Keep the core cache after logout until TTL; clear only runtime financial access.
   useEffect(() => {
     if (!isAuthenticated && !isDirectorAuth) {
       localStorage.removeItem(FINANCE_CACHE_KEY);
@@ -435,6 +432,12 @@ export const AppProvider = ({ children }) => {
     const docRef = await addDoc(collection(db, 'schedules'), newSchedule);
     setSchedules(prev => [{ id: docRef.id, ...newSchedule }, ...prev]);
     showToast(`Séance de ${scheduleData.module} ajoutée.`, 'success');
+  };
+
+  const updateSchedule = async (id, data) => {
+    await updateDoc(doc(db, 'schedules', id), data);
+    setSchedules(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    showToast(`Séance de ${data.module} mise à jour.`, 'success');
   };
 
   const deleteSchedule = async (id) => {
@@ -708,7 +711,7 @@ export const AppProvider = ({ children }) => {
       addStudent, addTeacher, updateStudent, updateTeacher, deleteStudent, deleteTeacher, updateGrades,
       studentAttendance, teacherAttendance, updateStudentAttendance, updateTeacherAttendance,
       loadAttendanceForSession, loadStudentAttendanceForMonth, loadTeacherAttendanceForDate, loadTeacherAttendanceForMonth,
-      schedules, addSchedule, deleteSchedule, clearAllSchedules, migrateTeacherTokens,
+      schedules, addSchedule, updateSchedule, deleteSchedule, clearAllSchedules, migrateTeacherTokens,
       payments, salaries, expenses, loadFinancialData, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary, addExpense, deleteExpense,
       modules, addModule, updateModule, deleteModule,
       confirmAction, notifications, markNotificationAsRead, clearNotifications
