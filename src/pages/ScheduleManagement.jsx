@@ -14,9 +14,19 @@ const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_
 const PX_PER_HOUR = 64;
 const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
+const formatTimeDash = (timeStr) => {
+  if (!timeStr) return '';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  return `${parts[0].trim().padStart(2, '0')}:${parts[1].trim()}`;
+};
+
 const parseTimeRange = (timeStr = '') => {
   const parts = timeStr.split('-');
-  if (parts.length >= 2) return { start: parts[0].trim(), end: parts[1].trim() };
+  if (parts.length >= 2) return { 
+    start: formatTimeDash(parts[0].trim()), 
+    end: formatTimeDash(parts[1].trim()) 
+  };
   return { start: '08:00', end: '10:00' };
 };
 
