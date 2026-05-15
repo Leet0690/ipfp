@@ -1001,20 +1001,27 @@ const AdminDashboard = () => {
 
       {isDashboard && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', marginBottom: 'var(--space-12)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
+          {/* 1. Séances d'aujourd'hui */}
+          <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} />
+
+          {/* 2. Saisie des Notes */}
+          <GradesBreakdownWidget students={students || []} grades={grades || {}} />
+
+          {/* 3. À faire */}
+          <PendingTasksWidget students={students || []} teachers={teachers || []} grades={grades || {}} teacherAttendance={teacherAttendance || []} />
+
+          {/* 4. Activité récente */}
+          <ActivityFeedWidget notifications={notifications || []} onClear={clearNotifications} />
+
+          {/* Stats Cards (moved below priority widgets) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
             <StatCard delay={0.05} icon={GraduationCap} iconColor="var(--primary)" iconBg="var(--primary-ultra-light)" value={(students || []).length} label="Total Stagiaires" />
             <StatCard delay={0.1} icon={UserPlus} iconColor="#a06208" iconBg="rgba(254, 205, 8, 0.12)" value={(teachers || []).length} label="Total Formateurs" />
             <StatCard delay={0.15} icon={UserPlus} iconColor="#16a34a" iconBg="rgba(22, 163, 74, 0.1)" value={studentAttendanceRate === null ? '—' : `${studentAttendanceRate}%`} label={`Présence Stagiaires — ${currentMonthName}`} />
             <StatCard delay={0.2} icon={User} iconColor="#0ea5e9" iconBg="rgba(14, 165, 233, 0.1)" value={teacherAttendanceRate === null ? '—' : `${teacherAttendanceRate}%`} label={`Présence Formateurs — ${currentMonthName}`} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
-            <PendingTasksWidget students={students || []} teachers={teachers || []} grades={grades || {}} teacherAttendance={teacherAttendance || []} />
-            <GradesBreakdownWidget students={students || []} grades={grades || {}} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
-            <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} />
-            <ActivityFeedWidget notifications={notifications || []} onClear={clearNotifications} />
-          </div>
+
+          {/* Emploi du temps */}
           <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} />
         </div>
       )}
