@@ -115,7 +115,11 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
       .filter(s => s.day === today)
       .map(s => {
         const parts = (s.time || '').split('-');
-        return { ...s, start: (parts[0] || '').trim(), end: (parts[1] || '').trim() };
+        return { 
+          ...s, 
+          start: formatTimeDash((parts[0] || '').trim()), 
+          end: formatTimeDash((parts[1] || '').trim()) 
+        };
       });
 
     const groups = {};
@@ -520,9 +524,19 @@ const DASH_END = 19;
 const DASH_HOURS = Array.from({ length: DASH_END - DASH_START + 1 }, (_, i) => DASH_START + i);
 const DASH_PX = 52;
 
+const formatTimeDash = (timeStr) => {
+  if (!timeStr) return '';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  return `${parts[0].trim().padStart(2, '0')}:${parts[1].trim()}`;
+};
+
 const parseTimeRangeDash = (timeStr = '') => {
   const parts = timeStr.split('-');
-  if (parts.length >= 2) return { start: parts[0].trim(), end: parts[1].trim() };
+  if (parts.length >= 2) return { 
+    start: formatTimeDash(parts[0].trim()), 
+    end: formatTimeDash(parts[1].trim()) 
+  };
   return { start: '08:00', end: '10:00' };
 };
 
