@@ -526,9 +526,10 @@ const DASH_PX = 52;
 
 const formatTimeDash = (timeStr) => {
   if (!timeStr) return '';
-  const parts = timeStr.split(':');
-  if (parts.length < 2) return timeStr;
-  return `${parts[0].trim().padStart(2, '0')}:${parts[1].trim()}`;
+  const cleaned = timeStr.replace(/h/gi, ':').trim();
+  const parts = cleaned.split(':');
+  if (parts.length < 2) return cleaned;
+  return `${parts[0].trim().padStart(2, '0')}:${parts[1].trim().padStart(2, '0')}`;
 };
 
 const parseTimeRangeDash = (timeStr = '') => {
