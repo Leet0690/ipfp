@@ -13,27 +13,32 @@ import {
 
 /* ─── Monthly-view helpers ─── */
 const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-const PRIORITY = { absent: 0, retard: 1, present: 2 };
 const aggregateStatus = (records) => {
   if (!records?.length) return null;
-  return records.reduce((best, r) => {
-    if (!best) return r.status;
-    return (PRIORITY[r.status] ?? 3) < (PRIORITY[best] ?? 3) ? r.status : best;
-  }, null);
+  const hasPresent = records.some(r => r.status === 'present');
+  if (hasPresent) return 'present';
+  const hasAbsent = records.some(r => r.status === 'absent');
+  if (hasAbsent) return 'absent';
+  return null;
 };
 const aggregateHours = (records) =>
   (records || []).reduce((sum, r) => sum + (r.status === 'present' ? Number(r.hours) || 0 : 0), 0);
 
-const StatusCell = ({ status }) => {
+const StatusCell = ({ status, hours }) => {
   if (!status) return (
     <div style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--border-light)' }} />
     </div>
   );
+  if (status === 'present') {
+    return (
+      <div style={{ width: '28px', height: '28px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(22,163,74,0.10)', border: '1px solid rgba(22,163,74,0.25)', fontSize: '9px', fontWeight: '900', color: '#15803d' }}>
+        {hours ? `${hours}h` : 'P'}
+      </div>
+    );
+  }
   const cfg = {
-    present: { label: 'P', bg: 'rgba(22,163,74,0.10)',  color: '#15803d', border: 'rgba(22,163,74,0.25)' },
     absent:  { label: 'A', bg: 'rgba(220,38,38,0.10)',   color: '#dc2626', border: 'rgba(220,38,38,0.25)' },
-    retard:  { label: 'R', bg: 'rgba(234,179,8,0.12)',   color: '#ca8a04', border: 'rgba(234,179,8,0.3)' },
   }[status] || {};
   return (
     <div style={{ width: '28px', height: '28px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: cfg.bg, border: `1px solid ${cfg.border}`, fontSize: '10px', fontWeight: '900', color: cfg.color }}>
@@ -185,23 +190,27 @@ const TeacherAttendance = () => {
       byDay[d] = aggregateStatus(recs);
       hoursByDay[d] = aggregateHours(recs);
     });
-    const counts = { present: 0, absent: 0, retard: 0, totalHours: 0 };
+    const counts = { present: 0, absent: 0, totalHours: 0 };
     mDays.forEach(d => { if (byDay[d]) counts[byDay[d]]++; counts.totalHours += hoursByDay[d] || 0; });
-    return { teacher, byDay, counts };
+    return { teacher, byDay, hoursByDay, counts };
   }), [mFilteredTeachers, teacherAttendance, mDays, monthPrefix]);
 
   const mGlobalStats = useMemo(() => {
-    const t = { present: 0, absent: 0, retard: 0, totalHours: 0 };
-    mGridData.forEach(({ counts }) => { t.present += counts.present; t.absent += counts.absent; t.retard += counts.retard; t.totalHours += counts.totalHours; });
+    const t = { present: 0, absent: 0, totalHours: 0 };
+    mGridData.forEach(({ counts }) => { t.present += counts.present; t.absent += counts.absent; t.totalHours += counts.totalHours; });
     return t;
   }, [mGridData]);
 
   const exportMonthlyCSV = () => {
     const dayHeaders = mDays.map(d => `${pad(d)}/${pad(mMonth + 1)}`).join(',');
-    const header = `\uFEFFFormateur,${dayHeaders},Présents,Absents,Retards,Heures\n`;
-    const rows = mGridData.map(({ teacher, byDay, counts }) => {
-      const cells = mDays.map(d => byDay[d] ? byDay[d][0].toUpperCase() : '-').join(',');
-      return `"${teacher.name}",${cells},${counts.present},${counts.absent},${counts.retard},${counts.totalHours}`;
+    const header = `\uFEFFFormateur,${dayHeaders},Jours Présents,Jours Absents,Heures\n`;
+    const rows = mGridData.map(({ teacher, byDay, hoursByDay, counts }) => {
+      const cells = mDays.map(d => {
+        if (!byDay[d]) return '-';
+        if (byDay[d] === 'present') return hoursByDay[d] ? `${hoursByDay[d]}h` : 'P';
+        return byDay[d][0].toUpperCase();
+      }).join(',');
+      return `"${teacher.name}",${cells},${counts.present},${counts.absent},${counts.totalHours}`;
     }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -399,7 +408,6 @@ const TeacherAttendance = () => {
               { label: 'Formateurs', value: mFilteredTeachers.length, color: 'var(--primary)', bg: 'var(--primary-ultra-light)' },
               { label: 'Jours Présents', value: mGlobalStats.present, color: '#15803d', bg: 'rgba(22,163,74,0.08)' },
               { label: 'Jours Absents', value: mGlobalStats.absent, color: '#dc2626', bg: 'rgba(220,38,38,0.08)' },
-              { label: 'Retards', value: mGlobalStats.retard, color: '#ca8a04', bg: 'rgba(234,179,8,0.08)' },
               { label: 'Total Heures', value: `${mGlobalStats.totalHours}h`, color: '#0ea5e9', bg: 'rgba(14,165,233,0.08)' },
             ].map(({ label, value, color, bg }) => (
               <div key={label} style={{ padding: '12px 18px', background: bg, border: `1px solid ${color}22`, borderRadius: 'var(--radius-xl)', flex: '1 1 110px', textAlign: 'center' }}>
@@ -412,9 +420,8 @@ const TeacherAttendance = () => {
           {/* Legend */}
           <div style={{ display: 'flex', gap: '14px', marginBottom: '14px', flexWrap: 'wrap' }}>
             {[
-              { label: 'Présent', code: 'P', color: '#15803d', bg: 'rgba(22,163,74,0.10)',  border: 'rgba(22,163,74,0.25)' },
+              { label: 'Présent (heures)', code: 'P', color: '#15803d', bg: 'rgba(22,163,74,0.10)',  border: 'rgba(22,163,74,0.25)' },
               { label: 'Absent',  code: 'A', color: '#dc2626', bg: 'rgba(220,38,38,0.10)',   border: 'rgba(220,38,38,0.25)' },
-              { label: 'Retard',  code: 'R', color: '#ca8a04', bg: 'rgba(234,179,8,0.12)',   border: 'rgba(234,179,8,0.3)' },
               { label: 'Non renseigné', code: '·', color: 'var(--text-faint)', bg: 'transparent', border: 'transparent' },
             ].map(l => (
               <div key={l.code} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -438,7 +445,7 @@ const TeacherAttendance = () => {
                     <col style={{ width: '44px' }} />
                     <col style={{ width: '190px' }} />
                     {mDays.map(d => <col key={d} style={{ width: '38px' }} />)}
-                    <col style={{ width: '38px' }} /><col style={{ width: '38px' }} /><col style={{ width: '38px' }} /><col style={{ width: '52px' }} />
+                    <col style={{ width: '38px' }} /><col style={{ width: '38px' }} /><col style={{ width: '52px' }} />
                   </colgroup>
                   <thead>
                     <tr style={{ background: 'var(--bg-subtle)' }}>
@@ -450,12 +457,11 @@ const TeacherAttendance = () => {
                       })}
                       <th style={{ ...mThStyle, color: '#15803d', background: 'rgba(22,163,74,0.06)' }}>P</th>
                       <th style={{ ...mThStyle, color: '#dc2626', background: 'rgba(220,38,38,0.06)' }}>A</th>
-                      <th style={{ ...mThStyle, color: '#ca8a04', background: 'rgba(234,179,8,0.08)' }}>R</th>
                       <th style={{ ...mThStyle, color: '#0ea5e9', background: 'rgba(14,165,233,0.06)' }}>Hrs</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {mGridData.map(({ teacher, byDay, counts }, idx) => (
+                    {mGridData.map(({ teacher, byDay, hoursByDay, counts }, idx) => (
                       <tr key={teacher.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                         <td style={{ ...mTdStyle, textAlign: 'center' }}><span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-faint)' }}>{idx + 1}</span></td>
                         <td style={{ ...mTdStyle, position: 'sticky', left: 0, zIndex: 5, background: idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.8)', borderRight: '1px solid var(--border-light)' }}>
@@ -468,13 +474,12 @@ const TeacherAttendance = () => {
                           const isWeekend = new Date(mYear, mMonth, d).getDay() % 6 === 0;
                           return (
                             <td key={d} style={{ ...mTdStyle, padding: '6px 4px', textAlign: 'center', background: isWeekend ? 'rgba(176,104,185,0.03)' : (idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.5)') }}>
-                              <div style={{ display: 'flex', justifyContent: 'center' }}><StatusCell status={byDay[d]} /></div>
+                              <div style={{ display: 'flex', justifyContent: 'center' }}><StatusCell status={byDay[d]} hours={hoursByDay[d]} /></div>
                             </td>
                           );
                         })}
                         <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(22,163,74,0.06)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#15803d' }}>{counts.present}</span></td>
                         <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(220,38,38,0.06)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#dc2626' }}>{counts.absent}</span></td>
-                        <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(234,179,8,0.08)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#ca8a04' }}>{counts.retard}</span></td>
                         <td style={{ ...mTdStyle, textAlign: 'center', padding: '6px 4px', background: 'rgba(14,165,233,0.06)' }}><span style={{ fontSize: '12px', fontWeight: '900', color: '#0ea5e9' }}>{counts.totalHours > 0 ? `${counts.totalHours}h` : '—'}</span></td>
                       </tr>
                     ))}
