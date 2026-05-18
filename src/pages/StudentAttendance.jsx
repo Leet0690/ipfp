@@ -13,20 +13,13 @@ import {
 
 /* ─── Monthly-view helpers ─── */
 const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-const PRIORITY = { absent: 0, present: 1 };
-const aggregateStatus = (records) => {
-  if (!records?.length) return null;
-  return records.reduce((best, r) => {
-    if (!best) return r.status;
-    return (PRIORITY[r.status] ?? 3) < (PRIORITY[best] ?? 3) ? r.status : best;
-  }, null);
-};
 const StatusCell = ({ status }) => {
   if (!status) return (
     <div style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--border-light)' }} />
     </div>
   );
+
   const cfg = {
     present: { label: 'P', bg: 'rgba(22,163,74,0.10)',  color: '#15803d', border: 'rgba(22,163,74,0.25)' },
     absent:  { label: 'A', bg: 'rgba(220,38,38,0.10)',   color: '#dc2626', border: 'rgba(220,38,38,0.25)' },
@@ -348,17 +341,73 @@ const StudentAttendance = () => {
     [students, mFilterFiliere, mFilterAnnee, mSearch]
   );
 
-  const mGridData = useMemo(() => mFilteredStudents.map(student => {
-    const byDay = {};
+  const monthColumns = useMemo(() => {
+    if (!mFilterFiliere || !mFilterAnnee) return [];
+    const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+    const colsMap = new Map();
+
     mDays.forEach(d => {
+      const dateObj = new Date(mYear, mMonth, d);
+      const weekday = dayNames[dateObj.getDay()];
       const dateStr = `${monthPrefix}-${pad(d)}`;
-      const recs = studentAttendance.filter(a => a.studentId === student.id && a.date === dateStr);
-      byDay[d] = aggregateStatus(recs);
+      
+      const daySchedules = (schedules || []).filter(sc => 
+         sc.filiere === mFilterFiliere && sc.annee === mFilterAnnee && sc.day === weekday
+      ).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      
+      daySchedules.forEach(sc => {
+        const safeModule = (sc.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+        const key = `${dateStr}_${safeModule}`;
+        if (!colsMap.has(key)) {
+          colsMap.set(key, { d, dateStr, weekday, module: sc.module, time: sc.time, safeModule, isScheduled: true, key });
+        }
+      });
     });
-    const counts = { present: 0, absent: 0 };
-    mDays.forEach(d => { if (byDay[d]) counts[byDay[d]]++; });
-    return { student, byDay, counts };
-  }), [mFilteredStudents, studentAttendance, mDays, monthPrefix]);
+
+    (studentAttendance || []).forEach(a => {
+      if (a.date?.startsWith(monthPrefix)) {
+        const student = mFilteredStudents.find(s => s.id === a.studentId);
+        if (student) {
+          const safeModule = (a.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+          const key = `${a.date}_${safeModule}`;
+          if (!colsMap.has(key)) {
+            const dStr = a.date.split('-')[2];
+            if (dStr) {
+              const d = parseInt(dStr, 10);
+              const dateObj = new Date(mYear, mMonth, d);
+              const weekday = dayNames[dateObj.getDay()];
+              colsMap.set(key, { d, dateStr: a.date, weekday, module: a.module || 'Général', time: '—', safeModule, isScheduled: false, key });
+            }
+          }
+        }
+      }
+    });
+
+    return Array.from(colsMap.values()).sort((a, b) => {
+      if (a.d !== b.d) return a.d - b.d;
+      return (a.time || '').localeCompare(b.time || '');
+    });
+  }, [mDays, mYear, mMonth, monthPrefix, schedules, mFilterFiliere, mFilterAnnee, studentAttendance, mFilteredStudents]);
+
+  const mGridData = useMemo(() => mFilteredStudents.map(student => {
+    const byColumn = {};
+    let totalPresent = 0;
+    let totalAbsent = 0;
+
+    monthColumns.forEach(col => {
+      const docId = `${student.id}_${col.safeModule}_${col.dateStr}`;
+      const record = studentAttendance.find(a => a.id === docId);
+      
+      if (record) {
+         byColumn[col.key] = record.status;
+         if (record.status === 'present') totalPresent++;
+         else if (record.status === 'absent') totalAbsent++;
+      } else {
+         byColumn[col.key] = null;
+      }
+    });
+    return { student, byColumn, counts: { present: totalPresent, absent: totalAbsent } };
+  }), [mFilteredStudents, monthColumns, studentAttendance]);
 
   const mGlobalStats = useMemo(() => {
     const t = { present: 0, absent: 0 };
@@ -367,16 +416,22 @@ const StudentAttendance = () => {
   }, [mGridData]);
 
   const exportMonthlyCSV = () => {
-    const dayHeaders = mDays.map(d => `${pad(d)}/${pad(mMonth + 1)}`).join(',');
-    const header = `\uFEFFNom,Prénom,Matricule,${dayHeaders},Présents,Absents\n`;
-    const rows = mGridData.map(({ student, byDay, counts }) => {
-      const cells = mDays.map(d => byDay[d] ? byDay[d][0].toUpperCase() : '-').join(',');
+    if (!mFilterFiliere || !mFilterAnnee) {
+       return showToast("Veuillez sélectionner une filière et une année pour exporter.", "warning");
+    }
+    const dayHeaders = monthColumns.map(c => `${pad(c.d)}/${pad(mMonth + 1)} ${c.module} (${c.time})`).join(',');
+    const header = `\uFEFFNom,Prénom,Matricule,${dayHeaders},Séances Présentes,Séances Absentes\n`;
+    const rows = mGridData.map(({ student, byColumn, counts }) => {
+      const cells = monthColumns.map(c => {
+        const st = byColumn[c.key];
+        return st ? st[0].toUpperCase() : '-';
+      }).join(',');
       return `"${student.lastName}","${student.firstName}","${student.regNo || ''}",${cells},${counts.present},${counts.absent}`;
     }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `Presences_Stagiaires_${MONTHS[mMonth]}_${mYear}.csv`);
+    link.setAttribute('download', `Presences_Stagiaires_${mFilterFiliere.replace(/[^a-zA-Z0-9]/g, '_')}_${MONTHS[mMonth]}_${mYear}.csv`);
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
@@ -663,8 +718,8 @@ const StudentAttendance = () => {
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: '12px', marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
             {[
               { label: 'Stagiaires', value: mFilteredStudents.length, color: 'var(--primary)', bg: 'var(--primary-ultra-light)' },
-              { label: 'Total Présences', value: mGlobalStats.present, color: '#15803d', bg: 'rgba(22,163,74,0.08)' },
-              { label: 'Total Absences', value: mGlobalStats.absent, color: '#dc2626', bg: 'rgba(220,38,38,0.08)' },
+              { label: 'Séances Présentes', value: mGlobalStats.present, color: '#15803d', bg: 'rgba(22,163,74,0.08)' },
+              { label: 'Séances Absentes', value: mGlobalStats.absent, color: '#dc2626', bg: 'rgba(220,38,38,0.08)' },
             ].map(({ label, value, color, bg }) => (
               <div key={label} style={{ padding: '12px 18px', background: bg, border: `1px solid ${color}22`, borderRadius: 'var(--radius-xl)', flex: '1 1 120px', textAlign: 'center' }}>
                 <div style={{ fontSize: 'var(--text-xl)', fontWeight: '900', color, lineHeight: 1 }}>{value}</div>
@@ -689,11 +744,25 @@ const StudentAttendance = () => {
 
           {/* Monthly grid */}
           <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-            {mFilteredStudents.length === 0 ? (
+            {!mFilterFiliere || !mFilterAnnee ? (
+              <div style={{ padding: '64px', textAlign: 'center' }}>
+                <Filter size={40} style={{ color: 'var(--text-faint)', margin: '0 auto 16px', display: 'block' }} />
+                <p style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                  Veuillez sélectionner une Filière et une Année d'étude pour afficher la grille de pointage.
+                </p>
+              </div>
+            ) : mFilteredStudents.length === 0 ? (
+              <div style={{ padding: '64px', textAlign: 'center' }}>
+                <Users size={40} style={{ color: 'var(--text-faint)', margin: '0 auto 16px', display: 'block' }} />
+                <p style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                  Aucun stagiaire trouvé pour cette filière.
+                </p>
+              </div>
+            ) : monthColumns.length === 0 ? (
               <div style={{ padding: '64px', textAlign: 'center' }}>
                 <CalendarRange size={40} style={{ color: 'var(--text-faint)', margin: '0 auto 16px', display: 'block' }} />
                 <p style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' }}>
-                  {!mFilterFiliere ? 'Sélectionnez une filière pour afficher les stagiaires.' : 'Aucun stagiaire trouvé.'}
+                  Aucune séance programmée ou pointée pour ce mois.
                 </p>
               </div>
             ) : (
@@ -702,35 +771,53 @@ const StudentAttendance = () => {
                   <colgroup>
                     <col style={{ width: '44px' }} />
                     <col style={{ width: '180px' }} />
-                    {mDays.map(d => <col key={d} style={{ width: '38px' }} />)}
-                    <col style={{ width: '38px' }} /><col style={{ width: '38px' }} /><col style={{ width: '38px' }} />
+                    {monthColumns.map(col => <col key={col.key} style={{ width: '48px' }} />)}
+                    <col style={{ width: '38px' }} /><col style={{ width: '38px' }} />
                   </colgroup>
                   <thead>
                     <tr style={{ background: 'var(--bg-subtle)' }}>
-                      <th style={mThStyle}>#</th>
-                      <th style={{ ...mThStyle, textAlign: 'left', position: 'sticky', left: 0, background: 'var(--bg-subtle)', zIndex: 10 }}>Stagiaire</th>
-                      {mDays.map(d => {
-                        const isWeekend = new Date(mYear, mMonth, d).getDay() % 6 === 0;
-                        return <th key={d} style={{ ...mThStyle, color: isWeekend ? 'var(--primary)' : 'var(--text-muted)', background: isWeekend ? 'rgba(176,104,185,0.05)' : 'var(--bg-subtle)' }}>{d}</th>;
+                      <th rowSpan={2} style={mThStyle}>#</th>
+                      <th rowSpan={2} style={{ ...mThStyle, textAlign: 'left', position: 'sticky', left: 0, background: 'var(--bg-subtle)', zIndex: 10 }}>Stagiaire</th>
+                      {monthColumns.map(col => {
+                        const isWeekend = col.weekday === 'Samedi' || col.weekday === 'Dimanche';
+                        return (
+                          <th key={col.key} style={{ ...mThStyle, padding: '8px 4px', color: isWeekend ? 'var(--primary)' : 'var(--text-primary)', background: isWeekend ? 'rgba(176,104,185,0.05)' : 'var(--bg-subtle)', borderBottom: 'none', borderRight: '1px solid var(--border-light)' }}>
+                             <div style={{ fontSize: '11px', fontWeight: '900' }}>{pad(col.d)}</div>
+                             <div style={{ fontSize: '9px', fontWeight: '600', color: 'var(--text-faint)', marginTop: '2px' }}>{col.weekday.slice(0,3)}</div>
+                          </th>
+                        );
                       })}
-                      <th style={{ ...mThStyle, color: '#15803d', background: 'rgba(22,163,74,0.06)' }}>P</th>
-                      <th style={{ ...mThStyle, color: '#dc2626', background: 'rgba(220,38,38,0.06)' }}>A</th>
-                      <th style={{ ...mThStyle, color: '#ca8a04', background: 'rgba(234,179,8,0.08)' }}>R</th>
+                      <th rowSpan={2} style={{ ...mThStyle, color: '#15803d', background: 'rgba(22,163,74,0.06)' }}>P</th>
+                      <th rowSpan={2} style={{ ...mThStyle, color: '#dc2626', background: 'rgba(220,38,38,0.06)' }}>A</th>
+                    </tr>
+                    <tr style={{ background: 'var(--bg-subtle)' }}>
+                      {monthColumns.map(col => {
+                         return (
+                           <th key={`mod_${col.key}`} style={{ ...mThStyle, padding: '4px', borderRight: '1px solid var(--border-light)', verticalAlign: 'top' }}>
+                             <div style={{ fontSize: '9px', color: 'var(--text-muted)', maxWidth: '40px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: '0 auto' }} title={col.module}>
+                               {col.module}
+                             </div>
+                             <div style={{ fontSize: '8px', color: 'var(--text-faint)', marginTop: '2px' }}>
+                               {col.time}
+                             </div>
+                           </th>
+                         );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
-                    {mGridData.map(({ student, byDay, counts }, idx) => (
+                    {mGridData.map(({ student, byColumn, counts }, idx) => (
                       <tr key={student.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                         <td style={{ ...mTdStyle, textAlign: 'center' }}><span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-faint)' }}>{idx + 1}</span></td>
                         <td style={{ ...mTdStyle, position: 'sticky', left: 0, zIndex: 5, background: idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.8)', borderRight: '1px solid var(--border-light)' }}>
                           <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '164px' }}>{student.lastName} {student.firstName}</div>
                           <div style={{ fontSize: '10px', color: 'var(--text-faint)', fontWeight: '600', marginTop: '2px' }}>{student.regNo || '—'}</div>
                         </td>
-                        {mDays.map(d => {
-                          const isWeekend = new Date(mYear, mMonth, d).getDay() % 6 === 0;
+                        {monthColumns.map(col => {
+                          const isWeekend = col.weekday === 'Samedi' || col.weekday === 'Dimanche';
                           return (
-                            <td key={d} style={{ ...mTdStyle, padding: '6px 4px', textAlign: 'center', background: isWeekend ? 'rgba(176,104,185,0.03)' : (idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.5)') }}>
-                              <div style={{ display: 'flex', justifyContent: 'center' }}><StatusCell status={byDay[d]} /></div>
+                            <td key={col.key} style={{ ...mTdStyle, padding: '6px 4px', textAlign: 'center', borderRight: '1px solid var(--border-light)', background: isWeekend ? 'rgba(176,104,185,0.03)' : (idx % 2 === 0 ? 'white' : 'rgba(248,249,251,0.5)') }}>
+                              <div style={{ display: 'flex', justifyContent: 'center' }}><StatusCell status={byColumn[col.key]} /></div>
                             </td>
                           );
                         })}
@@ -744,7 +831,7 @@ const StudentAttendance = () => {
             )}
           </div>
           <div style={{ marginTop: '14px', textAlign: 'center' }}>
-            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-faint)' }}>{MONTHS[mMonth]} {mYear} · {daysInMonth} jours</span>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-faint)' }}>{MONTHS[mMonth]} {mYear} · {monthColumns.length} séances</span>
           </div>
         </>
       )}
