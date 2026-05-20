@@ -59,8 +59,7 @@ const CustomDonutLabel = ({ cx, cy, value, label }) => (
 const Reports = () => {
   const {
     students = [], grades = {}, modules: allModules = [],
-    studentAttendance = [], loadStudentAttendanceForMonth,
-    activeSemester = 'S1'
+    studentAttendance = [], loadStudentAttendanceForMonth
   } = useApp() || {};
 
   const [selectedDiploma, setSelectedDiploma] = useState(Object.keys(MODULES_DATA)[0]);
@@ -87,10 +86,9 @@ const Reports = () => {
     return allModules.filter(m =>
       m.diploma === selectedDiploma &&
       m.major === selectedMajor &&
-      m.year === selectedYear &&
-      (m.semester || 'S1') === activeSemester
+      m.year === selectedYear
     );
-  }, [selectedDiploma, selectedMajor, selectedYear, allModules, activeSemester]);
+  }, [selectedDiploma, selectedMajor, selectedYear, allModules]);
 
   const availableModules = useMemo(() => availableModulesList.map(m => m.name), [availableModulesList]);
 

@@ -108,7 +108,7 @@ const getActivityIcon = (message) => {
   return { icon: Activity, color: 'var(--text-muted)', bg: 'var(--bg-subtle)' };
 };
 
-const TodaySessionsWidget = ({ schedules, teachers, getScheduleModule }) => {
+const TodaySessionsWidget = ({ schedules, teachers, getScheduleModule, activeSemester, setActiveSemester }) => {
   const today = getTodayFrench();
   const todaySessions = useMemo(() => {
     const filtered = schedules
@@ -166,6 +166,9 @@ const TodaySessionsWidget = ({ schedules, teachers, getScheduleModule }) => {
           <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-ultra-light)', borderRadius: '20px', padding: '3px 10px' }}>
             {todaySessions.length} séance{todaySessions.length !== 1 ? 's' : ''}
           </span>
+          {activeSemester && setActiveSemester && (
+            <SemesterToggle activeSemester={activeSemester} onChange={setActiveSemester} compact />
+          )}
           <button 
             onClick={() => {
               localStorage.removeItem('ipfp_v2_core_cache');
@@ -1111,7 +1114,7 @@ const AdminDashboard = () => {
 
           {/* New Requested Order in Grid format to keep dimensions */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
-            <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} getScheduleModule={getActiveScheduleModule} />
+            <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} getScheduleModule={getActiveScheduleModule} activeSemester={activeSemester} setActiveSemester={setActiveSemester} />
             <GradesBreakdownWidget students={students || []} grades={grades || {}} allModules={allModules || []} activeSemester={activeSemester} />
           </div>
 
