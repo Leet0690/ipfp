@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
-import { FILIERES, MODULES_DATA } from '../data/modules';
+import { FILIERES, MODULES_DATA, getModulesForFiliere } from '../data/modules';
 import {
   CalendarDays, Plus, Trash2, Clock, User, MapPin, Filter,
   X, Layers, Users, Calendar, Edit
@@ -77,10 +77,18 @@ const ScheduleManagement = () => {
   const semester = activeSemester;
 
   const groupLabel = useMemo(() => getGroupAbbreviation(filiere, annee), [filiere, annee]);
-  const modulesBySemester = useMemo(() => ({
-    S1: allModules.filter(m => m.major === filiere && m.year === annee && ['S1', 'Annuel'].includes(m.semester || 'S1')).map(m => m.name),
-    S2: allModules.filter(m => m.major === filiere && m.year === annee && ['S2', 'Annuel'].includes(m.semester || 'S1')).map(m => m.name)
-  }), [filiere, annee, allModules]);
+  const modulesBySemester = useMemo(() => {
+    const configured = allModules.filter(m => m.major === filiere && m.year === annee);
+    if (configured.length === 0) {
+      const diploma = Object.keys(FILIERES).find(d => FILIERES[d].includes(filiere));
+      const defaultModules = getModulesForFiliere(diploma, filiere, annee);
+      return { S1: defaultModules, S2: defaultModules };
+    }
+    return {
+      S1: configured.filter(m => ['S1', 'Annuel'].includes(m.semester || 'S1')).map(m => m.name),
+      S2: configured.filter(m => ['S2', 'Annuel'].includes(m.semester || 'S1')).map(m => m.name)
+    };
+  }, [filiere, annee, allModules]);
   const filteredSchedules = useMemo(
     () => schedules.filter(s => s.filiere === filiere && s.annee === annee),
     [schedules, filiere, annee]
