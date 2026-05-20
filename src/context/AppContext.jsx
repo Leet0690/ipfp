@@ -172,7 +172,7 @@ export const AppProvider = ({ children }) => {
   const showToast = useCallback((msg, type = 'info') => {
     originalShowToast(msg, type);
     if ((type === 'success' || type === 'warning') && !msg.toLowerCase().includes('connexion') && !msg.toLowerCase().includes('déconnexion')) {
-      setNotifications(prev => [{ id: Date.now().toString() + Math.random(), message: msg, type, timestamp: Date.now(), read: false }, ...prev].slice(0, 50));
+      setNotifications(prev => [{ id: Date.now().toString() + Math.random(), message: msg, type, timestamp: Date.now(), read: false }, ...prev].slice(0, 10));
     }
   }, [originalShowToast]);
 
