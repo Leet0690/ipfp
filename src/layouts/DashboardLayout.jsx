@@ -442,7 +442,7 @@ export default function DashboardLayout({ children }) {
                   <p style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Manager</p>
                 </div>
               </Link>
-              <button onClick={() => setIsMobileMenuOpen(false)} aria-label="Fermer le menu" style={{ background: 'transparent', border: 'none', fontSize: '18px', color: 'var(--text-tertiary)', cursor: 'pointer' }}>
+              <button onClick={() => setIsMobileMenuOpen(false)} className="close-button" aria-label="Fermer le menu" title="Fermer">
                 <X size={24} />
               </button>
             </div>

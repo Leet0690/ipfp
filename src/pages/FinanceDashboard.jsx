@@ -1048,7 +1048,7 @@ const FinanceDashboard = () => {
                   </div>
                   <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>Ajouter une charge</h2>
                 </div>
-                <button onClick={() => setShowExpenseModal(false)} className="action-btn"><X size={20} /></button>
+                <button onClick={() => setShowExpenseModal(false)} className="close-button" aria-label="Fermer la fenêtre" title="Fermer"><X size={20} /></button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div>
@@ -1109,7 +1109,7 @@ const FinanceDashboard = () => {
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-premium" style={{ position: 'relative', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', padding: '32px', borderRadius: 'var(--radius-3xl)', boxShadow: 'var(--shadow-xl)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>Enregistrer un Paiement</h2>
-                <button onClick={() => setShowPaymentModal(false)} className="action-btn"><X size={20} /></button>
+                <button onClick={() => setShowPaymentModal(false)} className="close-button" aria-label="Fermer la fenêtre" title="Fermer"><X size={20} /></button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div style={{ background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>

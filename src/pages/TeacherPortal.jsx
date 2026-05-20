@@ -545,7 +545,7 @@ const TeacherPortal = () => {
             <button onClick={handleForceRefresh} style={{ padding: '8px 16px', borderRadius: 'var(--radius-pill)', background: '#6366f1', color: 'white', border: 'none', fontSize: '12px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <RefreshCw size={13} /> Rafraîchir
             </button>
-            <button onClick={() => { setShowVersionBanner(false); localStorage.setItem(VERSION_KEY, APP_VERSION); }} style={{ padding: '8px', borderRadius: '50%', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+            <button onClick={() => { setShowVersionBanner(false); localStorage.setItem(VERSION_KEY, APP_VERSION); }} className="close-button close-button-sm" aria-label="Fermer le message" title="Fermer">
               <X size={14} />
             </button>
           </div>
@@ -658,7 +658,7 @@ const TeacherPortal = () => {
                   {unmarkedStudents.length} stagiaire{unmarkedStudents.length > 1 ? 's' : ''} n'ont pas encore été marqué{unmarkedStudents.length > 1 ? 's' : ''} — l'appel ne peut pas être validé.
                 </span>
               </div>
-              <button onClick={() => setShowUnmarkedWarning(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '2px', flexShrink: 0 }}>
+              <button onClick={() => setShowUnmarkedWarning(false)} className="close-button close-button-sm" aria-label="Fermer l'alerte" title="Fermer">
                 <X size={16} />
               </button>
             </div>

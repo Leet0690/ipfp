@@ -54,6 +54,11 @@ const getGroupAbbreviation = (filiere, annee) => {
   return diplomaAbbr + majorAbbr + yearNum;
 };
 
+const getScheduleModuleForSemester = (session, semester) => {
+  if (semester === 'S2') return session.moduleS2 || session.module || '';
+  return session.moduleS1 || session.module || '';
+};
+
 const labelStyle = {
   fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)',
   textTransform: 'uppercase', letterSpacing: '0.08em'
@@ -73,8 +78,13 @@ const ScheduleManagement = () => {
     allFilieres.includes('Développement Informatique') ? 'Développement Informatique' : allFilieres[0]
   );
   const [annee, setAnnee] = useState(allAnnees[0]);
+  const [semester, setSemester] = useState('S1');
 
   const groupLabel = useMemo(() => getGroupAbbreviation(filiere, annee), [filiere, annee]);
+  const modulesBySemester = useMemo(() => ({
+    S1: allModules.filter(m => m.major === filiere && m.year === annee && (m.semester || 'S1') === 'S1').map(m => m.name),
+    S2: allModules.filter(m => m.major === filiere && m.year === annee && (m.semester || 'S1') === 'S2').map(m => m.name)
+  }), [filiere, annee, allModules]);
   const filteredSchedules = useMemo(
     () => schedules.filter(s => s.filiere === filiere && s.annee === annee),
     [schedules, filiere, annee]
@@ -87,17 +97,17 @@ const ScheduleManagement = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const [formData, setFormData] = useState({
-    day: 'Lundi', time: '08:30-10:30', module: '', teacherId: '', room: '', type: 'Cours'
+    day: 'Lundi', time: '08:30-10:30', module: '', moduleS1: '', moduleS2: '', teacherId: '', room: '', type: 'Cours'
   });
 
   const currentModules = useMemo(
-    () => allModules.filter(m => m.major === filiere && m.year === annee).map(m => m.name),
-    [filiere, annee, allModules]
+    () => modulesBySemester[semester] || [],
+    [modulesBySemester, semester]
   );
 
   const openAdd = () => {
     setEditingSession(null);
-    setFormData({ day: 'Lundi', time: '08:30-10:30', module: '', teacherId: '', room: '', type: 'Cours' });
+    setFormData({ day: 'Lundi', time: '08:30-10:30', module: '', moduleS1: '', moduleS2: '', teacherId: '', room: '', type: 'Cours' });
     setShowAddModal(true);
   };
 
@@ -106,7 +116,9 @@ const ScheduleManagement = () => {
     setFormData({
       day: session.day,
       time: session.time,
-      module: session.module,
+      module: session.module || '',
+      moduleS1: session.moduleS1 || session.module || '',
+      moduleS2: session.moduleS2 || '',
       teacherId: session.teacherId,
       room: session.room || '',
       type: session.type || 'Cours'
@@ -116,7 +128,7 @@ const ScheduleManagement = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.module || !formData.teacherId) return showToast('Veuillez remplir tous les champs', 'warning');
+    if ((!formData.moduleS1 && !formData.moduleS2 && !formData.module) || !formData.teacherId) return showToast('Veuillez renseigner au moins un module et le formateur', 'warning');
     
     // Normalize time format to HH:mm-HH:mm
     const parts = formData.time.split('-');
@@ -124,7 +136,13 @@ const ScheduleManagement = () => {
     const endTime = parts[1] ? formatTimeDash(parts[1]) : '';
     const normalizedTime = startTime + (endTime ? `-${endTime}` : '');
     
-    const finalData = { ...formData, time: normalizedTime, filiere, annee };
+    const finalData = {
+      ...formData,
+      module: formData.moduleS1 || formData.moduleS2 || formData.module,
+      time: normalizedTime,
+      filiere,
+      annee
+    };
     
     if (editingSession) {
       updateSchedule(editingSession.id, finalData);
@@ -133,7 +151,7 @@ const ScheduleManagement = () => {
     }
     
     setShowAddModal(false);
-    setFormData(prev => ({ ...prev, module: '', room: '' }));
+    setFormData(prev => ({ ...prev, module: '', moduleS1: '', moduleS2: '', room: '' }));
   };
 
   const handleDelete = async (id) => {
@@ -182,6 +200,38 @@ const ScheduleManagement = () => {
         >
           {allAnnees.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
+        <div style={{
+          display: 'inline-flex',
+          padding: '4px',
+          borderRadius: 'var(--radius-xl)',
+          background: 'var(--bg-page)',
+          border: '1px solid var(--border-light)',
+          gap: '3px'
+        }}>
+          {['S1', 'S2'].map(sem => (
+            <button
+              key={sem}
+              type="button"
+              onClick={() => setSemester(sem)}
+              style={{
+                minWidth: '48px',
+                padding: '7px 14px',
+                borderRadius: 'var(--radius-lg)',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '900',
+                transition: 'all 0.18s ease',
+                background: semester === sem ? 'var(--primary)' : 'transparent',
+                color: semester === sem ? 'white' : 'var(--text-muted)',
+                boxShadow: semester === sem ? 'var(--shadow-xs)' : 'none'
+              }}
+              title={`Afficher les modules ${sem}`}
+            >
+              {sem}
+            </button>
+          ))}
+        </div>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '999px', background: 'var(--primary-ultra-light)', border: '1px solid rgba(176,104,185,0.15)' }}>
@@ -190,7 +240,7 @@ const ScheduleManagement = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '999px', background: 'rgba(254,205,8,0.12)', border: '1px solid rgba(254,205,8,0.2)' }}>
             <Clock size={13} style={{ color: '#a06208' }} />
-            <span style={{ fontSize: '12px', fontWeight: '800', color: '#a06208' }}>{filteredSchedules.length} séances</span>
+            <span style={{ fontSize: '12px', fontWeight: '800', color: '#a06208' }}>{filteredSchedules.length} séances {semester}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '999px', background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.15)' }}>
             <Calendar size={13} style={{ color: '#16a34a' }} />
@@ -298,10 +348,11 @@ const ScheduleManagement = () => {
 
                       {/* Session cards */}
                       {daySessions.map(session => {
-                        const top = timeToPixels(session.start);
-                        const height = Math.max(timeToPixels(session.end) - top, PX_PER_HOUR * 0.75);
-                        const isTP = session.type === 'TP';
-                        const teacher = teachers.find(t => t.id === session.teacherId);
+                      const top = timeToPixels(session.start);
+                      const height = Math.max(timeToPixels(session.end) - top, PX_PER_HOUR * 0.75);
+                      const isTP = session.type === 'TP';
+                      const teacher = teachers.find(t => t.id === session.teacherId);
+                      const displayedModule = getScheduleModuleForSemester(session, semester);
 
                         return (
                           <motion.div
@@ -388,7 +439,7 @@ const ScheduleManagement = () => {
                               display: '-webkit-box', WebkitLineClamp: 2,
                               WebkitBoxOrient: 'vertical', overflow: 'hidden'
                             }}>
-                              {session.module}
+                              {displayedModule || 'Module non défini'}
                             </div>
 
                             {/* Meta */}
@@ -444,11 +495,11 @@ const ScheduleManagement = () => {
                 <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: '900' }}>
                   {editingSession ? 'Modifier la séance' : 'Ajouter une séance'}
                 </h3>
-                <button onClick={() => setShowAddModal(false)} className="action-btn"><X size={20} /></button>
+                <button onClick={() => setShowAddModal(false)} className="close-button" aria-label="Fermer la fenêtre" title="Fermer"><X size={20} /></button>
               </div>
 
               <div className="badge-status primary" style={{ marginBottom: '24px', justifyContent: 'flex-start', padding: '12px 16px' }}>
-                <span style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>{filiere} — {annee}</span>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: '800' }}>{filiere} — {annee} — {semester}</span>
               </div>
 
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -499,7 +550,10 @@ const ScheduleManagement = () => {
                     value={formData.teacherId}
                     onChange={e => {
                       const teacher = teachers.find(t => t.id === e.target.value);
-                      setFormData({ ...formData, teacherId: e.target.value, module: teacher?.subjects?.[0] || '' });
+                      const teacherSubjects = (teacher?.subjects || [teacher?.subject]).filter(Boolean);
+                      const nextModuleS1 = teacherSubjects.find(subject => modulesBySemester.S1.includes(subject)) || '';
+                      const nextModuleS2 = teacherSubjects.find(subject => modulesBySemester.S2.includes(subject)) || '';
+                      setFormData({ ...formData, teacherId: e.target.value, module: nextModuleS1, moduleS1: nextModuleS1, moduleS2: nextModuleS2 });
                     }}
                   >
                     <option value="">Sélectionner un formateur...</option>
@@ -517,16 +571,35 @@ const ScheduleManagement = () => {
                   <label style={labelStyle}>Module / Matière</label>
                   <select
                     className="input-premium" style={{ width: '100%', marginTop: '6px' }} required
-                    value={formData.module}
-                    onChange={e => setFormData({ ...formData, module: e.target.value })}
+                    value={formData.moduleS1}
+                    onChange={e => setFormData({ ...formData, module: e.target.value, moduleS1: e.target.value })}
                   >
                     <option value="">Sélectionner un module...</option>
                     {(() => {
                       const teacher = teachers.find(t => t.id === formData.teacherId);
                       if (!teacher) return <option disabled>Veuillez sélectionner un formateur d'abord</option>;
                       const teacherModules = teacher.subjects || (teacher.subject ? [teacher.subject] : []);
-                      const filtered = currentModules.filter(m => teacherModules.includes(m));
-                      if (filtered.length === 0) return <option disabled>Aucun module commun disponible</option>;
+                      const filtered = (modulesBySemester.S1 || []).filter(m => teacherModules.includes(m));
+                      if (filtered.length === 0) return <option disabled>Aucun module commun disponible pour {semester}</option>;
+                      return filtered.map(m => <option key={m} value={m}>{m}</option>);
+                    })()}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Module S2 / Même horaire</label>
+                  <select
+                    className="input-premium" style={{ width: '100%', marginTop: '6px' }}
+                    value={formData.moduleS2}
+                    onChange={e => setFormData({ ...formData, moduleS2: e.target.value })}
+                  >
+                    <option value="">Aucun module S2</option>
+                    {(() => {
+                      const teacher = teachers.find(t => t.id === formData.teacherId);
+                      if (!teacher) return <option disabled>Veuillez sélectionner un formateur d'abord</option>;
+                      const teacherModules = teacher.subjects || (teacher.subject ? [teacher.subject] : []);
+                      const filtered = (modulesBySemester.S2 || []).filter(m => teacherModules.includes(m));
+                      if (filtered.length === 0) return <option disabled>Aucun module commun disponible pour S2</option>;
                       return filtered.map(m => <option key={m} value={m}>{m}</option>);
                     })()}
                   </select>

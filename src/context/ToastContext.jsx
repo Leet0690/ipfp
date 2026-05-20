@@ -74,7 +74,7 @@ const ToastItem = ({ toast, onClose }) => {
         {icons[toast.type] || icons.info}
         <span className="toast-message">{toast.message}</span>
       </div>
-      <button onClick={onClose} className="toast-close">
+      <button onClick={onClose} className="toast-close" aria-label="Fermer la notification" title="Fermer">
         <X size={14} />
       </button>
     </motion.div>

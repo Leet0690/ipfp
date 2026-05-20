@@ -546,14 +546,18 @@ const timeToPxDash = (t = '08:00') => {
   return ((h - DASH_START) * 60 + (m || 0)) * (DASH_PX / 60);
 };
 
-const ScheduleCalendar = ({ realSchedules, teachers }) => {
+const ScheduleCalendar = ({ realSchedules, teachers, allModules }) => {
   const allFilieres = useMemo(() => Array.from(new Set(Object.values(FILIERES).flat())), []);
   const allAnnees = ['1ère année', '2ème année'];
   const [selectedFiliere, setSelectedFiliere] = useState(allFilieres.includes('Développement Informatique') ? 'Développement Informatique' : allFilieres[0]);
   const [selectedAnnee, setSelectedAnnee] = useState(allAnnees[0]);
+  const [selectedSemester, setSelectedSemester] = useState('S1');
 
   const groupLabel = useMemo(() => getGroupAbbreviation(selectedFiliere, selectedAnnee), [selectedFiliere, selectedAnnee]);
-
+  const getSessionModule = useCallback((session) => {
+    if (selectedSemester === 'S2') return session.moduleS2 || session.module || '';
+    return session.moduleS1 || session.module || '';
+  }, [selectedSemester]);
   const filteredSessions = useMemo(
     () => realSchedules.filter(s => s.filiere === selectedFiliere && s.annee === selectedAnnee),
     [realSchedules, selectedFiliere, selectedAnnee]
@@ -576,6 +580,30 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
             <select className="input-premium" style={{ fontSize: '11px', padding: '5px 10px', width: '120px', cursor: 'pointer' }} value={selectedAnnee} onChange={e => setSelectedAnnee(e.target.value)}>
               {allAnnees.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
+            <div style={{ display: 'inline-flex', padding: '3px', borderRadius: '10px', background: 'var(--bg-page)', border: '1px solid var(--border-light)', gap: '2px' }}>
+              {['S1', 'S2'].map(sem => (
+                <button
+                  key={sem}
+                  type="button"
+                  onClick={() => setSelectedSemester(sem)}
+                  style={{
+                    minWidth: '38px',
+                    padding: '5px 9px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: '900',
+                    background: selectedSemester === sem ? 'var(--primary)' : 'transparent',
+                    color: selectedSemester === sem ? 'white' : 'var(--text-muted)',
+                    boxShadow: selectedSemester === sem ? 'var(--shadow-xs)' : 'none'
+                  }}
+                  title={`Afficher ${sem}`}
+                >
+                  {sem}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -583,7 +611,7 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
             {groupLabel}
           </span>
           <span style={{ padding: '5px 12px', borderRadius: '999px', background: 'rgba(254,205,8,0.12)', color: '#a06208', fontSize: '11px', fontWeight: '800' }}>
-            {filteredSessions.length} séances
+            {filteredSessions.length} séances {selectedSemester}
           </span>
           <Link to="/admin/schedules" className="btn-modern" style={{ padding: '5px 12px', fontSize: '11px', textDecoration: 'none' }}>
             <CalendarPlus size={12} style={{ marginRight: '5px' }} /> Gérer
@@ -683,7 +711,7 @@ const ScheduleCalendar = ({ realSchedules, teachers }) => {
                             display: '-webkit-box', WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical', overflow: 'hidden'
                           }}>
-                            {session.module}
+                            {getSessionModule(session) || 'Module non défini'}
                           </div>
                           {height >= 44 && teacher && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '3px' }}>
@@ -1058,7 +1086,7 @@ const AdminDashboard = () => {
             <ActivityFeedWidget notifications={notifications || []} onClear={clearNotifications} />
           </div>
 
-          <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} />
+          <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} allModules={allModules || []} />
         </div>
       )}
 
@@ -1129,7 +1157,7 @@ const AdminDashboard = () => {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-premium"
               style={{ width: '100%', maxWidth: '500px', padding: '32px', borderRadius: 'var(--radius-3xl)', position: 'relative', zIndex: 101, boxShadow: 'var(--shadow-xl)', maxHeight: '90vh', overflowY: 'auto' }}>
               
-              <button onClick={closeModal} style={{ position: 'absolute', right: '20px', top: '20px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <button onClick={closeModal} className="close-button" aria-label="Fermer la fenêtre" title="Fermer" style={{ position: 'absolute', right: '20px', top: '20px' }}>
                 <X size={20} />
               </button>
 
@@ -1354,7 +1382,7 @@ const AdminDashboard = () => {
               className="glass-premium"
               style={{ width: '100%', maxWidth: '380px', padding: '28px', borderRadius: 'var(--radius-3xl)', position: 'relative', zIndex: 201, boxShadow: 'var(--shadow-xl)' }}
             >
-              <button onClick={closeQR} style={{ position: 'absolute', right: '18px', top: '18px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <button onClick={closeQR} className="close-button" aria-label="Fermer le QR code" title="Fermer" style={{ position: 'absolute', right: '18px', top: '18px' }}>
                 <X size={20} />
               </button>
 

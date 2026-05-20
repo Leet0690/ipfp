@@ -361,7 +361,7 @@ const ModuleManagement = () => {
               style={{ position: 'relative', width: '100%', maxWidth: '500px', padding: '32px', borderRadius: 'var(--radius-3xl)', boxShadow: 'var(--shadow-xl)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>{isEditing ? 'Modifier Module' : 'Nouveau Module'}</h2>
-                <button onClick={() => setIsModalOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+                <button onClick={() => setIsModalOpen(false)} className="close-button" aria-label="Fermer la fenêtre" title="Fermer"><X size={20} /></button>
               </div>
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -421,7 +421,7 @@ const ModuleManagement = () => {
               style={{ position: 'relative', width: '100%', maxWidth: '480px', padding: '32px', borderRadius: 'var(--radius-3xl)', boxShadow: 'var(--shadow-xl)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>Copier vers d'autres groupes</h2>
-                <button onClick={() => setCopyModalOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+                <button onClick={() => setCopyModalOpen(false)} className="close-button" aria-label="Fermer la fenêtre" title="Fermer"><X size={20} /></button>
               </div>
 
               <div style={{ marginBottom: '20px', padding: '12px 14px', background: 'var(--primary-ultra-light)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--primary-light)' }}>

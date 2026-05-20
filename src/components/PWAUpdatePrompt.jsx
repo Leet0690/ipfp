@@ -80,16 +80,9 @@ const PWAUpdatePrompt = () => {
 
           <button
             onClick={dismiss}
-            style={{
-              flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '28px', height: '28px',
-              borderRadius: '50%',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-            }}
+            className="close-button close-button-sm"
+            aria-label="Fermer la mise à jour"
+            title="Fermer"
           >
             <X size={14} />
           </button>
