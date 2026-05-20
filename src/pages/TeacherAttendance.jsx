@@ -101,6 +101,72 @@ const getGroupAbbreviation = (filiere, annee) => {
   return diplomaAbbr + majorAbbr + (annee.includes('1') ? '1' : '2');
 };
 
+const DAY_NAMES = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const normalizeTimeSlot = (value = '') => (value || '').replace(/[^0-9]/g, '') || 'x';
+const safeModuleKey = (value = '') => (value || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+const makeAttendanceDocId = (teacherId, moduleId, timeSlot, date) =>
+  `${teacherId}_${safeModuleKey(moduleId)}_${normalizeTimeSlot(timeSlot)}_${date}`;
+
+const getDayNameFromDate = (dateStr) => {
+  const [year, month, day] = (dateStr || '').split('-').map(Number);
+  const date = year && month && day ? new Date(year, month - 1, day) : new Date(dateStr);
+  return DAY_NAMES[date.getDay()];
+};
+
+const getScheduledRowsForDate = ({ schedules = [], teachers = [], date, searchTerm = '' }) => {
+  const dayName = getDayNameFromDate(date);
+  const term = searchTerm.trim().toLowerCase();
+  const slotsMap = new Map();
+
+  schedules.filter(s => s.day === dayName).forEach(session => {
+    const teacher = teachers.find(t => t.id === session.teacherId);
+    if (!teacher) return;
+    if (term && !(teacher.name || '').toLowerCase().includes(term)) return;
+
+    const normalizedTime = normalizeTimeSlot(session.time);
+    const slotKey = `${teacher.id}_${normalizedTime}`;
+    const abbr = getGroupAbbreviation(session.filiere, session.annee);
+
+    if (slotsMap.has(slotKey)) {
+      const row = slotsMap.get(slotKey);
+      if (!row.groups.includes(abbr)) row.groups.push(abbr);
+      return;
+    }
+
+    slotsMap.set(slotKey, {
+      key: slotKey,
+      session,
+      teacher,
+      date,
+      duration: calcDuration(session.time),
+      docId: makeAttendanceDocId(teacher.id, session.module, session.time, date),
+      module: session.module,
+      time: session.time,
+      groups: [abbr]
+    });
+  });
+
+  return Array.from(slotsMap.values()).sort((a, b) =>
+    (a.teacher.name || '').localeCompare(b.teacher.name || '') || (a.time || '').localeCompare(b.time || '')
+  );
+};
+
+const getRecordForScheduledRow = (records = [], row) => {
+  const rowSlot = normalizeTimeSlot(row.time);
+  const candidates = records.filter(record =>
+    record.teacherId === row.teacher.id &&
+    record.date === row.date &&
+    normalizeTimeSlot(record.timeSlot) === rowSlot
+  );
+
+  if (!candidates.length) return null;
+  const exact = candidates.find(record => record.id === row.docId);
+  if (exact) return exact;
+  return candidates.reduce((latest, record) =>
+    getRecordTimestamp(record) >= getRecordTimestamp(latest) ? record : latest
+  , candidates[0]);
+};
+
 const labelStyle = { fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', display: 'block' };
 const fGroup = { display: 'flex', flexDirection: 'column' };
 const fIcon = { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' };
@@ -120,35 +186,16 @@ const TeacherAttendance = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingHours, setPendingHours] = useState({});
 
-  const dayOfWeek = useMemo(() => {
-    const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-    return days[new Date(selectedDate).getDay()];
-  }, [selectedDate]);
+  const dayOfWeek = useMemo(() => getDayNameFromDate(selectedDate), [selectedDate]);
 
   const sessionRows = useMemo(() => {
-    const todaySessions = (schedules || []).filter(s => s.day === dayOfWeek);
-    const slotsMap = new Map();
-    todaySessions.forEach(session => {
-      const teacher = (teachers || []).find(t => t.id === session.teacherId);
-      if (!teacher) return;
-      const normalizedTime = (session.time || '').replace(/[^0-9]/g, '');
-      const slotKey = `${(teacher.name || '').toLowerCase().trim()}_${normalizedTime}`;
-      const abbr = getGroupAbbreviation(session.filiere, session.annee);
-      if (slotsMap.has(slotKey)) { const r = slotsMap.get(slotKey); if (!r.groups.includes(abbr)) r.groups.push(abbr); return; }
-      if (searchTerm && !teacher.name.toLowerCase().includes(searchTerm.toLowerCase())) return;
-      const duration = calcDuration(session.time);
-      const safeModule = (session.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
-      const safeTime = (session.time || '').replace(/[^0-9]/g, '') || 'x';
-      const docId = `${teacher.id}_${safeModule}_${safeTime}_${selectedDate}`;
-      slotsMap.set(slotKey, { key: slotKey, session, teacher, duration, docId, module: session.module, time: session.time, groups: [abbr] });
-    });
-    return Array.from(slotsMap.values()).sort((a, b) => (a.teacher.name || '').localeCompare(b.teacher.name || '') || (a.time || '').localeCompare(b.time || ''));
-  }, [schedules, teachers, dayOfWeek, searchTerm, selectedDate]);
+    return getScheduledRowsForDate({ schedules, teachers, date: selectedDate, searchTerm });
+  }, [schedules, teachers, searchTerm, selectedDate]);
 
   const stats = useMemo(() => {
     let presents = 0, absents = 0, totalHours = 0;
     sessionRows.forEach(row => {
-      const r = teacherAttendance.find(a => a.id === row.docId);
+      const r = getRecordForScheduledRow(teacherAttendance, row);
       if (r?.status === 'present') { presents++; totalHours += r.hours || 0; }
       else if (r?.status === 'absent') absents++;
     });
@@ -168,7 +215,7 @@ const TeacherAttendance = () => {
   };
   const handleHoursChange = async (row, hours) => {
     try {
-      const record = teacherAttendance.find(a => a.id === row.docId);
+      const record = getRecordForScheduledRow(teacherAttendance, row);
       await updateTeacherAttendance(row.teacher.id, selectedDate, record?.status || 'present', record?.comment || '', hours, row.module, row.time);
     } catch { console.error('hours update failed'); }
   };
@@ -177,7 +224,7 @@ const TeacherAttendance = () => {
     if (!sessionRows.length) return showToast('Aucune donnée.', 'info');
     const headers = "\uFEFFFormateur,Module,Horaire,Groupes,Date,Statut,Heures\n";
     const rows = sessionRows.map(row => {
-      const r = teacherAttendance.find(a => a.id === row.docId) || {};
+      const r = getRecordForScheduledRow(teacherAttendance, row) || {};
       return `"${row.teacher.name}","${row.module}","${row.time}","${row.groups.join(', ')}","${selectedDate}","${r.status || 'non défini'}","${r.status === 'present' ? r.hours || 0 : 0}"`;
     }).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -193,7 +240,7 @@ const TeacherAttendance = () => {
   const [mSearch, setMSearch] = useState('');
   const availableYears = useMemo(() => { const y = now.getFullYear(); return [y - 1, y, y + 1]; }, []);
 
-  useEffect(() => { if (view === 'monthly') loadTeacherAttendanceForMonth(mMonth, mYear); }, [view, mMonth, mYear, loadTeacherAttendanceForMonth]);
+  useEffect(() => { if (view === 'monthly') loadTeacherAttendanceForMonth(mMonth, mYear, { force: true }); }, [view, mMonth, mYear, loadTeacherAttendanceForMonth]);
 
   const daysInMonth = useMemo(() => new Date(mYear, mMonth + 1, 0).getDate(), [mMonth, mYear]);
   const mDays = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
@@ -210,14 +257,17 @@ const TeacherAttendance = () => {
     const byDay = {}, hoursByDay = {};
     mDays.forEach(d => {
       const dateStr = `${monthPrefix}-${pad(d)}`;
-      const recs = teacherAttendance.filter(a => a.teacherId === teacher.id && a.date === dateStr);
+      const scheduledRows = getScheduledRowsForDate({ schedules, teachers: [teacher], date: dateStr });
+      const recs = scheduledRows
+        .map(row => getRecordForScheduledRow(teacherAttendance, row))
+        .filter(Boolean);
       byDay[d] = aggregateStatus(recs);
       hoursByDay[d] = aggregateHours(recs);
     });
     const counts = { present: 0, absent: 0, totalHours: 0 };
     mDays.forEach(d => { if (byDay[d]) counts[byDay[d]]++; counts.totalHours += hoursByDay[d] || 0; });
     return { teacher, byDay, hoursByDay, counts };
-  }), [mFilteredTeachers, teacherAttendance, mDays, monthPrefix]);
+  }), [mFilteredTeachers, teacherAttendance, schedules, mDays, monthPrefix]);
 
   const mGlobalStats = useMemo(() => {
     const t = { present: 0, absent: 0, totalHours: 0 };
@@ -334,7 +384,7 @@ const TeacherAttendance = () => {
                     </thead>
                     <tbody>
                       {sessionRows.map((row, idx) => {
-                        const record = teacherAttendance.find(a => a.id === row.docId);
+                        const record = getRecordForScheduledRow(teacherAttendance, row);
                         const status = record?.status || '';
                         return (
                           <tr key={row.key} style={{ borderBottom: '1px solid var(--border-light)' }}>

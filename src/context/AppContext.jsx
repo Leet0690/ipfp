@@ -667,10 +667,10 @@ export const AppProvider = ({ children }) => {
     }
   }, [showToast]);
 
-  const loadTeacherAttendanceForMonth = useCallback(async (monthIndex, year) => {
+  const loadTeacherAttendanceForMonth = useCallback(async (monthIndex, year, { force = false } = {}) => {
     const { start, end } = getMonthBounds(monthIndex, year);
     const cacheKey = `month:${year}-${monthIndex}`;
-    if (teacherAttendanceKeysRef.current.has(cacheKey)) return;
+    if (teacherAttendanceKeysRef.current.has(cacheKey) && !force) return;
 
     try {
       const snapshot = await getDocs(query(
@@ -679,7 +679,11 @@ export const AppProvider = ({ children }) => {
         where('date', '<=', end)
       ));
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setTeacherAttendance(prev => mergeById(prev, data));
+      setTeacherAttendance(prev => {
+        if (!force) return mergeById(prev, data);
+        const outsideMonth = prev.filter(record => !record.date || record.date < start || record.date > end);
+        return mergeById(outsideMonth, data);
+      });
       teacherAttendanceKeysRef.current.add(cacheKey);
     } catch (e) {
       console.error("Error loading monthly teacher attendance:", e);

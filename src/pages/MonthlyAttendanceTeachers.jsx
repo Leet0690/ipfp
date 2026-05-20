@@ -22,26 +22,65 @@ const calcDuration = (timeStr) => {
   } catch { return 0; }
 };
 
+const DAY_NAMES = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const normalizeTimeSlot = (value = '') => (value || '').replace(/[^0-9]/g, '') || 'x';
+const getRecordTimestamp = (record) => {
+  if (!record?.timestamp) return 0;
+  if (typeof record.timestamp.toMillis === 'function') return record.timestamp.toMillis();
+  if (typeof record.timestamp.seconds === 'number') return record.timestamp.seconds * 1000;
+  return 0;
+};
+const getDayNameFromDate = (dateStr) => {
+  const [year, month, day] = (dateStr || '').split('-').map(Number);
+  const date = year && month && day ? new Date(year, month - 1, day) : new Date(dateStr);
+  return DAY_NAMES[date.getDay()];
+};
+const dedupeTeacherRecordsBySlot = (records = []) => {
+  const bySlot = {};
+  records.forEach(record => {
+    const slotKey = normalizeTimeSlot(record.timeSlot);
+    const current = bySlot[slotKey];
+    if (!current || getRecordTimestamp(record) >= getRecordTimestamp(current)) {
+      bySlot[slotKey] = record;
+    }
+  });
+  return Object.values(bySlot);
+};
+const getScheduledRecordsForDate = ({ records = [], schedules = [], teacher, date }) => {
+  const dayName = getDayNameFromDate(date);
+  const scheduledSlots = new Set(
+    schedules
+      .filter(session => session.teacherId === teacher.id && session.day === dayName)
+      .map(session => normalizeTimeSlot(session.time))
+  );
+
+  if (scheduledSlots.size === 0) return [];
+  return records.filter(record =>
+    record.teacherId === teacher.id &&
+    record.date === date &&
+    scheduledSlots.has(normalizeTimeSlot(record.timeSlot))
+  );
+};
+
 const aggregateStatus = (records) => {
-  if (!records?.length) return null;
-  const hasPresent = records.some(r => r.status === 'present');
+  const uniqueRecords = dedupeTeacherRecordsBySlot(records);
+  if (!uniqueRecords.length) return null;
+  const hasPresent = uniqueRecords.some(r => r.status === 'present');
   if (hasPresent) return 'present';
-  const hasAbsent = records.some(r => r.status === 'absent');
+  const hasAbsent = uniqueRecords.some(r => r.status === 'absent');
   if (hasAbsent) return 'absent';
   return null;
 };
 
 const aggregateHours = (records) => {
-  if (!records?.length) return 0;
-  const groups = {};
-  records.forEach(r => {
-    if (r.status !== 'present') return;
+  const uniqueRecords = dedupeTeacherRecordsBySlot(records);
+  if (!uniqueRecords.length) return 0;
+  return uniqueRecords.reduce((sum, r) => {
+    if (r.status !== 'present') return sum;
     const h = Number(r.hours);
     const calculated = h > 0 ? h : (calcDuration(r.timeSlot) || 4);
-    const slotKey = (r.timeSlot || '').replace(/[^0-9]/g, '') || ('global_' + Math.random());
-    groups[slotKey] = Math.max(groups[slotKey] || 0, calculated);
-  });
-  return Object.values(groups).reduce((sum, val) => sum + val, 0);
+    return sum + calculated;
+  }, 0);
 };
 
 const StatusCell = ({ status }) => {
@@ -74,7 +113,7 @@ const labelStyle = {
 };
 
 const MonthlyAttendanceTeachers = () => {
-  const { teachers, teacherAttendance, loadTeacherAttendanceForMonth, loading } = useApp();
+  const { teachers, teacherAttendance, loadTeacherAttendanceForMonth, schedules, loading } = useApp();
 
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth());
@@ -90,7 +129,7 @@ const MonthlyAttendanceTeachers = () => {
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
 
   useEffect(() => {
-    loadTeacherAttendanceForMonth(month, year);
+    loadTeacherAttendanceForMonth(month, year, { force: true });
   }, [month, year, loadTeacherAttendanceForMonth]);
 
   const filteredTeachers = useMemo(() =>
@@ -109,7 +148,12 @@ const MonthlyAttendanceTeachers = () => {
       const hoursByDay = {};
       days.forEach(d => {
         const dateStr = `${monthPrefix}-${pad(d)}`;
-        const recs = teacherAttendance.filter(a => a.teacherId === teacher.id && a.date === dateStr);
+        const recs = getScheduledRecordsForDate({
+          records: teacherAttendance,
+          schedules,
+          teacher,
+          date: dateStr
+        });
         byDay[d] = aggregateStatus(recs);
         hoursByDay[d] = aggregateHours(recs);
       });
@@ -120,7 +164,7 @@ const MonthlyAttendanceTeachers = () => {
       });
       return { teacher, byDay, hoursByDay, counts };
     });
-  }, [filteredTeachers, teacherAttendance, days, monthPrefix]);
+  }, [filteredTeachers, teacherAttendance, schedules, days, monthPrefix]);
 
   const globalStats = useMemo(() => {
     const totals = { present: 0, absent: 0, retard: 0, totalHours: 0 };
