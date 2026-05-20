@@ -341,7 +341,7 @@ const PendingTasksWidget = ({ students, teachers, grades, teacherAttendance, all
     Object.values(groupMap).forEach(({ diploma, major, year, students: gs }) => {
       const label = getGroupAbbreviation(major, year);
       const configuredModules = (allModules || [])
-        .filter(m => m.diploma === diploma && m.major === major && m.year === year && (m.semester || 'S1') === activeSemester)
+        .filter(m => m.diploma === diploma && m.major === major && m.year === year && [activeSemester, 'Annuel'].includes(m.semester || 'S1'))
         .map(m => m.name);
       const mods = configuredModules.length > 0 ? configuredModules : getModulesForFiliere(diploma, major, year);
       if (mods.length === 0) return;
@@ -442,7 +442,7 @@ const GradesBreakdownWidget = ({ students, grades, allModules, activeSemester })
       const g = map[key];
       g.count++;
       const configuredModules = (allModules || [])
-        .filter(m => m.diploma === s.diploma && m.major === s.major && m.year === s.year && (m.semester || 'S1') === activeSemester)
+        .filter(m => m.diploma === s.diploma && m.major === s.major && m.year === s.year && [activeSemester, 'Annuel'].includes(m.semester || 'S1'))
         .map(m => m.name);
       const mods = configuredModules.length > 0 ? configuredModules : getModulesForStudent(s);
       g.total += mods.length;
@@ -797,7 +797,7 @@ const AdminDashboard = () => {
   }, [allModules, diplomaFilter]);
   const getStudentActiveModules = useCallback((student) => {
     const configuredModules = (allModules || [])
-      .filter(m => m.diploma === student.diploma && m.major === student.major && m.year === student.year && (m.semester || 'S1') === activeSemester)
+      .filter(m => m.diploma === student.diploma && m.major === student.major && m.year === student.year && [activeSemester, 'Annuel'].includes(m.semester || 'S1'))
       .map(m => m.name);
     return configuredModules.length > 0 ? configuredModules : getModulesForStudent(student);
   }, [allModules, activeSemester]);

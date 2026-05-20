@@ -103,7 +103,7 @@ const StudentResults = () => {
     m.diploma === student.diploma &&
     m.major === student.major &&
     m.year === student.year &&
-    (m.semester || 'S1') === activeSemester
+    [activeSemester, 'Annuel'].includes(m.semester || 'S1')
   );
   const moduleNames = studentModules.map(m => m.name || '');
 

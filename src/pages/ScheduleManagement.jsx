@@ -78,8 +78,8 @@ const ScheduleManagement = () => {
 
   const groupLabel = useMemo(() => getGroupAbbreviation(filiere, annee), [filiere, annee]);
   const modulesBySemester = useMemo(() => ({
-    S1: allModules.filter(m => m.major === filiere && m.year === annee && (m.semester || 'S1') === 'S1').map(m => m.name),
-    S2: allModules.filter(m => m.major === filiere && m.year === annee && (m.semester || 'S1') === 'S2').map(m => m.name)
+    S1: allModules.filter(m => m.major === filiere && m.year === annee && ['S1', 'Annuel'].includes(m.semester || 'S1')).map(m => m.name),
+    S2: allModules.filter(m => m.major === filiere && m.year === annee && ['S2', 'Annuel'].includes(m.semester || 'S1')).map(m => m.name)
   }), [filiere, annee, allModules]);
   const filteredSchedules = useMemo(
     () => schedules.filter(s => s.filiere === filiere && s.annee === annee),

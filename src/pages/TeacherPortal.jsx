@@ -199,7 +199,7 @@ const TeacherPortal = () => {
     if (!teacher) return [];
     const teacherSubjects = teacher.subjects || [teacher.subject] || [];
     return Array.from(new Set((allModules || [])
-      .filter(m => teacherSubjects.includes(m.name) && (m.semester || 'S1') === activeSemester)
+      .filter(m => teacherSubjects.includes(m.name) && [activeSemester, 'Annuel'].includes(m.semester || 'S1'))
       .map(m => m.diploma)
       .filter(Boolean)));
   }, [teacher, allModules, activeSemester]);
@@ -212,7 +212,7 @@ const TeacherPortal = () => {
       (allModules || []).some(m =>
         m.diploma === selectedDiploma &&
         m.year === y &&
-        (m.semester || 'S1') === activeSemester &&
+        [activeSemester, 'Annuel'].includes(m.semester || 'S1') &&
         teacherSubjects.includes(m.name)
       )
     );
@@ -227,7 +227,7 @@ const TeacherPortal = () => {
         m.diploma === selectedDiploma &&
         m.major === g &&
         m.year === filterYear &&
-        (m.semester || 'S1') === activeSemester &&
+        [activeSemester, 'Annuel'].includes(m.semester || 'S1') &&
         teacherSubjects.includes(m.name)
       )
     );
@@ -241,7 +241,7 @@ const TeacherPortal = () => {
         m.diploma === selectedDiploma &&
         m.major === selectedGroup &&
         m.year === filterYear &&
-        (m.semester || 'S1') === activeSemester &&
+        [activeSemester, 'Annuel'].includes(m.semester || 'S1') &&
         teacherSubjects.includes(m.name)
       )
       .map(m => m.name);

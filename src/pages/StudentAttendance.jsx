@@ -93,7 +93,7 @@ const StudentAttendance = () => {
         .filter(Boolean);
       if (scheduledModules.length > 0) return Array.from(new Set(scheduledModules));
       const configuredModules = (allModules || [])
-        .filter(m => m.diploma === filterDiploma && m.major === filterMajor && m.year === filterYear && (m.semester || 'S1') === activeSemester)
+        .filter(m => m.diploma === filterDiploma && m.major === filterMajor && m.year === filterYear && [activeSemester, 'Annuel'].includes(m.semester || 'S1'))
         .map(m => m.name);
       if (configuredModules.length > 0) return configuredModules;
       if (filterDiploma) return getModulesForFiliere(filterDiploma, filterMajor, filterYear);

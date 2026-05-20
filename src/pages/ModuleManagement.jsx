@@ -263,6 +263,7 @@ const ModuleManagement = () => {
           <option value="" disabled>-- Semestre --</option>
           <option value="S1">S1</option>
           <option value="S2">S2</option>
+          <option value="Annuel">Annuel (S1 & S2)</option>
         </select>
       </div>
 
@@ -378,6 +379,7 @@ const ModuleManagement = () => {
                     <select className="input-premium" value={formData.semester} onChange={e => setFormData({ ...formData, semester: e.target.value })}>
                       <option value="S1">S1</option>
                       <option value="S2">S2</option>
+                      <option value="Annuel">Annuel (S1 & S2)</option>
                     </select>
                   </div>
                 </div>
