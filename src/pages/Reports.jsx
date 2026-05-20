@@ -59,7 +59,8 @@ const CustomDonutLabel = ({ cx, cy, value, label }) => (
 const Reports = () => {
   const {
     students = [], grades = {}, modules: allModules = [],
-    studentAttendance = [], loadStudentAttendanceForMonth
+    studentAttendance = [], loadStudentAttendanceForMonth,
+    activeSemester = 'S1'
   } = useApp() || {};
 
   const [selectedDiploma, setSelectedDiploma] = useState(Object.keys(MODULES_DATA)[0]);
@@ -84,9 +85,12 @@ const Reports = () => {
   const availableModulesList = useMemo(() => {
     if (!selectedDiploma || !selectedMajor || !selectedYear) return [];
     return allModules.filter(m =>
-      m.diploma === selectedDiploma && m.major === selectedMajor && m.year === selectedYear
+      m.diploma === selectedDiploma &&
+      m.major === selectedMajor &&
+      m.year === selectedYear &&
+      (m.semester || 'S1') === activeSemester
     );
-  }, [selectedDiploma, selectedMajor, selectedYear, allModules]);
+  }, [selectedDiploma, selectedMajor, selectedYear, allModules, activeSemester]);
 
   const availableModules = useMemo(() => availableModulesList.map(m => m.name), [availableModulesList]);
 
@@ -98,6 +102,8 @@ const Reports = () => {
   useEffect(() => {
     if (availableModules.length > 0 && !availableModules.includes(selectedModule))
       setSelectedModule(availableModules[0]);
+    else if (availableModules.length === 0 && selectedModule)
+      setSelectedModule('');
   }, [availableModules, selectedModule]);
 
   const analytics = useMemo(() => {

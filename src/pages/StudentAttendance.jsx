@@ -50,7 +50,7 @@ const calcDuration = (timeStr) => {
 };
 
 const StudentAttendance = () => {
-  const { students, teachers, studentAttendance, updateStudentAttendance, loadAttendanceForSession, loadStudentAttendanceForMonth, loading, schedules, teacherAttendance, updateTeacherAttendance, loadTeacherAttendanceForDate } = useApp();
+  const { students, teachers, studentAttendance, updateStudentAttendance, loadAttendanceForSession, loadStudentAttendanceForMonth, loading, schedules, teacherAttendance, updateTeacherAttendance, loadTeacherAttendanceForDate, modules: allModules = [], activeSemester = 'S1', getActiveScheduleModule } = useApp();
   const { showToast } = useToast();
 
   /* Tab state */
@@ -87,12 +87,25 @@ const StudentAttendance = () => {
   const availableMajors = filterDiploma ? (FILIERES[filterDiploma] || []) : Array.from(new Set(students.map(s => s.major)));
   const availableModules = useMemo(() => {
     if (filterMajor && filterYear) {
-      const scheduledModules = (schedules || []).filter(sc => sc.filiere === filterMajor && sc.annee === filterYear && sc.day === dayOfWeek).map(sc => sc.module);
+      const scheduledModules = (schedules || [])
+        .filter(sc => sc.filiere === filterMajor && sc.annee === filterYear && sc.day === dayOfWeek)
+        .map(sc => getActiveScheduleModule(sc))
+        .filter(Boolean);
       if (scheduledModules.length > 0) return Array.from(new Set(scheduledModules));
+      const configuredModules = (allModules || [])
+        .filter(m => m.diploma === filterDiploma && m.major === filterMajor && m.year === filterYear && (m.semester || 'S1') === activeSemester)
+        .map(m => m.name);
+      if (configuredModules.length > 0) return configuredModules;
       if (filterDiploma) return getModulesForFiliere(filterDiploma, filterMajor, filterYear);
     }
     return [];
-  }, [filterDiploma, filterMajor, filterYear, schedules, dayOfWeek]);
+  }, [filterDiploma, filterMajor, filterYear, schedules, dayOfWeek, getActiveScheduleModule, allModules, activeSemester]);
+
+  useEffect(() => {
+    if (filterModule && availableModules.length > 0 && !availableModules.includes(filterModule)) {
+      setFilterModule('');
+    }
+  }, [filterModule, availableModules]);
 
   const stats = useMemo(() => {
     let presents = 0, absents = 0;
@@ -111,7 +124,7 @@ const StudentAttendance = () => {
     if (!filterModule || !filterMajor || !filterYear) return null;
     const matchingSession = (schedules || []).find(sc =>
       sc.filiere === filterMajor && sc.annee === filterYear &&
-      sc.day === dayOfWeek && sc.module === filterModule
+      sc.day === dayOfWeek && getActiveScheduleModule(sc) === filterModule
     );
     if (!matchingSession?.teacherId || !matchingSession?.time) return null;
 
@@ -128,7 +141,7 @@ const StudentAttendance = () => {
       const groupStudents = (students || []).filter(s =>
         s.major === session.filiere && s.year === session.annee
       );
-      const safeModule = (session.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeModule = (getActiveScheduleModule(session) || 'global').replace(/[^a-zA-Z0-9]/g, '_');
       const marked = groupStudents.filter(s =>
         (studentAttendance || []).some(a => a.id === `${s.id}_${safeModule}_${selectedDate}` && a.status)
       ).length;
@@ -140,7 +153,7 @@ const StudentAttendance = () => {
 
     const completedCount = groups.filter(g => g.done).length;
     return { teacherName, time: matchingSession.time, groups, completedCount, totalGroups: groups.length };
-  }, [filterModule, filterMajor, filterYear, dayOfWeek, schedules, students, studentAttendance, selectedDate, teachers]);
+  }, [filterModule, filterMajor, filterYear, dayOfWeek, schedules, students, studentAttendance, selectedDate, teachers, getActiveScheduleModule]);
 
   useEffect(() => {
     if (filterModule && selectedDate) loadAttendanceForSession(filterModule, selectedDate);
@@ -150,7 +163,7 @@ const StudentAttendance = () => {
     if (!filterModule || !filterMajor || !filterYear || !dayOfWeek) return [];
     const matchingSession = (schedules || []).find(sc =>
       sc.filiere === filterMajor && sc.annee === filterYear &&
-      sc.day === dayOfWeek && sc.module === filterModule
+      sc.day === dayOfWeek && getActiveScheduleModule(sc) === filterModule
     );
     if (!matchingSession?.teacherId || !matchingSession?.time) return [];
     return (schedules || []).filter(sc =>
@@ -164,10 +177,10 @@ const StudentAttendance = () => {
   useEffect(() => {
     if (otherTeacherSessions.length > 0 && selectedDate) {
       otherTeacherSessions.forEach(session => {
-        loadAttendanceForSession(session.module, selectedDate);
+        loadAttendanceForSession(getActiveScheduleModule(session), selectedDate);
       });
     }
-  }, [otherTeacherSessions, selectedDate, loadAttendanceForSession]);
+  }, [otherTeacherSessions, selectedDate, loadAttendanceForSession, getActiveScheduleModule]);
 
   useEffect(() => {
     if (selectedDate) loadTeacherAttendanceForDate(selectedDate);
@@ -189,7 +202,7 @@ const StudentAttendance = () => {
         s.major === session.filiere && s.year === session.annee
       );
       if (groupStudents.length === 0) return true;
-      const safeModule = (session.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeModule = (getActiveScheduleModule(session) || 'global').replace(/[^a-zA-Z0-9]/g, '_');
       return groupStudents.every(s => {
         const docId = `${s.id}_${safeModule}_${selectedDate}`;
         return combinedAttendance.some(a => a.id === docId && a.status);
@@ -198,15 +211,16 @@ const StudentAttendance = () => {
 
     if (!allGroupsComplete) return;
 
-    const safeModule = (matchingSession.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+    const matchingModule = getActiveScheduleModule(matchingSession);
+    const safeModule = (matchingModule || 'global').replace(/[^a-zA-Z0-9]/g, '_');
     const safeTime = (matchingSession.time || '').replace(/[^0-9]/g, '') || 'x';
     const teacherDocId = `${matchingSession.teacherId}_${safeModule}_${safeTime}_${selectedDate}`;
     const existingTeacherRecord = (teacherAttendance || []).find(a => a.id === teacherDocId);
     if (!existingTeacherRecord) {
       const duration = calcDuration(matchingSession.time);
-      await updateTeacherAttendance(matchingSession.teacherId, selectedDate, 'present', '', duration, matchingSession.module, matchingSession.time);
+      await updateTeacherAttendance(matchingSession.teacherId, selectedDate, 'present', '', duration, matchingModule, matchingSession.time);
     }
-  }, [schedules, students, studentAttendance, teacherAttendance, dayOfWeek, selectedDate, updateTeacherAttendance]);
+  }, [schedules, students, studentAttendance, teacherAttendance, dayOfWeek, selectedDate, updateTeacherAttendance, getActiveScheduleModule]);
 
   const handleStatusChange = async (studentId, status) => {
     if (!filterModule) { showToast("Veuillez d'abord sélectionner un module.", 'warning'); return; }
@@ -234,7 +248,7 @@ const StudentAttendance = () => {
         sc.filiere === filterMajor &&
         sc.annee === filterYear &&
         sc.day === dayOfWeek &&
-        sc.module === filterModule
+        getActiveScheduleModule(sc) === filterModule
       );
       const extraRecords = [
         { id: docId, studentId, status },
@@ -268,7 +282,7 @@ const StudentAttendance = () => {
         sc.filiere === filterMajor &&
         sc.annee === filterYear &&
         sc.day === dayOfWeek &&
-        sc.module === filterModule
+        getActiveScheduleModule(sc) === filterModule
       );
       const extraRecords = filteredStudents.map(s => ({
         id: `${s.id}_${safeModule}_${selectedDate}`,
@@ -356,10 +370,11 @@ const StudentAttendance = () => {
       ).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
       
       daySchedules.forEach(sc => {
-        const safeModule = (sc.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+        const displayModule = getActiveScheduleModule(sc);
+        const safeModule = (displayModule || 'global').replace(/[^a-zA-Z0-9]/g, '_');
         const key = `${dateStr}_${safeModule}`;
         if (!colsMap.has(key)) {
-          colsMap.set(key, { d, dateStr, weekday, module: sc.module, time: sc.time, safeModule, isScheduled: true, key });
+          colsMap.set(key, { d, dateStr, weekday, module: displayModule, time: sc.time, safeModule, isScheduled: true, key });
         }
       });
     });
@@ -368,7 +383,8 @@ const StudentAttendance = () => {
       if (a.date?.startsWith(monthPrefix)) {
         const student = mFilteredStudents.find(s => s.id === a.studentId);
         if (student) {
-          const safeModule = (a.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+          const attendanceModule = a.moduleId || a.module || 'global';
+          const safeModule = attendanceModule.replace(/[^a-zA-Z0-9]/g, '_');
           const key = `${a.date}_${safeModule}`;
           if (!colsMap.has(key)) {
             const dStr = a.date.split('-')[2];
@@ -376,7 +392,7 @@ const StudentAttendance = () => {
               const d = parseInt(dStr, 10);
               const dateObj = new Date(mYear, mMonth, d);
               const weekday = dayNames[dateObj.getDay()];
-              colsMap.set(key, { d, dateStr: a.date, weekday, module: a.module || 'Général', time: '—', safeModule, isScheduled: false, key });
+              colsMap.set(key, { d, dateStr: a.date, weekday, module: attendanceModule || 'Général', time: '—', safeModule, isScheduled: false, key });
             }
           }
         }
@@ -387,7 +403,7 @@ const StudentAttendance = () => {
       if (a.d !== b.d) return a.d - b.d;
       return (a.time || '').localeCompare(b.time || '');
     });
-  }, [mDays, mYear, mMonth, monthPrefix, schedules, mFilterFiliere, mFilterAnnee, studentAttendance, mFilteredStudents]);
+  }, [mDays, mYear, mMonth, monthPrefix, schedules, mFilterFiliere, mFilterAnnee, studentAttendance, mFilteredStudents, getActiveScheduleModule]);
 
   const mGridData = useMemo(() => mFilteredStudents.map(student => {
     const byColumn = {};

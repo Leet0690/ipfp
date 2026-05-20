@@ -55,7 +55,7 @@ const MiniStat = ({ label, value, icon: Icon }) => (
 );
 
 const GradeManagement = () => {
-  const { students = [], teachers = [], grades = {}, updateGrades, loading = false, modules: allModules = [], confirmAction } = useApp() || {};
+  const { students = [], teachers = [], grades = {}, updateGrades, loading = false, modules: allModules = [], confirmAction, activeSemester = 'S1' } = useApp() || {};
   const { showToast } = useToast();
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [filterDiploma, setFilterDiploma] = useState('');
@@ -85,9 +85,10 @@ const GradeManagement = () => {
     return allModules.filter(m => 
       m.diploma === selectedStudent.diploma && 
       m.major === selectedStudent.major && 
-      m.year === selectedStudent.year
+      m.year === selectedStudent.year &&
+      (m.semester || 'S1') === activeSemester
     );
-  }, [selectedStudent, allModules]);
+  }, [selectedStudent, allModules, activeSemester]);
   
   const modules = studentModules.map(m => m.name);
   const studentGrades = selectedStudent ? (grades[selectedStudent.id] || {}) : {};
@@ -98,11 +99,12 @@ const GradeManagement = () => {
       return allModules.filter(m => 
         m.diploma === filterDiploma && 
         m.major === filterMajor && 
-        m.year === filterYear
+        m.year === filterYear &&
+        (m.semester || 'S1') === activeSemester
       );
     }
     return [];
-  }, [filterDiploma, filterMajor, filterYear, allModules]);
+  }, [filterDiploma, filterMajor, filterYear, allModules, activeSemester]);
   
   const pdfModules = pdfModulesList.map(m => m.name);
 

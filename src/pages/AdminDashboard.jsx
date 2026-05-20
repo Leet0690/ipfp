@@ -108,7 +108,7 @@ const getActivityIcon = (message) => {
   return { icon: Activity, color: 'var(--text-muted)', bg: 'var(--bg-subtle)' };
 };
 
-const TodaySessionsWidget = ({ schedules, teachers }) => {
+const TodaySessionsWidget = ({ schedules, teachers, getScheduleModule }) => {
   const today = getTodayFrench();
   const todaySessions = useMemo(() => {
     const filtered = schedules
@@ -117,6 +117,7 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
         const parts = (s.time || '').split('-');
         return { 
           ...s, 
+          displayModule: getScheduleModule(s),
           start: formatTimeDash((parts[0] || '').trim()), 
           end: formatTimeDash((parts[1] || '').trim()) 
         };
@@ -124,7 +125,7 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
 
     const groups = {};
     filtered.forEach(s => {
-      const normalizedModule = (s.module || '').trim().toLowerCase();
+      const normalizedModule = (s.displayModule || s.module || '').trim().toLowerCase();
       const normalizedTime = (s.time || '').replace(/\s+/g, '');
       const normalizedTeacher = (s.teacherId || '').trim();
       const key = `${normalizedTeacher}_${s.start}_${s.end}_${normalizedModule}`;
@@ -139,7 +140,7 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
     });
 
     return Object.values(groups).sort((a, b) => a.start.localeCompare(b.start));
-  }, [schedules, today]);
+  }, [schedules, today, getScheduleModule]);
 
   return (
     <motion.div
@@ -212,7 +213,7 @@ const TodaySessionsWidget = ({ schedules, teachers }) => {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: '12px', fontWeight: '700', color: isTP ? '#7a3d82' : '#8a6a00', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>
-                    {session.module}
+                    {session.displayModule || 'Module non dÃ©fini'}
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                     {teacher && (
@@ -320,7 +321,7 @@ const SEVERITY_CONFIG = {
   info: { color: '#0ea5e9', bg: 'rgba(14,165,233,0.07)', border: 'rgba(14,165,233,0.18)', icon: Info },
 };
 
-const PendingTasksWidget = ({ students, teachers, grades, teacherAttendance }) => {
+const PendingTasksWidget = ({ students, teachers, grades, teacherAttendance, allModules, activeSemester }) => {
   const tasks = useMemo(() => {
     const items = [];
     const now = new Date();
@@ -336,13 +337,16 @@ const PendingTasksWidget = ({ students, teachers, grades, teacherAttendance }) =
 
     Object.values(groupMap).forEach(({ diploma, major, year, students: gs }) => {
       const label = getGroupAbbreviation(major, year);
-      const mods = getModulesForFiliere(diploma, major, year);
+      const configuredModules = (allModules || [])
+        .filter(m => m.diploma === diploma && m.major === major && m.year === year && (m.semester || 'S1') === activeSemester)
+        .map(m => m.name);
+      const mods = configuredModules.length > 0 ? configuredModules : getModulesForFiliere(diploma, major, year);
       if (mods.length === 0) return;
       let entered = 0;
       const total = gs.length * mods.length;
       gs.forEach(s => {
         mods.forEach(m => {
-          const g = grades[s.id]?.[m];
+          const g = grades[s.id]?.[m.replace(/\./g, '_')];
           if (g && (g.c1 || g.c2 || g.c3 || g.efcfp || g.efcft)) entered++;
         });
       });
@@ -374,7 +378,7 @@ const PendingTasksWidget = ({ students, teachers, grades, teacherAttendance }) =
     }
 
     return items;
-  }, [students, teachers, grades, teacherAttendance]);
+  }, [students, teachers, grades, teacherAttendance, allModules, activeSemester]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
@@ -425,7 +429,7 @@ const PendingTasksWidget = ({ students, teachers, grades, teacherAttendance }) =
   );
 };
 
-const GradesBreakdownWidget = ({ students, grades }) => {
+const GradesBreakdownWidget = ({ students, grades, allModules, activeSemester }) => {
   const groups = useMemo(() => {
     const map = {};
     (students || []).forEach(s => {
@@ -434,10 +438,13 @@ const GradesBreakdownWidget = ({ students, grades }) => {
       if (!map[key]) map[key] = { diploma: s.diploma, major: s.major, year: s.year, count: 0, total: 0, entered: 0 };
       const g = map[key];
       g.count++;
-      const mods = getModulesForStudent(s);
+      const configuredModules = (allModules || [])
+        .filter(m => m.diploma === s.diploma && m.major === s.major && m.year === s.year && (m.semester || 'S1') === activeSemester)
+        .map(m => m.name);
+      const mods = configuredModules.length > 0 ? configuredModules : getModulesForStudent(s);
       g.total += mods.length;
       mods.forEach(m => {
-        const gr = grades[s.id]?.[m];
+        const gr = grades[s.id]?.[m.replace(/\./g, '_')];
         if (gr && (gr.c1 || gr.c2 || gr.c3 || gr.efcfp || gr.efcft)) g.entered++;
       });
     });
@@ -446,7 +453,7 @@ const GradesBreakdownWidget = ({ students, grades }) => {
       label: getGroupAbbreviation(g.major, g.year),
       pct: g.total > 0 ? Math.round((g.entered / g.total) * 100) : 0,
     })).sort((a, b) => a.pct - b.pct);
-  }, [students, grades]);
+  }, [students, grades, allModules, activeSemester]);
 
   const overall = useMemo(() => {
     if (groups.length === 0) return 0;
@@ -546,18 +553,47 @@ const timeToPxDash = (t = '08:00') => {
   return ((h - DASH_START) * 60 + (m || 0)) * (DASH_PX / 60);
 };
 
-const ScheduleCalendar = ({ realSchedules, teachers, allModules }) => {
+const SemesterToggle = ({ activeSemester, onChange, compact = false }) => (
+  <div style={{
+    display: 'inline-flex',
+    padding: compact ? '3px' : '4px',
+    borderRadius: compact ? '10px' : 'var(--radius-xl)',
+    background: 'var(--bg-page)',
+    border: '1px solid var(--border-light)',
+    gap: compact ? '2px' : '3px'
+  }}>
+    {['S1', 'S2'].map(sem => (
+      <button
+        key={sem}
+        type="button"
+        onClick={() => onChange(sem)}
+        style={{
+          minWidth: compact ? '38px' : '52px',
+          padding: compact ? '5px 9px' : '8px 16px',
+          borderRadius: compact ? '8px' : 'var(--radius-lg)',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: compact ? '11px' : '12px',
+          fontWeight: '900',
+          transition: 'all 0.18s ease',
+          background: activeSemester === sem ? 'var(--primary)' : 'transparent',
+          color: activeSemester === sem ? 'white' : 'var(--text-muted)',
+          boxShadow: activeSemester === sem ? 'var(--shadow-xs)' : 'none'
+        }}
+        title={`Activer ${sem}`}
+      >
+        {sem}
+      </button>
+    ))}
+  </div>
+);
+
+const ScheduleCalendar = ({ realSchedules, teachers, activeSemester, setActiveSemester, getScheduleModule }) => {
   const allFilieres = useMemo(() => Array.from(new Set(Object.values(FILIERES).flat())), []);
   const allAnnees = ['1ère année', '2ème année'];
   const [selectedFiliere, setSelectedFiliere] = useState(allFilieres.includes('Développement Informatique') ? 'Développement Informatique' : allFilieres[0]);
   const [selectedAnnee, setSelectedAnnee] = useState(allAnnees[0]);
-  const [selectedSemester, setSelectedSemester] = useState('S1');
-
   const groupLabel = useMemo(() => getGroupAbbreviation(selectedFiliere, selectedAnnee), [selectedFiliere, selectedAnnee]);
-  const getSessionModule = useCallback((session) => {
-    if (selectedSemester === 'S2') return session.moduleS2 || session.module || '';
-    return session.moduleS1 || session.module || '';
-  }, [selectedSemester]);
   const filteredSessions = useMemo(
     () => realSchedules.filter(s => s.filiere === selectedFiliere && s.annee === selectedAnnee),
     [realSchedules, selectedFiliere, selectedAnnee]
@@ -580,30 +616,7 @@ const ScheduleCalendar = ({ realSchedules, teachers, allModules }) => {
             <select className="input-premium" style={{ fontSize: '11px', padding: '5px 10px', width: '120px', cursor: 'pointer' }} value={selectedAnnee} onChange={e => setSelectedAnnee(e.target.value)}>
               {allAnnees.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
-            <div style={{ display: 'inline-flex', padding: '3px', borderRadius: '10px', background: 'var(--bg-page)', border: '1px solid var(--border-light)', gap: '2px' }}>
-              {['S1', 'S2'].map(sem => (
-                <button
-                  key={sem}
-                  type="button"
-                  onClick={() => setSelectedSemester(sem)}
-                  style={{
-                    minWidth: '38px',
-                    padding: '5px 9px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                    fontWeight: '900',
-                    background: selectedSemester === sem ? 'var(--primary)' : 'transparent',
-                    color: selectedSemester === sem ? 'white' : 'var(--text-muted)',
-                    boxShadow: selectedSemester === sem ? 'var(--shadow-xs)' : 'none'
-                  }}
-                  title={`Afficher ${sem}`}
-                >
-                  {sem}
-                </button>
-              ))}
-            </div>
+            <SemesterToggle activeSemester={activeSemester} onChange={setActiveSemester} compact />
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -611,7 +624,7 @@ const ScheduleCalendar = ({ realSchedules, teachers, allModules }) => {
             {groupLabel}
           </span>
           <span style={{ padding: '5px 12px', borderRadius: '999px', background: 'rgba(254,205,8,0.12)', color: '#a06208', fontSize: '11px', fontWeight: '800' }}>
-            {filteredSessions.length} séances {selectedSemester}
+            {filteredSessions.length} séances {activeSemester}
           </span>
           <Link to="/admin/schedules" className="btn-modern" style={{ padding: '5px 12px', fontSize: '11px', textDecoration: 'none' }}>
             <CalendarPlus size={12} style={{ marginRight: '5px' }} /> Gérer
@@ -711,7 +724,7 @@ const ScheduleCalendar = ({ realSchedules, teachers, allModules }) => {
                             display: '-webkit-box', WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical', overflow: 'hidden'
                           }}>
-                            {getSessionModule(session) || 'Module non défini'}
+                            {getScheduleModule(session) || 'Module non défini'}
                           </div>
                           {height >= 44 && teacher && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '3px' }}>
@@ -736,7 +749,7 @@ const ScheduleCalendar = ({ realSchedules, teachers, allModules }) => {
 };
 
 const AdminDashboard = () => {
-  const { students, teachers, grades, schedules, modules: allModules, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance, loadStudentAttendanceForMonth, loadTeacherAttendanceForMonth, migrateTeacherTokens, loading, confirmAction, notifications, clearNotifications } = useApp();
+  const { students, teachers, grades, schedules, modules: allModules, deleteStudent, deleteTeacher, updateStudent, updateTeacher, studentAttendance, teacherAttendance, loadStudentAttendanceForMonth, loadTeacherAttendanceForMonth, migrateTeacherTokens, loading, confirmAction, notifications, clearNotifications, activeSemester, setActiveSemester, getActiveScheduleModule } = useApp();
   const { showToast } = useToast();
   const location = useLocation();
   const isDashboard = location.pathname === '/';
@@ -779,6 +792,12 @@ const AdminDashboard = () => {
     if (!diplomaFilter) return Array.from(new Set(allModules.map(m => m.major)));
     return Array.from(new Set(allModules.filter(m => m.diploma === diplomaFilter).map(m => m.major)));
   }, [allModules, diplomaFilter]);
+  const getStudentActiveModules = useCallback((student) => {
+    const configuredModules = (allModules || [])
+      .filter(m => m.diploma === student.diploma && m.major === student.major && m.year === student.year && (m.semester || 'S1') === activeSemester)
+      .map(m => m.name);
+    return configuredModules.length > 0 ? configuredModules : getModulesForStudent(student);
+  }, [allModules, activeSemester]);
 
   // Edit helper functions
   const toggleDiplomaEdit = (dip) => {
@@ -999,12 +1018,12 @@ const AdminDashboard = () => {
           }} />}
           <ActionBtn icon={Eye} title="Détails" onClick={() => openDetails(row.original)} />
           <ActionBtn icon={Edit3} title="Modifier" onClick={() => openEdit(row.original)} />
-          {activeTab === 'students' && <ActionBtn icon={Download} title="Bulletin" onClick={() => generateBulletinGlobal(row.original, grades, getModulesForStudent(row.original))} />}
+          {activeTab === 'students' && <ActionBtn icon={Download} title="Bulletin" onClick={() => generateBulletinGlobal(row.original, grades, getStudentActiveModules(row.original))} />}
           <ActionBtn icon={Trash2} title="Supprimer" color="#dc2626" onClick={() => handleDelete(row.original)} />
         </div>
       ),
     },
-  ], [activeTab, openDetails, openEdit, handleDelete, grades]);
+  ], [activeTab, openDetails, openEdit, handleDelete, grades, getStudentActiveModules]);
 
   const table = useReactTable({
     data: tableData,
@@ -1068,6 +1087,21 @@ const AdminDashboard = () => {
 
       {isDashboard && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', marginBottom: 'var(--space-12)' }}>
+          <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: 'var(--radius-lg)', background: 'var(--primary-ultra-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Layers size={18} />
+              </div>
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: '900', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Semestre actif</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginTop: '2px' }}>
+                  Les modules affichés dans les emplois du temps, appels, notes et rapports suivent {activeSemester}.
+                </p>
+              </div>
+            </div>
+            <SemesterToggle activeSemester={activeSemester} onChange={setActiveSemester} />
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
             <StatCard delay={0.05} icon={GraduationCap} iconColor="var(--primary)" iconBg="var(--primary-ultra-light)" value={(students || []).length} label="Total Stagiaires" />
             <StatCard delay={0.1} icon={UserPlus} iconColor="#a06208" iconBg="rgba(254, 205, 8, 0.12)" value={(teachers || []).length} label="Total Formateurs" />
@@ -1077,16 +1111,16 @@ const AdminDashboard = () => {
 
           {/* New Requested Order in Grid format to keep dimensions */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
-            <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} />
-            <GradesBreakdownWidget students={students || []} grades={grades || {}} />
+            <TodaySessionsWidget schedules={schedules || []} teachers={teachers || []} getScheduleModule={getActiveScheduleModule} />
+            <GradesBreakdownWidget students={students || []} grades={grades || {}} allModules={allModules || []} activeSemester={activeSemester} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-3)' }}>
-            <PendingTasksWidget students={students || []} teachers={teachers || []} grades={grades || {}} teacherAttendance={teacherAttendance || []} />
+            <PendingTasksWidget students={students || []} teachers={teachers || []} grades={grades || {}} teacherAttendance={teacherAttendance || []} allModules={allModules || []} activeSemester={activeSemester} />
             <ActivityFeedWidget notifications={notifications || []} onClear={clearNotifications} />
           </div>
 
-          <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} allModules={allModules || []} />
+          <ScheduleCalendar realSchedules={schedules || []} teachers={teachers || []} activeSemester={activeSemester} setActiveSemester={setActiveSemester} getScheduleModule={getActiveScheduleModule} />
         </div>
       )}
 

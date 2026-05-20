@@ -70,7 +70,7 @@ const getGroupAbbreviation = (filiere, annee) => {
 const TeacherPortal = () => {
   const { teacherId } = useParams();
   const navigate = useNavigate();
-  const { teachers, students, updateGrades, grades, loading, studentAttendance, updateStudentAttendance, schedules, updateTeacherAttendance, loadAttendanceForSession, teacherAttendance, loadTeacherAttendanceForDate, confirmAction } = useApp();
+  const { teachers, students, updateGrades, grades, loading, studentAttendance, updateStudentAttendance, schedules, updateTeacherAttendance, loadAttendanceForSession, teacherAttendance, loadTeacherAttendanceForDate, confirmAction, modules: allModules = [], activeSemester, getActiveScheduleModule } = useApp();
   const { showToast } = useToast();
   
   const teacher = useMemo(() => {
@@ -113,14 +113,15 @@ const TeacherPortal = () => {
     const unique = [];
     const seen = new Set();
     unfiltered.forEach(s => {
-      const key = `${s.time}_${s.filiere}_${s.annee}_${s.module}`.toLowerCase().trim();
+      const displayModule = getActiveScheduleModule(s);
+      const key = `${s.time}_${s.filiere}_${s.annee}_${displayModule}`.toLowerCase().trim();
       if (!seen.has(key)) {
         seen.add(key);
-        unique.push(s);
+        unique.push({ ...s, displayModule });
       }
     });
     return unique;
-  }, [teacher, schedules, dayOfWeek]);
+  }, [teacher, schedules, dayOfWeek, getActiveScheduleModule]);
 
   // Load teacher attendance for today to detect if already done
   useEffect(() => {
@@ -134,13 +135,13 @@ const TeacherPortal = () => {
     if (!teacher || todaysSessions.length === 0 || accessMode !== 'attendance') return false;
     // Check if ALL sessions have a 'present' teacher attendance record for today
     return todaysSessions.every(session => {
-      const safeModule = (session.module || 'global').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeModule = (getActiveScheduleModule(session) || 'global').replace(/[^a-zA-Z0-9]/g, '_');
       const safeTime = (session.time || '').replace(/[^0-9]/g, '') || 'x';
       const docId = `${teacher.id}_${safeModule}_${safeTime}_${selectedDate}`;
       const record = teacherAttendance.find(a => a.id === docId);
       return record && record.status === 'present';
     });
-  }, [teacher, todaysSessions, teacherAttendance, selectedDate, accessMode]);
+  }, [teacher, todaysSessions, teacherAttendance, selectedDate, accessMode, getActiveScheduleModule]);
 
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const currentSession = useMemo(() => {
@@ -166,9 +167,19 @@ const TeacherPortal = () => {
 
   React.useEffect(() => {
     if (currentSession) {
+      const sessionModule = getActiveScheduleModule(currentSession);
       setSelectedGroup(currentSession.filiere);
-      setSelectedSubject(currentSession.module);
+      setSelectedSubject(sessionModule);
       setFilterYear(currentSession.annee);
+      const matchingModule = (allModules || []).find(m =>
+        m.major === currentSession.filiere &&
+        m.year === currentSession.annee &&
+        m.name === sessionModule
+      );
+      if (matchingModule?.diploma) {
+        setSelectedDiploma(matchingModule.diploma);
+        return;
+      }
       for (const dip in MODULES_DATA) {
         if (MODULES_DATA[dip][currentSession.filiere]) {
           setSelectedDiploma(dip);
@@ -176,7 +187,7 @@ const TeacherPortal = () => {
         }
       }
     }
-  }, [currentSession]);
+  }, [currentSession, allModules, getActiveScheduleModule]);
 
   React.useEffect(() => {
     if (activeTab === 'attendance' && selectedSubject && selectedDate) {
@@ -186,40 +197,55 @@ const TeacherPortal = () => {
 
   const availableDiplomas = useMemo(() => {
     if (!teacher) return [];
-    const teacherDiplomas = teacher.diplomas || (teacher.diploma ? [teacher.diploma] : []);
     const teacherSubjects = teacher.subjects || [teacher.subject] || [];
-    return teacherDiplomas.filter(dip => {
-      const diplomaData = MODULES_DATA[dip] || {};
-      return Object.values(diplomaData).some(filiere => 
-        Object.values(filiere).some(yearModules => teacherSubjects.some(s => yearModules.includes(s)))
-      );
-    });
-  }, [teacher]);
+    return Array.from(new Set((allModules || [])
+      .filter(m => teacherSubjects.includes(m.name) && (m.semester || 'S1') === activeSemester)
+      .map(m => m.diploma)
+      .filter(Boolean)));
+  }, [teacher, allModules, activeSemester]);
 
   const availableYears = useMemo(() => {
     if (!teacher || !selectedDiploma) return [];
     const teacherYears = teacher.years || ['1ère année', '2ème année'];
     const teacherSubjects = teacher.subjects || [teacher.subject] || [];
-    const diplomaData = MODULES_DATA[selectedDiploma] || {};
-    return teacherYears.filter(y => 
-      Object.values(diplomaData).some(filiere => (filiere[y] || []).some(m => teacherSubjects.includes(m)))
+    return teacherYears.filter(y =>
+      (allModules || []).some(m =>
+        m.diploma === selectedDiploma &&
+        m.year === y &&
+        (m.semester || 'S1') === activeSemester &&
+        teacherSubjects.includes(m.name)
+      )
     );
-  }, [teacher, selectedDiploma]);
+  }, [teacher, selectedDiploma, allModules, activeSemester]);
 
   const filteredGroups = useMemo(() => {
     if (!teacher || !selectedDiploma || !filterYear) return [];
     const teacherGroups = teacher.groups || [];
     const teacherSubjects = teacher.subjects || [teacher.subject] || [];
-    const diplomaData = MODULES_DATA[selectedDiploma] || {};
-    return teacherGroups.filter(g => (diplomaData[g]?.[filterYear] || []).some(m => teacherSubjects.includes(m)));
-  }, [teacher, selectedDiploma, filterYear]);
+    return teacherGroups.filter(g =>
+      (allModules || []).some(m =>
+        m.diploma === selectedDiploma &&
+        m.major === g &&
+        m.year === filterYear &&
+        (m.semester || 'S1') === activeSemester &&
+        teacherSubjects.includes(m.name)
+      )
+    );
+  }, [teacher, selectedDiploma, filterYear, allModules, activeSemester]);
 
   const filteredSubjects = useMemo(() => {
     if (!teacher || !selectedDiploma || !selectedGroup || !filterYear) return [];
     const teacherSubjects = teacher.subjects || [teacher.subject] || [];
-    const validModules = MODULES_DATA[selectedDiploma]?.[selectedGroup]?.[filterYear] || [];
-    return teacherSubjects.filter(s => validModules.includes(s));
-  }, [teacher, selectedDiploma, selectedGroup, filterYear]);
+    return (allModules || [])
+      .filter(m =>
+        m.diploma === selectedDiploma &&
+        m.major === selectedGroup &&
+        m.year === filterYear &&
+        (m.semester || 'S1') === activeSemester &&
+        teacherSubjects.includes(m.name)
+      )
+      .map(m => m.name);
+  }, [teacher, selectedDiploma, selectedGroup, filterYear, allModules, activeSemester]);
 
   React.useEffect(() => {
     if (availableDiplomas.length > 0 && (!selectedDiploma || !availableDiplomas.includes(selectedDiploma))) setSelectedDiploma(availableDiplomas[0]);
@@ -561,7 +587,7 @@ const TeacherPortal = () => {
               <SessionStat label="Séance" value={dayOfWeek} icon={CalendarDays} />
               <SessionStat label="Horaire" value={currentSession.time} icon={Clock} />
               <SessionStat label="Groupe" value={getGroupAbbreviation(currentSession.filiere, currentSession.annee)} icon={Users} />
-              <SessionStat label="Module" value={currentSession.module} icon={BookOpen} />
+              <SessionStat label="Module" value={selectedSubject || getActiveScheduleModule(currentSession)} icon={BookOpen} />
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--primary)' }}>
@@ -576,7 +602,7 @@ const TeacherPortal = () => {
           <div style={{ minWidth: '240px' }}>
             <select className="input-premium" style={{ width: '100%', background: 'white' }} value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)}>
               <option value="">-- Choisir la séance --</option>
-              {todaysSessions.map(s => <option key={s.id} value={s.id}>{s.time} - {getGroupAbbreviation(s.filiere, s.annee)} - {s.module}</option>)}
+              {todaysSessions.map(s => <option key={s.id} value={s.id}>{s.time} - {getGroupAbbreviation(s.filiere, s.annee)} - {s.displayModule || s.module}</option>)}
             </select>
           </div>
         </motion.div>

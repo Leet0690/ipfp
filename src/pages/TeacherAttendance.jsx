@@ -113,7 +113,7 @@ const getDayNameFromDate = (dateStr) => {
   return DAY_NAMES[date.getDay()];
 };
 
-const getScheduledRowsForDate = ({ schedules = [], teachers = [], date, searchTerm = '' }) => {
+const getScheduledRowsForDate = ({ schedules = [], teachers = [], date, searchTerm = '', getScheduleModule = (session) => session.module || '' }) => {
   const dayName = getDayNameFromDate(date);
   const term = searchTerm.trim().toLowerCase();
   const slotsMap = new Map();
@@ -126,6 +126,7 @@ const getScheduledRowsForDate = ({ schedules = [], teachers = [], date, searchTe
     const normalizedTime = normalizeTimeSlot(session.time);
     const slotKey = `${teacher.id}_${normalizedTime}`;
     const abbr = getGroupAbbreviation(session.filiere, session.annee);
+    const displayModule = getScheduleModule(session);
 
     if (slotsMap.has(slotKey)) {
       const row = slotsMap.get(slotKey);
@@ -139,8 +140,8 @@ const getScheduledRowsForDate = ({ schedules = [], teachers = [], date, searchTe
       teacher,
       date,
       duration: calcDuration(session.time),
-      docId: makeAttendanceDocId(teacher.id, session.module, session.time, date),
-      module: session.module,
+      docId: makeAttendanceDocId(teacher.id, displayModule, session.time, date),
+      module: displayModule,
       time: session.time,
       groups: [abbr]
     });
@@ -176,7 +177,7 @@ const mThStyle = { padding: '12px 4px', fontSize: '11px', fontWeight: '800', col
 const mTdStyle = { padding: '10px 8px', verticalAlign: 'middle' };
 
 const TeacherAttendance = () => {
-  const { teachers, teacherAttendance, updateTeacherAttendance, loadTeacherAttendanceForDate, loadTeacherAttendanceForMonth, schedules, loading } = useApp();
+  const { teachers, teacherAttendance, updateTeacherAttendance, loadTeacherAttendanceForDate, loadTeacherAttendanceForMonth, schedules, loading, getActiveScheduleModule, activeSemester, setActiveSemester } = useApp();
   const { showToast } = useToast();
 
   const [view, setView] = useState('daily');
@@ -189,8 +190,8 @@ const TeacherAttendance = () => {
   const dayOfWeek = useMemo(() => getDayNameFromDate(selectedDate), [selectedDate]);
 
   const sessionRows = useMemo(() => {
-    return getScheduledRowsForDate({ schedules, teachers, date: selectedDate, searchTerm });
-  }, [schedules, teachers, searchTerm, selectedDate]);
+    return getScheduledRowsForDate({ schedules, teachers, date: selectedDate, searchTerm, getScheduleModule: getActiveScheduleModule });
+  }, [schedules, teachers, searchTerm, selectedDate, getActiveScheduleModule]);
 
   const stats = useMemo(() => {
     let presents = 0, absents = 0, totalHours = 0;
@@ -257,7 +258,7 @@ const TeacherAttendance = () => {
     const byDay = {}, hoursByDay = {};
     mDays.forEach(d => {
       const dateStr = `${monthPrefix}-${pad(d)}`;
-      const scheduledRows = getScheduledRowsForDate({ schedules, teachers: [teacher], date: dateStr });
+      const scheduledRows = getScheduledRowsForDate({ schedules, teachers: [teacher], date: dateStr, getScheduleModule: getActiveScheduleModule });
       const recs = scheduledRows
         .map(row => getRecordForScheduledRow(teacherAttendance, row))
         .filter(Boolean);
@@ -267,7 +268,7 @@ const TeacherAttendance = () => {
     const counts = { present: 0, absent: 0, totalHours: 0 };
     mDays.forEach(d => { if (byDay[d]) counts[byDay[d]]++; counts.totalHours += hoursByDay[d] || 0; });
     return { teacher, byDay, hoursByDay, counts };
-  }), [mFilteredTeachers, teacherAttendance, schedules, mDays, monthPrefix]);
+  }), [mFilteredTeachers, teacherAttendance, schedules, mDays, monthPrefix, getActiveScheduleModule]);
 
   const mGlobalStats = useMemo(() => {
     const t = { present: 0, absent: 0, totalHours: 0 };
@@ -351,6 +352,14 @@ const TeacherAttendance = () => {
                 <div style={{ position: 'relative' }}>
                   <Search size={14} style={fIcon} />
                   <input type="text" className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} placeholder="Nom..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                </div>
+              </div>
+              <div style={fGroup}>
+                <label style={labelStyle}>Semestre</label>
+                <div style={{ display: 'inline-flex', padding: '4px', borderRadius: 'var(--radius-xl)', background: 'var(--bg-page)', border: '1px solid var(--border-light)', gap: '3px', alignSelf: 'stretch' }}>
+                  {['S1', 'S2'].map(sem => (
+                    <button key={sem} type="button" onClick={() => setActiveSemester(sem)} style={{ flex: 1, padding: '7px 14px', borderRadius: 'var(--radius-lg)', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '900', transition: 'all 0.18s ease', background: activeSemester === sem ? 'var(--primary)' : 'transparent', color: activeSemester === sem ? 'white' : 'var(--text-muted)', boxShadow: activeSemester === sem ? 'var(--shadow-xs)' : 'none' }} title={`Afficher les modules ${sem}`}>{sem}</button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -471,6 +480,14 @@ const TeacherAttendance = () => {
                 <div style={{ position: 'relative' }}>
                   <Search size={13} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
                   <input type="text" className="input-premium" style={{ width: '100%', paddingLeft: '34px' }} placeholder="Nom du formateur..." value={mSearch} onChange={e => setMSearch(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Semestre</label>
+                <div style={{ display: 'inline-flex', padding: '4px', borderRadius: 'var(--radius-xl)', background: 'var(--bg-page)', border: '1px solid var(--border-light)', gap: '3px' }}>
+                  {['S1', 'S2'].map(sem => (
+                    <button key={sem} type="button" onClick={() => setActiveSemester(sem)} style={{ flex: 1, minWidth: '48px', padding: '7px 14px', borderRadius: 'var(--radius-lg)', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '900', transition: 'all 0.18s ease', background: activeSemester === sem ? 'var(--primary)' : 'transparent', color: activeSemester === sem ? 'white' : 'var(--text-muted)', boxShadow: activeSemester === sem ? 'var(--shadow-xs)' : 'none' }} title={`Afficher les modules ${sem}`}>{sem}</button>
+                  ))}
                 </div>
               </div>
             </div>

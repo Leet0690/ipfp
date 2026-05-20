@@ -68,7 +68,7 @@ const Grade = ({ val }) => {
 
 const StudentResults = () => {
   const { studentId } = useParams();
-  const { students = [], grades = {}, loading = false, modules: allModules = [] } = useApp() || {};
+  const { students = [], grades = {}, loading = false, modules: allModules = [], activeSemester = 'S1' } = useApp() || {};
 
   const student = students.find(s => {
     if (!s) return false;
@@ -100,7 +100,10 @@ const StudentResults = () => {
 
   const studentGrades = grades[student.id] || {};
   const studentModules = (allModules || []).filter(m =>
-    m.diploma === student.diploma && m.major === student.major && m.year === student.year
+    m.diploma === student.diploma &&
+    m.major === student.major &&
+    m.year === student.year &&
+    (m.semester || 'S1') === activeSemester
   );
   const moduleNames = studentModules.map(m => m.name || '');
 

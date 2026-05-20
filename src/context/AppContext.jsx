@@ -29,7 +29,9 @@ const CORE_CACHE_KEY = 'ipfp_v2_core_cache';
 const FINANCE_CACHE_KEY = 'ipfp_v2_finance_cache';
 const CORE_CACHE_TTL = 6 * 60 * 60 * 1000;
 const FINANCE_CACHE_TTL = 15 * 60 * 1000;
+const ACTIVE_SEMESTER_KEY = 'ipfp_active_semester';
 const pendingLoads = new Map();
+const normalizeSemester = (semester) => semester === 'S2' ? 'S2' : 'S1';
 const makeToken = (length = 32) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const values = new Uint32Array(length);
@@ -52,6 +54,11 @@ const mergeById = (current, incoming) => {
   const map = new Map((current || []).map(item => [item.id, item]));
   incoming.forEach(item => map.set(item.id, item));
   return Array.from(map.values());
+};
+
+const getScheduleModuleForSemester = (session = {}, semester = 'S1') => {
+  if (normalizeSemester(semester) === 'S2') return session.moduleS2 || session.module || '';
+  return session.moduleS1 || session.module || '';
 };
 
 const getTeacherAttendanceSlotKey = (record = {}) => {
@@ -180,6 +187,9 @@ export const AppProvider = ({ children }) => {
   const [expenses, setExpenses] = useState([]);
   const [modules, setModules] = useState([]);
   const [accessLogs, setAccessLogs] = useState([]);
+  const [activeSemester, setActiveSemesterState] = useState(() => {
+    try { return normalizeSemester(localStorage.getItem(ACTIVE_SEMESTER_KEY)); } catch { return 'S1'; }
+  });
   const [loading, setLoading] = useState(true);
   const studentAttendanceKeysRef = useRef(new Set());
   const teacherAttendanceKeysRef = useRef(new Set());
@@ -228,6 +238,43 @@ export const AppProvider = ({ children }) => {
     window.addEventListener('beforeunload', clearDirectorSession);
     return () => window.removeEventListener('beforeunload', clearDirectorSession);
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadActiveSemester = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'app'));
+        if (!isMounted || !snap.exists()) return;
+        const nextSemester = normalizeSemester(snap.data()?.activeSemester);
+        setActiveSemesterState(nextSemester);
+        try { localStorage.setItem(ACTIVE_SEMESTER_KEY, nextSemester); } catch { }
+      } catch (error) {
+        console.warn('Impossible de charger le semestre actif:', error);
+      }
+    };
+    loadActiveSemester();
+    return () => { isMounted = false; };
+  }, []);
+
+  const setActiveSemester = useCallback(async (semester) => {
+    const nextSemester = normalizeSemester(semester);
+    setActiveSemesterState(nextSemester);
+    try { localStorage.setItem(ACTIVE_SEMESTER_KEY, nextSemester); } catch { }
+    try {
+      await setDoc(doc(db, 'settings', 'app'), {
+        activeSemester: nextSemester,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      showToast(`Semestre ${nextSemester} active.`, 'success');
+    } catch (error) {
+      console.warn('Impossible de synchroniser le semestre actif:', error);
+      showToast(`Semestre ${nextSemester} active localement.`, 'warning');
+    }
+  }, [showToast]);
+
+  const getActiveScheduleModule = useCallback((session = {}) => {
+    return getScheduleModuleForSemester(session, activeSemester);
+  }, [activeSemester]);
 
   // ──────────────────────────────────────────────────────────
   // OPTIMISATION FIREBASE (QUOTA) : Chargement ciblé et unique
@@ -856,6 +903,7 @@ export const AppProvider = ({ children }) => {
       payments, salaries, expenses, loadFinancialData, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary, addExpense, deleteExpense,
       modules, addModule, updateModule, deleteModule,
       accessLogs, logAppAccess, loadAccessLogs,
+      activeSemester, setActiveSemester, getActiveScheduleModule,
       confirmAction, notifications, markNotificationAsRead, clearNotifications
     }}>
       {children}

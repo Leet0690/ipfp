@@ -54,11 +54,6 @@ const getGroupAbbreviation = (filiere, annee) => {
   return diplomaAbbr + majorAbbr + yearNum;
 };
 
-const getScheduleModuleForSemester = (session, semester) => {
-  if (semester === 'S2') return session.moduleS2 || session.module || '';
-  return session.moduleS1 || session.module || '';
-};
-
 const labelStyle = {
   fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)',
   textTransform: 'uppercase', letterSpacing: '0.08em'
@@ -67,7 +62,8 @@ const labelStyle = {
 const ScheduleManagement = () => {
   const { 
     teachers, schedules, addSchedule, updateSchedule, 
-    deleteSchedule, modules: allModules, confirmAction 
+    deleteSchedule, modules: allModules, confirmAction,
+    activeSemester, setActiveSemester, getActiveScheduleModule
   } = useApp();
   const { showToast } = useToast();
 
@@ -78,7 +74,7 @@ const ScheduleManagement = () => {
     allFilieres.includes('Développement Informatique') ? 'Développement Informatique' : allFilieres[0]
   );
   const [annee, setAnnee] = useState(allAnnees[0]);
-  const [semester, setSemester] = useState('S1');
+  const semester = activeSemester;
 
   const groupLabel = useMemo(() => getGroupAbbreviation(filiere, annee), [filiere, annee]);
   const modulesBySemester = useMemo(() => ({
@@ -99,11 +95,6 @@ const ScheduleManagement = () => {
   const [formData, setFormData] = useState({
     day: 'Lundi', time: '08:30-10:30', module: '', moduleS1: '', moduleS2: '', teacherId: '', room: '', type: 'Cours'
   });
-
-  const currentModules = useMemo(
-    () => modulesBySemester[semester] || [],
-    [modulesBySemester, semester]
-  );
 
   const openAdd = () => {
     setEditingSession(null);
@@ -212,7 +203,7 @@ const ScheduleManagement = () => {
             <button
               key={sem}
               type="button"
-              onClick={() => setSemester(sem)}
+              onClick={() => setActiveSemester(sem)}
               style={{
                 minWidth: '48px',
                 padding: '7px 14px',
@@ -352,7 +343,7 @@ const ScheduleManagement = () => {
                       const height = Math.max(timeToPixels(session.end) - top, PX_PER_HOUR * 0.75);
                       const isTP = session.type === 'TP';
                       const teacher = teachers.find(t => t.id === session.teacherId);
-                      const displayedModule = getScheduleModuleForSemester(session, semester);
+                      const displayedModule = getActiveScheduleModule(session);
 
                         return (
                           <motion.div
@@ -568,7 +559,7 @@ const ScheduleManagement = () => {
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Module / Matière</label>
+                  <label style={labelStyle}>Module S1 / Même horaire</label>
                   <select
                     className="input-premium" style={{ width: '100%', marginTop: '6px' }} required
                     value={formData.moduleS1}
@@ -580,7 +571,7 @@ const ScheduleManagement = () => {
                       if (!teacher) return <option disabled>Veuillez sélectionner un formateur d'abord</option>;
                       const teacherModules = teacher.subjects || (teacher.subject ? [teacher.subject] : []);
                       const filtered = (modulesBySemester.S1 || []).filter(m => teacherModules.includes(m));
-                      if (filtered.length === 0) return <option disabled>Aucun module commun disponible pour {semester}</option>;
+                      if (filtered.length === 0) return <option disabled>Aucun module commun disponible pour S1</option>;
                       return filtered.map(m => <option key={m} value={m}>{m}</option>);
                     })()}
                   </select>
