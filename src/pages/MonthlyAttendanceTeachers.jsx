@@ -11,18 +11,38 @@ const MONTHS = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
 ];
 
-const PRIORITY = { absent: 0, retard: 1, present: 2 };
-
-const aggregateStatus = (records) => {
-  if (!records || records.length === 0) return null;
-  return records.reduce((best, r) => {
-    if (best === null) return r.status;
-    return (PRIORITY[r.status] ?? 3) < (PRIORITY[best] ?? 3) ? r.status : best;
-  }, null);
+const calcDuration = (timeStr) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d{1,2})[h:]?(\d{2})?\s*[-–—]\s*(\d{1,2})[h:]?(\d{2})?/i);
+  if (!match) return 0;
+  try {
+    const h1 = parseInt(match[1] || 0, 10), m1 = parseInt(match[2] || 0, 10);
+    const h2 = parseInt(match[3] || 0, 10), m2 = parseInt(match[4] || 0, 10);
+    return Math.max(0, Math.round(((h2 * 60 + m2) - (h1 * 60 + m1)) / 60 * 100) / 100);
+  } catch { return 0; }
 };
 
-const aggregateHours = (records) =>
-  (records || []).reduce((sum, r) => sum + (r.status === 'present' ? Number(r.hours) || 0 : 0), 0);
+const aggregateStatus = (records) => {
+  if (!records?.length) return null;
+  const hasPresent = records.some(r => r.status === 'present');
+  if (hasPresent) return 'present';
+  const hasAbsent = records.some(r => r.status === 'absent');
+  if (hasAbsent) return 'absent';
+  return null;
+};
+
+const aggregateHours = (records) => {
+  if (!records?.length) return 0;
+  const groups = {};
+  records.forEach(r => {
+    if (r.status !== 'present') return;
+    const h = Number(r.hours);
+    const calculated = h > 0 ? h : (calcDuration(r.timeSlot) || 4);
+    const slotKey = (r.timeSlot || '').replace(/[^0-9]/g, '') || ('global_' + Math.random());
+    groups[slotKey] = Math.max(groups[slotKey] || 0, calculated);
+  });
+  return Object.values(groups).reduce((sum, val) => sum + val, 0);
+};
 
 const StatusCell = ({ status }) => {
   if (!status) return (

@@ -107,7 +107,19 @@ const TeacherPortal = () => {
 
   const todaysSessions = useMemo(() => {
     if (!teacher) return [];
-    return (schedules || []).filter(s => s.teacherId === teacher.id && s.day === dayOfWeek);
+    const unfiltered = (schedules || []).filter(s => s.teacherId === teacher.id && s.day === dayOfWeek);
+    
+    // Deduplicate sessions that are exactly identical (same time, same filiere, same annee, same module)
+    const unique = [];
+    const seen = new Set();
+    unfiltered.forEach(s => {
+      const key = `${s.time}_${s.filiere}_${s.annee}_${s.module}`.toLowerCase().trim();
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(s);
+      }
+    });
+    return unique;
   }, [teacher, schedules, dayOfWeek]);
 
   // Load teacher attendance for today to detect if already done

@@ -54,12 +54,101 @@ const mergeById = (current, incoming) => {
   return Array.from(map.values());
 };
 
+const getTeacherAttendanceSlotKey = (record = {}) => {
+  const safeTime = (record.timeSlot || '').replace(/[^0-9]/g, '') || 'x';
+  return `${record.teacherId || ''}_${record.date || ''}_${safeTime}`;
+};
+
 const getMonthBounds = (monthIndex, year) => {
   const start = new Date(year, monthIndex, 1);
   const end = new Date(year, monthIndex + 1, 0);
   const pad = (value) => String(value).padStart(2, '0');
   const toISO = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   return { start: toISO(start), end: toISO(end) };
+};
+
+const ACCESS_LOG_SESSION_KEY = 'ipfp_access_logged_this_session';
+
+const getBrowserName = (userAgent = '') => {
+  if (/Edg\//i.test(userAgent)) return 'Microsoft Edge';
+  if (/OPR\//i.test(userAgent)) return 'Opera';
+  if (/Firefox\//i.test(userAgent)) return 'Firefox';
+  if (/CriOS\//i.test(userAgent)) return 'Chrome iOS';
+  if (/Chrome\//i.test(userAgent)) return 'Chrome';
+  if (/Safari\//i.test(userAgent)) return 'Safari';
+  return 'Navigateur inconnu';
+};
+
+const getOsName = (userAgent = '') => {
+  if (/Windows NT/i.test(userAgent)) return 'Windows';
+  if (/Android/i.test(userAgent)) return 'Android';
+  if (/iPhone|iPad|iPod/i.test(userAgent)) return 'iOS';
+  if (/Mac OS X|Macintosh/i.test(userAgent)) return 'macOS';
+  if (/Linux/i.test(userAgent)) return 'Linux';
+  return 'OS inconnu';
+};
+
+const getDeviceType = (userAgent = '') => {
+  if (/iPad|Tablet|PlayBook|Silk/i.test(userAgent)) return 'Tablette';
+  if (/Mobi|Android|iPhone|iPod/i.test(userAgent)) return 'Mobile';
+  return 'Ordinateur';
+};
+
+const getLocalDateParts = (date = new Date()) => {
+  const pad = (value) => String(value).padStart(2, '0');
+  return {
+    date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    time: `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  };
+};
+
+const fetchPublicIp = async () => {
+  if (typeof fetch === 'undefined' || typeof AbortController === 'undefined') return 'Non disponible';
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+  try {
+    const response = await fetch('https://api.ipify.org?format=json', {
+      signal: controller.signal,
+      cache: 'no-store'
+    });
+    if (!response.ok) return 'Non disponible';
+    const data = await response.json();
+    return data?.ip || 'Non disponible';
+  } catch {
+    return 'Non disponible';
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const buildAccessLogPayload = async ({ path = '', accessType = 'app' } = {}) => {
+  const now = new Date();
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+  const browser = getBrowserName(userAgent);
+  const os = getOsName(userAgent);
+  const deviceType = getDeviceType(userAgent);
+  const { date, time } = getLocalDateParts(now);
+  const screenSize = typeof window !== 'undefined' && window.screen
+    ? `${window.screen.width}x${window.screen.height}`
+    : '';
+
+  return {
+    ipAddress: await fetchPublicIp(),
+    deviceName: [os, browser, deviceType].filter(Boolean).join(' - '),
+    browser,
+    os,
+    deviceType,
+    screenSize,
+    userAgent,
+    path: path || (typeof window !== 'undefined' ? window.location.pathname : ''),
+    hostname: typeof window !== 'undefined' ? window.location.hostname : '',
+    accessType,
+    date,
+    time,
+    loggedAt: now.toISOString(),
+    createdAt: serverTimestamp()
+  };
 };
 
 export const AppProvider = ({ children }) => {
@@ -90,10 +179,12 @@ export const AppProvider = ({ children }) => {
   const [salaries, setSalaries] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [modules, setModules] = useState([]);
+  const [accessLogs, setAccessLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const studentAttendanceKeysRef = useRef(new Set());
   const teacherAttendanceKeysRef = useRef(new Set());
   const financeLoadedRef = useRef(false);
+  const accessLoggedRef = useRef(false);
 
   // Modal de confirmation global
   const [confirmState, setConfirmState] = useState({ 
@@ -153,7 +244,7 @@ export const AppProvider = ({ children }) => {
         const isStudentPortal = path.startsWith('/results/');
 
         if (isAuthenticated || isDirectorAuth) {
-          // 1. Tentative de restauration depuis le cache local (0 lecture Firestore)
+          // 1. Restore local cache immediately, then refresh from Firebase.
           const cached = readCache(CORE_CACHE_KEY, CORE_CACHE_TTL);
           if (cached && isMounted && Array.isArray(cached.students)) {
             setStudents(cached.students || []);
@@ -162,10 +253,9 @@ export const AppProvider = ({ children }) => {
             setSchedules(cached.schedules || []);
             setModules(cached.modules || []);
             setLoading(false);
-            return;
           }
 
-          // 2. Core admin load only: no attendance or finance reads here.
+          // 2. Core admin refresh only: no attendance or finance reads here.
           const coreLoadKey = 'admin-core';
           if (!pendingLoads.has(coreLoadKey)) {
             pendingLoads.set(coreLoadKey, Promise.all([
@@ -360,6 +450,43 @@ export const AppProvider = ({ children }) => {
     setIsAuthenticated(false);
     showToast('Déconnexion effectuée');
   };
+
+  const logAppAccess = useCallback(async (context = {}) => {
+    if (accessLoggedRef.current) return;
+
+    try {
+      if (sessionStorage.getItem(ACCESS_LOG_SESSION_KEY) === 'true') {
+        accessLoggedRef.current = true;
+        return;
+      }
+      sessionStorage.setItem(ACCESS_LOG_SESSION_KEY, 'true');
+    } catch {
+      // sessionStorage can be unavailable in private browsing.
+    }
+
+    accessLoggedRef.current = true;
+
+    try {
+      const newLog = await buildAccessLogPayload(context);
+      const docRef = await addDoc(collection(db, 'access_logs'), newLog);
+      setAccessLogs(prev => [{ id: docRef.id, ...newLog }, ...prev].slice(0, 500));
+    } catch (error) {
+      console.error('Error logging app access:', error);
+    }
+  }, []);
+
+  const loadAccessLogs = useCallback(async () => {
+    try {
+      const snapshot = await getDocs(query(collection(db, 'access_logs'), orderBy('loggedAt', 'desc'), limit(500)));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setAccessLogs(data);
+      return data;
+    } catch (error) {
+      console.error('Error loading access logs:', error);
+      showToast('Erreur de chargement du journal des accès', 'error');
+      return [];
+    }
+  }, [showToast]);
 
   // --- STAGIAIRES ---
   const addStudent = async (studentData) => {
@@ -566,17 +693,29 @@ export const AppProvider = ({ children }) => {
     const docId = `${teacherId}_${safeModule}_${safeTime}_${date}`;
     const data = { teacherId, date, status, hours: status === 'present' ? hours : 0, comment: comment || '', moduleId: moduleId || '', timeSlot: timeSlot || '', timestamp: serverTimestamp() };
     
+    const duplicateSnapshot = await getDocs(query(
+      collection(db, 'attendance_formateurs'),
+      where('teacherId', '==', teacherId),
+      where('date', '==', date)
+    ));
+    const duplicateDeletes = duplicateSnapshot.docs
+      .filter(d => d.id !== docId && ((d.data().timeSlot || '').replace(/[^0-9]/g, '') || 'x') === safeTime)
+      .map(d => deleteDoc(d.ref));
+    if (duplicateDeletes.length > 0) await Promise.all(duplicateDeletes);
+
     await setDoc(doc(db, 'attendance_formateurs', docId), data, { merge: true });
     
     setTeacherAttendance(prev => {
-      const existingIdx = prev.findIndex(a => a.id === docId);
       const updatedRecord = { id: docId, ...data };
+      const updatedSlotKey = getTeacherAttendanceSlotKey(updatedRecord);
+      const deduped = prev.filter(a => a.id === docId || getTeacherAttendanceSlotKey(a) !== updatedSlotKey);
+      const existingIdx = deduped.findIndex(a => a.id === docId);
       if (existingIdx >= 0) {
-        const updated = [...prev];
+        const updated = [...deduped];
         updated[existingIdx] = updatedRecord;
         return updated;
       }
-      return [...prev, updatedRecord];
+      return [...deduped, updatedRecord];
     });
     showToast('Présence formateur enregistrée', 'success');
   };
@@ -590,8 +729,6 @@ export const AppProvider = ({ children }) => {
       setPayments(cached.payments || []);
       setSalaries(cached.salaries || []);
       setExpenses(cached.expenses || []);
-      financeLoadedRef.current = true;
-      return;
     }
 
     const financeLoadKey = 'finance';
@@ -714,6 +851,7 @@ export const AppProvider = ({ children }) => {
       schedules, addSchedule, updateSchedule, deleteSchedule, clearAllSchedules, migrateTeacherTokens,
       payments, salaries, expenses, loadFinancialData, addPayment, updatePayment, deletePayment, addSalary, updateSalary, deleteSalary, addExpense, deleteExpense,
       modules, addModule, updateModule, deleteModule,
+      accessLogs, logAppAccess, loadAccessLogs,
       confirmAction, notifications, markNotificationAsRead, clearNotifications
     }}>
       {children}

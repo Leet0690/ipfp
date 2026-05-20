@@ -20,6 +20,7 @@ const FinanceDashboard         = lazy(() => import('./pages/FinanceDashboard'));
 const ModuleManagement         = lazy(() => import('./pages/ModuleManagement'));
 const MonthlyAttendance        = lazy(() => import('./pages/MonthlyAttendance'));
 const MonthlyAttendanceTeachers = lazy(() => import('./pages/MonthlyAttendanceTeachers'));
+const AccessLogs               = lazy(() => import('./pages/AccessLogs'));
 
 const PageLoader = () => (
   <div className="flex-center" style={{ height: '100vh' }}>
@@ -56,9 +57,15 @@ const ScrollToTop = () => {
 };
 
 const AppContent = () => {
-  const { isAuthenticated, loading } = useApp();
+  const { isAuthenticated, loading, logAppAccess } = useApp();
   const location = useLocation();
   const isPublicRoute = location.pathname.startsWith('/portal/') || location.pathname.startsWith('/results/') || location.pathname.startsWith('/teacher/');
+
+  React.useEffect(() => {
+    if (loading || !logAppAccess) return;
+    const accessType = isPublicRoute ? 'portail' : (isAuthenticated ? 'admin' : 'public');
+    logAppAccess({ path: location.pathname, accessType });
+  }, [isAuthenticated, isPublicRoute, loading, location.pathname, logAppAccess]);
 
   if (isPortailDomain) {
     if (loading) return <PageLoader />;
@@ -99,6 +106,8 @@ const AppContent = () => {
         <Route path="/admin/reports" element={<Reports />} />
         <Route path="/admin/attendance-teachers" element={<TeacherAttendance />} />
         <Route path="/admin/finance" element={<FinanceDashboard />} />
+        <Route path="/admin/logs" element={<AccessLogs />} />
+        <Route path="/admin/access-logs" element={<Navigate to="/admin/logs" replace />} />
         <Route path="/portal/:teacherId" element={<TeacherPortal />} />
         <Route path="/teacher/:teacherId" element={<TeacherPortal />} />
         <Route path="/results/:studentId" element={<StudentResults />} />

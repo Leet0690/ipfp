@@ -11,18 +11,55 @@ import {
   CalendarRange, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
-/* ─── Monthly-view helpers ─── */
+/* ─── Helpers & Monthly-view helpers ─── */
+const calcDuration = (timeStr) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d{1,2})[h:]?(\d{2})?\s*[-–—]\s*(\d{1,2})[h:]?(\d{2})?/i);
+  if (!match) return 0;
+  try {
+    const h1 = parseInt(match[1] || 0, 10), m1 = parseInt(match[2] || 0, 10);
+    const h2 = parseInt(match[3] || 0, 10), m2 = parseInt(match[4] || 0, 10);
+    return Math.max(0, Math.round(((h2 * 60 + m2) - (h1 * 60 + m1)) / 60 * 100) / 100);
+  } catch { return 0; }
+};
+
 const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const getRecordTimestamp = (record) => {
+  if (!record?.timestamp) return 0;
+  if (typeof record.timestamp.toMillis === 'function') return record.timestamp.toMillis();
+  if (typeof record.timestamp.seconds === 'number') return record.timestamp.seconds * 1000;
+  return 0;
+};
+const dedupeTeacherRecordsBySlot = (records = []) => {
+  const bySlot = {};
+  records.forEach(record => {
+    const slotKey = (record.timeSlot || '').replace(/[^0-9]/g, '') || 'global';
+    const current = bySlot[slotKey];
+    if (!current || getRecordTimestamp(record) >= getRecordTimestamp(current)) {
+      bySlot[slotKey] = record;
+    }
+  });
+  return Object.values(bySlot);
+};
 const aggregateStatus = (records) => {
-  if (!records?.length) return null;
-  const hasPresent = records.some(r => r.status === 'present');
+  const uniqueRecords = dedupeTeacherRecordsBySlot(records);
+  if (!uniqueRecords.length) return null;
+  const hasPresent = uniqueRecords.some(r => r.status === 'present');
   if (hasPresent) return 'present';
-  const hasAbsent = records.some(r => r.status === 'absent');
+  const hasAbsent = uniqueRecords.some(r => r.status === 'absent');
   if (hasAbsent) return 'absent';
   return null;
 };
-const aggregateHours = (records) =>
-  (records || []).reduce((sum, r) => sum + (r.status === 'present' ? Number(r.hours) || 0 : 0), 0);
+const aggregateHours = (records) => {
+  const uniqueRecords = dedupeTeacherRecordsBySlot(records);
+  if (!uniqueRecords.length) return 0;
+  return uniqueRecords.reduce((sum, r) => {
+    if (r.status !== 'present') return sum;
+    const h = Number(r.hours);
+    const calculated = h > 0 ? h : (calcDuration(r.timeSlot) || 4);
+    return sum + calculated;
+  }, 0);
+};
 
 const StatusCell = ({ status, hours }) => {
   if (!status) return (
@@ -45,18 +82,6 @@ const StatusCell = ({ status, hours }) => {
       {cfg.label}
     </div>
   );
-};
-
-/* ─── Helpers ─── */
-const calcDuration = (timeStr) => {
-  if (!timeStr) return 0;
-  const match = timeStr.match(/(\d{1,2})[h:]?(\d{2})?\s*[-–—]\s*(\d{1,2})[h:]?(\d{2})?/i);
-  if (!match) return 0;
-  try {
-    const h1 = parseInt(match[1] || 0, 10), m1 = parseInt(match[2] || 0, 10);
-    const h2 = parseInt(match[3] || 0, 10), m2 = parseInt(match[4] || 0, 10);
-    return Math.max(0, Math.round(((h2 * 60 + m2) - (h1 * 60 + m1)) / 60 * 100) / 100);
-  } catch { return 0; }
 };
 const formatHours = (h) => {
   if (!h) return '0h';
@@ -134,9 +159,8 @@ const TeacherAttendance = () => {
 
   const handleStatusChange = async (row, status) => {
     try {
-      const savedHours = teacherAttendance.find(a => a.id === row.docId)?.hours;
       const hours = status === 'present'
-        ? (pendingHours[row.docId] !== undefined ? parseFloat(pendingHours[row.docId]) || 0 : (savedHours !== undefined ? savedHours : row.duration))
+        ? (pendingHours[row.docId] !== undefined ? parseFloat(pendingHours[row.docId]) || 0 : row.duration)
         : 0;
       await updateTeacherAttendance(row.teacher.id, selectedDate, status, '', hours, row.module, row.time);
     }
