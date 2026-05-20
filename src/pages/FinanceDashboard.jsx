@@ -15,7 +15,7 @@ import {
   DoorOpen, 
   Search, 
   Plus, 
-  FileText, 
+  FileDown,
   Trash2, 
   Check, 
   ChevronLeft, 
@@ -33,6 +33,104 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+
+const calcDuration = (timeStr) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d{1,2})[h:]?(\d{2})?\s*[-–—]\s*(\d{1,2})[h:]?(\d{2})?/i);
+  if (!match) return 0;
+  try {
+    const h1 = parseInt(match[1] || 0, 10), m1 = parseInt(match[2] || 0, 10);
+    const h2 = parseInt(match[3] || 0, 10), m2 = parseInt(match[4] || 0, 10);
+    return Math.max(0, Math.round(((h2 * 60 + m2) - (h1 * 60 + m1)) / 60 * 100) / 100);
+  } catch { return 0; }
+};
+
+const getTeacherMonthlyHours = (attendance, teacherId, month, year) => {
+  const recordsByDate = {};
+  (attendance || []).forEach(a => {
+    if (a.teacherId !== teacherId || a.status !== 'present') return;
+    const parts = (a.date || '').split('-');
+    if (parts.length !== 3) return;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    if (m !== month || y !== year) return;
+    if (!recordsByDate[a.date]) recordsByDate[a.date] = [];
+    recordsByDate[a.date].push(a);
+  });
+
+  let totalHours = 0;
+  Object.values(recordsByDate).forEach(dayRecords => {
+    const groups = {};
+    dayRecords.forEach(r => {
+      const h = Number(r.hours);
+      const calculated = h > 0 ? h : (calcDuration(r.timeSlot) || 4);
+      const slotKey = (r.timeSlot || '').replace(/[^0-9]/g, '') || ('global_' + Math.random());
+      groups[slotKey] = Math.max(groups[slotKey] || 0, calculated);
+    });
+    totalHours += Object.values(groups).reduce((sum, val) => sum + val, 0);
+  });
+
+  return totalHours;
+};
+
+const formatMoney = (value) => (parseFloat(value) || 0).toLocaleString();
+
+const PAYMENT_FEE_FIELDS = [
+  { key: 'examFee', label: "Frais d'examen" },
+  { key: 'registrationFee', label: "Frais d'inscription" },
+  { key: 'supportFee', label: 'Support' }
+];
+
+const getPaymentFeeItems = (payment) => {
+  const legacyFees = Array.isArray(payment?.fees) ? payment.fees : [];
+  const normalizedLegacyFees = legacyFees
+    .map(fee => ({ label: fee.label, amount: parseFloat(fee.amount) || 0 }))
+    .filter(fee => fee.amount > 0);
+
+  const keyedFees = PAYMENT_FEE_FIELDS
+    .map(({ key, label }) => ({ label, amount: parseFloat(payment?.[key]) || 0 }))
+    .filter(fee => fee.amount > 0);
+
+  return normalizedLegacyFees.length ? normalizedLegacyFees : keyedFees;
+};
+
+const getPaymentTotal = (payment) => parseFloat(payment?.amount) || 0;
+
+const getPaymentBaseAmount = (payment) => {
+  if (payment?.tuitionAmount !== undefined) return parseFloat(payment.tuitionAmount) || 0;
+  const feesTotal = getPaymentFeeItems(payment).reduce((sum, fee) => sum + fee.amount, 0);
+  return Math.max(0, getPaymentTotal(payment) - feesTotal);
+};
+
+const getTeacherMonthlySessionRows = (attendance, teacherId, month, year) => {
+  const rowsByKey = {};
+  (attendance || []).forEach(record => {
+    if (record.teacherId !== teacherId || record.status !== 'present') return;
+    const parts = (record.date || '').split('-');
+    if (parts.length !== 3) return;
+    const recordYear = parseInt(parts[0], 10);
+    const recordMonth = parseInt(parts[1], 10) - 1;
+    if (recordMonth !== month || recordYear !== year) return;
+
+    const hours = Number(record.hours) > 0 ? Number(record.hours) : (calcDuration(record.timeSlot) || 4);
+    const key = `${record.date}_${record.timeSlot || ''}_${record.moduleId || ''}`;
+    if (!rowsByKey[key]) {
+      rowsByKey[key] = {
+        date: record.date,
+        module: record.moduleId || 'Seance',
+        timeSlot: record.timeSlot || '-',
+        hours
+      };
+    } else {
+      rowsByKey[key].hours = Math.max(rowsByKey[key].hours, hours);
+    }
+  });
+
+  return Object.values(rowsByKey).sort((a, b) =>
+    (a.date || '').localeCompare(b.date || '') ||
+    (a.timeSlot || '').localeCompare(b.timeSlot || '')
+  );
+};
 
 const EXPENSE_CATEGORIES = ['Loyer', 'Matériel', 'Fournitures', 'Services', 'Entretien', 'Communication', 'Transport', 'Autre'];
 
@@ -79,6 +177,9 @@ const FinanceDashboard = () => {
   const [paymentData, setPaymentData] = useState({
     studentId: '',
     amount: '',
+    examFee: '',
+    registrationFee: '',
+    supportFee: '',
     month: new Date().toLocaleString('fr-FR', { month: 'long' }),
     date: new Date().toISOString().split('T')[0],
     status: 'payé'
@@ -90,6 +191,10 @@ const FinanceDashboard = () => {
     month: new Date().getMonth(),
     year: new Date().getFullYear()
   });
+
+  const paymentBaseAmount = parseFloat(paymentData.amount) || 0;
+  const paymentExtraTotal = PAYMENT_FEE_FIELDS.reduce((sum, { key }) => sum + (parseFloat(paymentData[key]) || 0), 0);
+  const paymentGrandTotal = paymentBaseAmount + paymentExtraTotal;
 
   const months = [
     "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
@@ -124,28 +229,138 @@ const FinanceDashboard = () => {
   };
 
   const generateReceipt = (payment, student) => {
-    const doc = new jsPDF();
+    if (!student) return showToast('Stagiaire introuvable', 'warning');
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
     const w = doc.internal.pageSize.getWidth();
-    try { doc.addImage(logoBase64, 'JPEG', 15, 10, 40, 18); } catch(e) {}
-    doc.setFontSize(22); doc.setTextColor(40, 40, 40); doc.text('REÇU DE PAIEMENT', w/2, 45, { align: 'center' });
-    doc.setDrawColor(200); doc.line(15, 50, w - 15, 50);
-    doc.setFontSize(12); doc.setTextColor(80, 80, 80);
-    doc.text(`N° Reçu: ${payment.id.substring(0, 8).toUpperCase()}`, 15, 65);
-    doc.text(`Date: ${payment.date}`, w - 15, 65, { align: 'right' });
-    doc.setFillColor(248, 250, 252); doc.rect(15, 75, w - 30, 60, 'F');
-    doc.setDrawColor(226, 232, 240); doc.rect(15, 75, w - 30, 60, 'S');
-    doc.setTextColor(40, 40, 40); doc.setFont('helvetica', 'bold'); doc.text('Détails du Stagiaire:', 25, 85);
-    doc.setFont('helvetica', 'normal'); doc.text(`${student.firstName} ${student.lastName}`, 25, 95);
-    doc.text(`Filière: ${student.major}`, 25, 103);
-    doc.setFont('helvetica', 'bold'); doc.text('Détails du Paiement:', 110, 85);
-    doc.setFont('helvetica', 'normal'); doc.text(`Mois: ${payment.month}`, 110, 95);
-    doc.text(`Montant: ${payment.amount} DH`, 110, 103);
-    doc.text(`Mode: Cash`, 110, 111);
-    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-    doc.text(`TOTAL PAYÉ: ${payment.amount} DH`, w - 25, 125, { align: 'right' });
-    doc.setFontSize(10); doc.setFont('helvetica', 'italic'); doc.text('Signature et Cachet IPFP', w - 60, 160);
+    const margin = 10;
+    const feeItems = getPaymentFeeItems(payment);
+    const lineItems = [
+      { label: `Frais de formation - ${payment.month}`, amount: getPaymentBaseAmount(payment) },
+      ...feeItems
+    ].filter(item => item.amount > 0);
+    const total = getPaymentTotal(payment);
+
+    try { doc.addImage(logoBase64, 'JPEG', margin, 8, 34, 15); } catch(e) {}
+    doc.setFontSize(14); doc.setTextColor(35, 35, 35); doc.setFont('helvetica', 'bold');
+    doc.text('RECU DE PAIEMENT', w / 2, 28, { align: 'center' });
+    doc.setDrawColor(200); doc.line(margin, 33, w - margin, 33);
+
+    doc.setFontSize(8); doc.setTextColor(80, 80, 80); doc.setFont('helvetica', 'normal');
+    doc.text(`N Recu: ${payment.id.substring(0, 8).toUpperCase()}`, margin, 42);
+    doc.text(`Date: ${payment.date}`, w - margin, 42, { align: 'right' });
+
+    doc.setFillColor(248, 250, 252); doc.rect(margin, 48, w - (margin * 2), 34, 'F');
+    doc.setDrawColor(226, 232, 240); doc.rect(margin, 48, w - (margin * 2), 34, 'S');
+    doc.setTextColor(40, 40, 40); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text('Stagiaire', margin + 5, 57);
+    doc.text('Paiement', 86, 57);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+    doc.text(`${student.firstName || ''} ${student.lastName || ''}`.trim(), margin + 5, 65);
+    doc.text(`Filiere: ${student.major || '-'}`, margin + 5, 72);
+    doc.text(`Mois: ${payment.month}`, 86, 65);
+    doc.text('Mode: Cash', 86, 72);
+
+    let y = 94;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text('Designation', margin, y);
+    doc.text('Montant', w - margin, y, { align: 'right' });
+    y += 3;
+    doc.setDrawColor(210); doc.line(margin, y, w - margin, y);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+
+    lineItems.forEach(item => {
+      y += 8;
+      doc.text(item.label, margin, y);
+      doc.text(`${formatMoney(item.amount)} DH`, w - margin, y, { align: 'right' });
+    });
+
+    y += 10;
+    doc.setDrawColor(35); doc.line(margin, y, w - margin, y);
+    y += 9;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text('TOTAL PAYE', margin, y);
+    doc.text(`${formatMoney(total)} DH`, w - margin, y, { align: 'right' });
+
+    doc.setFontSize(8); doc.setFont('helvetica', 'italic');
+    doc.text('Signature et Cachet IPFP', w - margin - 38, 188);
     doc.save(`Recu_${student.lastName}_${payment.month}.pdf`);
     showToast('Reçu généré', 'success');
+  };
+
+  const generateTeacherReceipt = (salary) => {
+    const teacher = teachers.find(t => t.id === salary.teacherId);
+    const monthIndex = months.indexOf(salary.month);
+    const sessionRows = (Array.isArray(salary.sessions) && salary.sessions.length > 0)
+      ? salary.sessions
+      : getTeacherMonthlySessionRows(teacherAttendance, salary.teacherId, monthIndex, salary.year);
+    const totalHours = Math.round((sessionRows.reduce((sum, row) => sum + (parseFloat(row.hours) || 0), 0) || parseFloat(salary.hours) || 0) * 100) / 100;
+    const hourlyRate = parseFloat(salary.hourlyRate) || parseFloat(teacher?.hourlyRate) || (totalHours > 0 ? (parseFloat(salary.amount) || 0) / totalHours : 0);
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+    const w = doc.internal.pageSize.getWidth();
+    const margin = 10;
+    let y = 8;
+
+    try { doc.addImage(logoBase64, 'JPEG', margin, y, 34, 15); } catch(e) {}
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(35, 35, 35);
+    doc.text('RECU FORMATEUR', w / 2, 28, { align: 'center' });
+    doc.setDrawColor(200); doc.line(margin, 33, w - margin, 33);
+
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+    doc.text(`N Recu: ${salary.id.substring(0, 8).toUpperCase()}`, margin, 42);
+    doc.text(`Date: ${salary.date || new Date().toISOString().split('T')[0]}`, w - margin, 42, { align: 'right' });
+    doc.text(`Formateur: ${salary.teacherName || teacher?.name || '-'}`, margin, 50);
+    doc.text(`Periode: ${salary.month} ${salary.year}`, margin, 57);
+    doc.text(`Tarif: ${formatMoney(hourlyRate)} DH/h`, w - margin, 57, { align: 'right' });
+
+    y = 70;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.setFillColor(248, 250, 252); doc.rect(margin, y - 6, w - (margin * 2), 8, 'F');
+    doc.text('Date', margin + 2, y);
+    doc.text('Module', margin + 25, y);
+    doc.text('Horaire', w - 42, y, { align: 'right' });
+    doc.text('H', w - margin - 2, y, { align: 'right' });
+    doc.setDrawColor(226, 232, 240); doc.line(margin, y + 3, w - margin, y + 3);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+
+    if (sessionRows.length === 0) {
+      y += 12;
+      doc.text('Aucune seance detaillee disponible pour cette periode.', margin + 2, y);
+    } else {
+      sessionRows.forEach((row, index) => {
+        if (y > 166) {
+          doc.addPage('a5', 'portrait');
+          y = 18;
+        }
+        y += 8;
+        if (index % 2 === 0) {
+          doc.setFillColor(252, 252, 252);
+          doc.rect(margin, y - 5, w - (margin * 2), 7, 'F');
+        }
+        const moduleText = doc.splitTextToSize(row.module || '-', 58)[0] || '-';
+        doc.text(row.date || '-', margin + 2, y);
+        doc.text(moduleText, margin + 25, y);
+        doc.text(row.timeSlot || '-', w - 42, y, { align: 'right' });
+        doc.text(`${parseFloat(row.hours) || 0}`, w - margin - 2, y, { align: 'right' });
+      });
+    }
+
+    y = Math.min(y + 16, 178);
+    doc.setDrawColor(35); doc.line(margin, y, w - margin, y);
+    y += 8;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text('Total heures travaillees', margin, y);
+    doc.text(`${totalHours} h`, w - margin, y, { align: 'right' });
+    y += 8;
+    doc.text('Net a payer', margin, y);
+    doc.text(`${formatMoney(salary.amount)} DH`, w - margin, y, { align: 'right' });
+
+    doc.setFontSize(8); doc.setFont('helvetica', 'italic');
+    doc.text('Signature formateur', margin, 196);
+    doc.text('Signature et Cachet IPFP', w - margin - 38, 196);
+    doc.save(`Recu_Formateur_${(salary.teacherName || 'Formateur').replace(/\s+/g, '_')}_${salary.month}_${salary.year}.pdf`);
+    showToast('Reçu formateur généré', 'success');
   };
 
   const filteredPayments = useMemo(() => {
@@ -179,13 +394,7 @@ const FinanceDashboard = () => {
 
   const calculatedSalaries = useMemo(() => {
     return teachers.map(t => {
-      const hours = teacherAttendance
-        .filter(a => {
-          if (a.teacherId !== t.id || a.status !== 'present') return false;
-          const date = new Date(a.date);
-          return date.getMonth() === salaryFilter.month && date.getFullYear() === salaryFilter.year;
-        })
-        .reduce((acc, a) => acc + (parseFloat(a.hours) || 0), 0);
+      const hours = getTeacherMonthlyHours(teacherAttendance, t.id, salaryFilter.month, salaryFilter.year);
       const hourlyRate = parseFloat(t.hourlyRate) || 0;
       const total = hours * hourlyRate;
       const monthName = months[salaryFilter.month];
@@ -227,7 +436,7 @@ const FinanceDashboard = () => {
   );
 
   const stats = useMemo(() => {
-    const totalRevenue = payments.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+    const totalRevenue = payments.reduce((acc, p) => acc + getPaymentTotal(p), 0);
     const totalSalaries = salaries.reduce((acc, s) => acc + (parseFloat(s.amount) || 0), 0);
     const totalOtherExpenses = (expenses || []).reduce((acc, e) => acc + (parseFloat(e.amount) || 0), 0);
     const totalExpenses = totalSalaries + totalOtherExpenses;
@@ -344,17 +553,80 @@ const FinanceDashboard = () => {
                           <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{student?.major}</p>
                         </td>
                         <td style={tdStyle}><span style={{ fontWeight: '700' }}>{p.month}</span></td>
-                        <td style={tdStyle}><span style={{ fontWeight: '900', color: 'var(--success)' }}>{p.amount.toLocaleString()} DH</span></td>
+                        <td style={tdStyle}>
+                          <span style={{ fontWeight: '900', color: 'var(--success)' }}>{formatMoney(getPaymentTotal(p))} DH</span>
+                          {getPaymentFeeItems(p).length > 0 && (
+                            <p style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', marginTop: '3px' }}>
+                              Frais inclus
+                            </p>
+                          )}
+                        </td>
                         <td style={tdStyle}><span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{p.date}</span></td>
                         <td style={tdStyle}><span className="badge-status success">{p.status}</span></td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                            <button onClick={() => generateReceipt(p, student)} className="action-btn" title="Reçu"><FileText size={16} /></button>
-                            <button onClick={async () => {
-                              if (await confirmAction({ title: "Supprimer paiement ?", message: "Voulez-vous supprimer ce reçu de paiement ?", type: "danger" })) {
-                                deletePayment(p.id);
-                              }
-                            }} className="action-btn delete"><Trash2 size={16} /></button>
+                            <motion.button
+                              whileHover={{ scale: 1.08, translateY: -1 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => generateReceipt(p, student)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '10px',
+                                background: 'rgba(176, 104, 185, 0.08)',
+                                border: '1px solid rgba(176, 104, 185, 0.15)',
+                                color: 'var(--primary)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = 'var(--primary)';
+                                e.currentTarget.style.color = '#ffffff';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = 'rgba(176, 104, 185, 0.08)';
+                                e.currentTarget.style.color = 'var(--primary)';
+                              }}
+                              title="Reçu PDF"
+                            >
+                              <FileDown size={16} />
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.08, translateY: -1 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={async () => {
+                                if (await confirmAction({ title: "Supprimer paiement ?", message: "Voulez-vous supprimer ce reçu de paiement ?", type: "danger" })) {
+                                  deletePayment(p.id);
+                                }
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '10px',
+                                background: 'rgba(239, 68, 68, 0.08)',
+                                border: '1px solid rgba(239, 68, 68, 0.15)',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = '#ef4444';
+                                e.currentTarget.style.color = '#ffffff';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                                e.currentTarget.style.color = '#ef4444';
+                              }}
+                              title="Supprimer"
+                            >
+                              <Trash2 size={16} />
+                            </motion.button>
                           </div>
                         </td>
                       </tr>
@@ -448,7 +720,17 @@ const FinanceDashboard = () => {
                             }
                           } else {
                             if (await confirmAction({ title: "Confirmer paiement ?", message: `Valider le salaire de ${s.total.toLocaleString()} DH pour ${s.name} ?`, type: "warning" })) {
-                              await addSalary({ teacherId: s.id, teacherName: s.name, amount: s.total, hours: s.hours, month: months[salaryFilter.month], year: salaryFilter.year, date: new Date().toISOString().split('T')[0] });
+                              await addSalary({
+                                teacherId: s.id,
+                                teacherName: s.name,
+                                amount: s.total,
+                                hours: s.hours,
+                                hourlyRate: s.hourlyRate,
+                                sessions: getTeacherMonthlySessionRows(teacherAttendance, s.id, salaryFilter.month, salaryFilter.year),
+                                month: months[salaryFilter.month],
+                                year: salaryFilter.year,
+                                date: new Date().toISOString().split('T')[0]
+                              });
                             }
                           }
                         }}
@@ -510,11 +792,69 @@ const FinanceDashboard = () => {
                       <td style={tdStyle}><span style={{ fontWeight: '800' }}>{s.amount.toLocaleString()} DH</span></td>
                       <td style={tdStyle}>{s.date}</td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <button onClick={async () => {
-                          if (await confirmAction({ title: "Supprimer ?", message: "Voulez-vous supprimer cet historique ?", type: "danger" })) {
-                            deleteSalary(s.id);
-                          }
-                        }} className="action-btn delete"><Trash2 size={16} /></button>
+                        <motion.button
+                          whileHover={{ scale: 1.08, translateY: -1 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => generateTeacherReceipt(s)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: 'rgba(176, 104, 185, 0.08)',
+                            border: '1px solid rgba(176, 104, 185, 0.15)',
+                            color: 'var(--primary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            marginRight: '8px'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--primary)';
+                            e.currentTarget.style.color = '#ffffff';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'rgba(176, 104, 185, 0.08)';
+                            e.currentTarget.style.color = 'var(--primary)';
+                          }}
+                          title="Reçu formateur PDF"
+                        >
+                          <FileDown size={16} />
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.08, translateY: -1 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={async () => {
+                            if (await confirmAction({ title: "Supprimer ?", message: "Voulez-vous supprimer cet historique ?", type: "danger" })) {
+                              deleteSalary(s.id);
+                            }
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.15)',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = '#ef4444';
+                            e.currentTarget.style.color = '#ffffff';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                            e.currentTarget.style.color = '#ef4444';
+                          }}
+                          title="Supprimer"
+                        >
+                          <Trash2 size={16} />
+                        </motion.button>
                       </td>
                     </tr>
                   ))}
@@ -605,11 +945,39 @@ const FinanceDashboard = () => {
                       <td style={tdStyle}><span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{e.date}</span></td>
                       <td style={tdStyle}><span style={{ fontWeight: '900', color: 'var(--danger)' }}>{parseFloat(e.amount).toLocaleString()} DH</span></td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <button onClick={async () => {
-                          if (await confirmAction({ title: "Supprimer la charge ?", message: `Voulez-vous supprimer "${e.label}" ?`, type: "danger" })) {
-                            deleteExpense(e.id);
-                          }
-                        }} className="action-btn delete"><Trash2 size={16} /></button>
+                        <motion.button
+                          whileHover={{ scale: 1.08, translateY: -1 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={async () => {
+                            if (await confirmAction({ title: "Supprimer la charge ?", message: `Voulez-vous supprimer "${e.label}" ?`, type: "danger" })) {
+                              deleteExpense(e.id);
+                            }
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.15)',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = '#ef4444';
+                            e.currentTarget.style.color = '#ffffff';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                            e.currentTarget.style.color = '#ef4444';
+                          }}
+                          title="Supprimer"
+                        >
+                          <Trash2 size={16} />
+                        </motion.button>
                       </td>
                     </tr>
                   ))}
@@ -738,7 +1106,7 @@ const FinanceDashboard = () => {
         {showPaymentModal && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(6px)' }} onClick={() => setShowPaymentModal(false)} />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-premium" style={{ position: 'relative', width: '100%', maxWidth: '500px', padding: '32px', borderRadius: 'var(--radius-3xl)', boxShadow: 'var(--shadow-xl)' }}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-premium" style={{ position: 'relative', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', padding: '32px', borderRadius: 'var(--radius-3xl)', boxShadow: 'var(--shadow-xl)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: '900' }}>Enregistrer un Paiement</h2>
                 <button onClick={() => setShowPaymentModal(false)} className="action-btn"><X size={20} /></button>
@@ -801,12 +1169,43 @@ const FinanceDashboard = () => {
                     </select>
                   </div>
                 </div>
+                <div style={{ background: 'var(--bg-subtle)', borderRadius: 'var(--radius-xl)', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <p style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Frais optionnels</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                    {PAYMENT_FEE_FIELDS.map(({ key, label }) => (
+                      <div key={key}>
+                        <label style={{ ...lbl, fontSize: '9px' }}>{label}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          className="input-premium"
+                          style={{ width: '100%', marginTop: '4px', fontSize: '12px' }}
+                          placeholder="0"
+                          value={paymentData[key]}
+                          onChange={(e) => setPaymentData({ ...paymentData, [key]: e.target.value })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid var(--border-light)' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-secondary)' }}>Total à encaisser</span>
+                    <span style={{ fontSize: '16px', fontWeight: '900', color: 'var(--success)' }}>{formatMoney(paymentGrandTotal)} DH</span>
+                  </div>
+                </div>
                 <button className="btn-modern primary" style={{ width: '100%', padding: '14px', justifyContent: 'center' }}
                   onClick={async () => {
-                    if (!paymentData.studentId || !paymentData.amount) return showToast('Champs requis', 'warning');
-                    await addPayment(paymentData);
+                    if (!paymentData.studentId || paymentGrandTotal <= 0) return showToast('Stagiaire et montant requis', 'warning');
+                    const fees = PAYMENT_FEE_FIELDS
+                      .map(({ key, label }) => ({ key, label, amount: parseFloat(paymentData[key]) || 0 }))
+                      .filter(fee => fee.amount > 0);
+                    await addPayment({
+                      ...paymentData,
+                      tuitionAmount: paymentBaseAmount,
+                      amount: paymentGrandTotal,
+                      fees
+                    });
                     setShowPaymentModal(false);
-                    setPaymentData({ ...paymentData, studentId: '', amount: '' });
+                    setPaymentData({ ...paymentData, studentId: '', amount: '', examFee: '', registrationFee: '', supportFee: '' });
                     setPaymentModalFilter({ diploma: '', major: '', year: '' });
                   }}><CreditCard size={18} style={{ marginRight: '8px' }} /> Valider l'encaissement</button>
               </div>
